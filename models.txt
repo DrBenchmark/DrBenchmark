@@ -1,0 +1,7 @@
+almanach/camemberta-base
+camembert-base
+flaubert/flaubert_base_uncased
+Dr-BERT/DrBERT-7GB
+Dr-BERT/DrBERT-4GB-CP-PubMedBERT
+almanach/camembert-bio-base
+microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext

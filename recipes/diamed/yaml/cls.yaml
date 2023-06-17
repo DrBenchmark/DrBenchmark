@@ -1,0 +1,10 @@
+epochs: 10
+model_name: Dr-BERT/DrBERT-7GB
+batch_size: 16
+max_position_embeddings: 512
+weight_decay: 0.01
+learning_rate: 2e-5
+output_dir: "../save_models/"
+data_dir: "../data/"
+subset: null
+fewshot: 1.0
