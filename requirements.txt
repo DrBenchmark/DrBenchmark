@@ -1,5 +1,0 @@
-transformers
-datasets
-seqeval
-evaluate
-pyyaml

@@ -1,1 +1,0 @@
-python download_datasets_locally.py && python download_models_locally.py && sbatch run_all_jean_zay.sh
