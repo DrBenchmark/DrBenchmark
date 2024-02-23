@@ -133,7 +133,20 @@ flaubert/flaubert_base_uncased
 ## Citing DrBenchmark
 
 ```bibtex
-TODO
+@inproceedings{labrak:hal-04470938,
+  TITLE = {{DrBenchmark: A Large Language Understanding Evaluation Benchmark for French Biomedical Domain}},
+  AUTHOR = {Labrak, Yanis and Bazoge, Adrien and El Khettari, Oumaima and Rouvier, Micka{\"e}l and Constant Dit Beaufils, Pac{\^o}me and Grabar, Natalia and Daille, B{\'e}atrice and Quiniou, Solen and Morin, Emmanuel and Gourraud, Pierre-antoine and Dufour, Richard},
+  URL = {https://hal.science/hal-04470938},
+  BOOKTITLE = {{Fourteenth Language Resources and Evaluation Conference (LREC-COLING 2024)}},
+  ADDRESS = {Torino, Italy},
+  ORGANIZATION = {{Nicoletta Calzolari and Min-Yen Kan}},
+  YEAR = {2024},
+  MONTH = May,
+  KEYWORDS = {NLP evaluation ; Benchmarking ; Medical domain ; French language ; Transformers},
+  PDF = {https://hal.science/hal-04470938/file/DrBenchmark.pdf},
+  HAL_ID = {hal-04470938},
+  HAL_VERSION = {v1},
+}
 ```
 
 ## Citing DrBert
@@ -331,7 +344,20 @@ DEFT-2021:
 DiaMED:
 
 ```bibtex
-TODO
+@inproceedings{labrak:hal-04470938,
+  TITLE = {{DrBenchmark: A Large Language Understanding Evaluation Benchmark for French Biomedical Domain}},
+  AUTHOR = {Labrak, Yanis and Bazoge, Adrien and El Khettari, Oumaima and Rouvier, Micka{\"e}l and Constant Dit Beaufils, Pac{\^o}me and Grabar, Natalia and Daille, B{\'e}atrice and Quiniou, Solen and Morin, Emmanuel and Gourraud, Pierre-antoine and Dufour, Richard},
+  URL = {https://hal.science/hal-04470938},
+  BOOKTITLE = {{Fourteenth Language Resources and Evaluation Conference (LREC-COLING 2024)}},
+  ADDRESS = {Torino, Italy},
+  ORGANIZATION = {{Nicoletta Calzolari and Min-Yen Kan}},
+  YEAR = {2024},
+  MONTH = May,
+  KEYWORDS = {NLP evaluation ; Benchmarking ; Medical domain ; French language ; Transformers},
+  PDF = {https://hal.science/hal-04470938/file/DrBenchmark.pdf},
+  HAL_ID = {hal-04470938},
+  HAL_VERSION = {v1},
+}
 ```
 
 PxCorpus:
