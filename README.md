@@ -27,7 +27,7 @@ More information on managing environments with Anaconda can be found in [the con
 Once you have created your Python environment (Python 3.9+) you can simply type:
 
 ```bash
-git clone https://github.com/mrouvier/drbenchmark.git
+git clone https://github.com/DrBenchmark/DrBenchmark.git
 cd DrBenchmark
 pip install -r requirements.txt
 ```
@@ -36,11 +36,12 @@ pip install -r requirements.txt
 
 ```bash
 module purge
+module load git-lfs/3.3.0
 module load pytorch-gpu/py3/1.12.1
 ```
 
 ```bash
-git clone https://github.com/mrouvier/drbenchmark.git
+git clone https://github.com/DrBenchmark/DrBenchmark.git
 cd DrBenchmark
 pip install -r requirements.txt
 ```
