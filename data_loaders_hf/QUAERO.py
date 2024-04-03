@@ -55,6 +55,8 @@ All questions regarding the task or data should be addressed to aurelie.neveol@l
 	
 _LABELS_BASE = ['DISO', 'DEVI', 'CHEM', 'GEOG', 'OBJC', 'PHEN', 'PHYS', 'LIVB', 'PROC', 'ANAT']
 
+_URL = "https://quaerofrenchmed.limsi.fr/QUAERO_FrenchMed_brat.zip"
+
 class QUAERO(datasets.GeneratorBasedBuilder):
 	"""QUAERO dataset."""
 

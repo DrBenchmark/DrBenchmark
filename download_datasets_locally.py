@@ -30,6 +30,13 @@ ds = [
     ["ESSAI", "ner_spec"],    
 ]
 
+
+ds = [
+    ["QUAERO", "emea"],
+    ["QUAERO", "medline"],
+]
+
+
 def save_locally(arr):
 
     print(arr)
