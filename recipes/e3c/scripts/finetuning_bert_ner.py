@@ -156,7 +156,7 @@ def main():
     os.makedirs(args.output_dir, exist_ok=True)
     output_name = f"DrBenchmark-E3C-ner-{args.subset}-{str(uuid.uuid4().hex)}"
 
-    training_args = TrainingArgumentsWithMPSSupport(
+    training_args = TrainingArguments(
         f"{args.output_dir}/{output_name}",
         evaluation_strategy="epoch",
         save_strategy="epoch",
