@@ -65,15 +65,19 @@ flaubert/flaubert_base_uncased
 
 ## Run the benchmark
 
+**On local:**
+
+1. `run.sh`
+
 **On local SLURM:**
 
-1. `sbatch run_all.sh`
+1. `sbatch run_slurm.sh`
 
 **On Jean-Zay SLURM:**
 
 1. `idr_compuse`
-2. `nano run_all_jean_zay.sh` (replace the account identifier with the one from idr_compuse)
-3. `sbatch run_all_jean_zay.sh`
+2. `nano run_jean_zay.sh` (replace the account identifier with the one from idr_compuse)
+3. `sbatch run_jean_zay.sh`
 
 ## Tasks
 
