@@ -57,6 +57,8 @@ This version only contain the annotated CAS corpus
 
 _HOMEPAGE = "https://clementdalloux.fr/?page_id=28"
 
+_URL = "https://drbenchmark.univ-avignon.fr/corpus/cas_essai.zip"
+
 _LICENSE = 'Data User Agreement'
 
 class CAS(datasets.GeneratorBasedBuilder):
@@ -133,13 +135,15 @@ class CAS(datasets.GeneratorBasedBuilder):
         )
 
     def _split_generators(self, dl_manager):
+        data_dir = dl_manager.download_and_extract(_URL).rstrip("/")
 
+        '''
         if self.config.data_dir is None:
             raise ValueError("This is a local dataset. Please pass the data_dir kwarg to load_dataset.")
         
         else:
             data_dir = self.config.data_dir
-            
+        ''' 
         return [
             datasets.SplitGenerator(
                 name=datasets.Split.TRAIN,
@@ -175,9 +179,9 @@ class CAS(datasets.GeneratorBasedBuilder):
         unique_id_doc = []
 
         if self.config.name.find("ner") != -1:
-            docs = [f"CAS_{subset}.txt"]
+            docs = [f"corpora/CAS_{subset}.txt"]
         else:
-            docs = ["CAS_neg.txt", "CAS_spec.txt"]
+            docs = ["corpora/CAS_neg.txt", "corpora/CAS_spec.txt"]
 
         for file in docs:
 

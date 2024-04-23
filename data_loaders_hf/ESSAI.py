@@ -39,9 +39,11 @@ _HOMEPAGE = "https://clementdalloux.fr/?page_id=28"
 
 _LICENSE = 'Data User Agreement'
 
+_URL = "https://drbenchmark.univ-avignon.fr/corpus/cas_essai.zip"
+
 class ESSAI(datasets.GeneratorBasedBuilder):
 
-    DEFAULT_CONFIG_NAME = "pos_spec"
+    DEFAULT_CONFIG_NAME = "pos"
 
     BUILDER_CONFIGS = [
         datasets.BuilderConfig(name="pos", version="1.0.0", description="The ESSAI corpora - POS Speculation task"),
@@ -111,11 +113,15 @@ class ESSAI(datasets.GeneratorBasedBuilder):
 
     def _split_generators(self, dl_manager):
 
+        data_dir = dl_manager.download_and_extract(_URL).rstrip("/")
+
+        '''
         if self.config.data_dir is None:
             raise ValueError("This is a local dataset. Please pass the data_dir kwarg to load_dataset.")
         
         else:
             data_dir = self.config.data_dir
+        '''
             
         return [
             datasets.SplitGenerator(
@@ -152,9 +158,9 @@ class ESSAI(datasets.GeneratorBasedBuilder):
         unique_id_doc = []
 
         if self.config.name.find("ner") != -1:
-            docs = [f"ESSAI_{subset}.txt"]
+            docs = [f"corpora/ESSAI_{subset}.txt"]
         else:
-            docs = ["ESSAI_neg.txt", "ESSAI_spec.txt"]
+            docs = ["corpora/ESSAI_neg.txt", "corpora/ESSAI_spec.txt"]
 
         for file in docs:
 
