@@ -2,8 +2,8 @@ from datasets import load_dataset
 
 ds = [
     ["CLISTER", None],
-    ["DEFT2020", "task_1"],
-    ["DEFT2020", "task_2"],
+#    ["DEFT2020", "task_1"],
+#    ["DEFT2020", "task_2"],
     ["E3C", "French_clinical"],
     ["E3C", "French_temporal"],
     ["FrenchMedMCQA", None],
@@ -15,9 +15,9 @@ ds = [
     ["QUAERO", "medline"],
     ["PxCorpus", None],
     ["DiaMED", None],
-    ["DEFT2019", None],
-    ["DEFT2021", "cls"],
-    ["DEFT2021", "ner"],
+#    ["DEFT2019", None],
+#    ["DEFT2021", "cls"],
+#    ["DEFT2021", "ner"],
     
     ["CAS", "pos"],
     ["CAS", "cls"],
@@ -31,11 +31,6 @@ ds = [
 ]
 
 
-ds = [
-    ["QUAERO", "emea"],
-    ["QUAERO", "medline"],
-]
-
 
 def save_locally(arr):
 
@@ -44,7 +39,7 @@ def save_locally(arr):
     corpus, subset = arr
 
     dataset = load_dataset(
-        f"Dr-BERT/{corpus}",
+        f"data_loaders_hf/{corpus}.py",
         subset,
         data_dir=f"./recipes/{corpus.lower()}/data/",
     )
