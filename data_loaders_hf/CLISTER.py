@@ -44,6 +44,9 @@ _HOMEPAGE = "https://gitlab.inria.fr/codeine/clister"
 
 _LICENSE = "unknown"
 
+_URL = "https://drbenchmark.univ-avignon.fr/corpus/clister.tar.gz"
+
+
 class CLISTER(datasets.GeneratorBasedBuilder):
 
     DEFAULT_CONFIG_NAME = "source"
@@ -75,8 +78,9 @@ class CLISTER(datasets.GeneratorBasedBuilder):
         )
 
     def _split_generators(self, dl_manager):
+        data_dir = dl_manager.download_and_extract(_URL).rstrip("/")
 
-        data_dir = self.config.data_dir.rstrip("/")
+        #data_dir = self.config.data_dir.rstrip("/")
             
         return [
             datasets.SplitGenerator(
