@@ -38,6 +38,7 @@ pip install -r requirements.txt
 module purge
 module load git-lfs/3.3.0
 module load pytorch-gpu/py3/1.12.1
+git lfs install
 ```
 
 ```bash
