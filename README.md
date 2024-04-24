@@ -131,7 +131,7 @@ flaubert/flaubert_base_uncased
 
 [DEFT-2021](https://aclanthology.org/2021.jeptalnrecital-deft.1/) is a corpus annotated on two tasks: (i) multi-label classification and (ii) named-entity recognition. This task aims at identifying patient's clinical profile on the basis of the diseases, signs or symptoms mentioned in a subset of 275 clinical cases taken from DEFT-2019. The corpus is annotated with 23 axes derived from Chapter C of Medical Subject Headings (MeSH)
 
-[DiaMED]() is a corpus of XXX clinical cases manually annotated in major diagnostic categories (CMD). These CMD classes are a clinical classification composed of 28 classes, most often corresponding to a functional system (nervous system, eyes, ...) and allowing the assignment of patients to a particular hospital service.
+[DiaMED]() is a corpus of 739 clinical cases manually annotated in major diagnostic categories (CMD). These CMD classes are a clinical classification composed of 28 classes, most often corresponding to a functional system (nervous system, eyes, ...) and allowing the assignment of patients to a particular hospital service.
 
 [PxCorpus](https://zenodo.org/record/6524162) is the first open-sourced corpus of spoken language understanding on medical drug prescriptions. It contains 4 hours of transcribed and annotated dialogues of drug prescriptions in French acquired through an experiment with 55 experts and non-experts participants. In total, the dataset includes 1,981 recordings of 55 participants (38\% non-experts, 25\% doctors, 36\% medical practitioners), manually transcribed and semantically annotated. The first task consist of classifying the textual utterances into one of 4 intent classes (Appendix~\ref{sec:classes-pxcorpus}). The second one consist of a named entity recognition task where each word of a sequence is classified into one of the 38 classes and formatted at the IOB2 format.
 
@@ -140,18 +140,18 @@ flaubert/flaubert_base_uncased
 
 ```bibtex
 @inproceedings{labrak:hal-04470938,
-  TITLE = {{DrBenchmark: A Large Language Understanding Evaluation Benchmark for French Biomedical Domain}},
-  AUTHOR = {Labrak, Yanis and Bazoge, Adrien and El Khettari, Oumaima and Rouvier, Micka{\"e}l and Constant Dit Beaufils, Pac{\^o}me and Grabar, Natalia and Daille, B{\'e}atrice and Quiniou, Solen and Morin, Emmanuel and Gourraud, Pierre-antoine and Dufour, Richard},
-  URL = {https://hal.science/hal-04470938},
-  BOOKTITLE = {{Fourteenth Language Resources and Evaluation Conference (LREC-COLING 2024)}},
-  ADDRESS = {Torino, Italy},
-  ORGANIZATION = {{Nicoletta Calzolari and Min-Yen Kan}},
-  YEAR = {2024},
-  MONTH = May,
-  KEYWORDS = {NLP evaluation ; Benchmarking ; Medical domain ; French language ; Transformers},
-  PDF = {https://hal.science/hal-04470938/file/DrBenchmark.pdf},
-  HAL_ID = {hal-04470938},
-  HAL_VERSION = {v1},
+  title = {{DrBenchmark: A Large Language Understanding Evaluation Benchmark for French Biomedical Domain}},
+  author = {Labrak, Yanis and Bazoge, Adrien and El Khettari, Oumaima and Rouvier, Micka{\"e}l and Constant Dit Beaufils, Pac{\^o}me and Grabar, Natalia and Daille, B{\'e}atrice and Quiniou, Solen and Morin, Emmanuel and Gourraud, Pierre-antoine and Dufour, Richard},
+  url = {https://hal.science/hal-04470938},
+  booktitle = {{Fourteenth Language Resources and Evaluation Conference (LREC-COLING 2024)}},
+  address = {Torino, Italy},
+  organization = {{Nicoletta Calzolari and Min-Yen Kan}},
+  year = {2024},
+  month = May,
+  keywords = {NLP evaluation ; Benchmarking ; Medical domain ; French language ; Transformers},
+  pdf = {https://hal.science/hal-04470938/file/DrBenchmark.pdf},
+  hal_id = {hal-04470938},
+  hal_version = {v1},
 }
 ```
 
@@ -159,12 +159,12 @@ flaubert/flaubert_base_uncased
 
 ```bibtex
 @misc{labrak2023drbert,
-      title={DrBERT: A Robust Pre-trained Model in French for Biomedical and Clinical domains}, 
-      author={Yanis Labrak and Adrien Bazoge and Richard Dufour and Mickael Rouvier and Emmanuel Morin and Béatrice Daille and Pierre-Antoine Gourraud},
-      year={2023},
-      eprint={2304.00958},
-      archivePrefix={arXiv},
-      primaryClass={cs.CL}
+  title={DrBERT: A Robust Pre-trained Model in French for Biomedical and Clinical domains}, 
+  author={Yanis Labrak and Adrien Bazoge and Richard Dufour and Mickael Rouvier and Emmanuel Morin and Béatrice Daille and Pierre-Antoine Gourraud},
+  year={2023},
+  eprint={2304.00958},
+  archivePrefix={arXiv},
+  primaryClass={cs.CL}
 }
 ```
 
@@ -226,24 +226,30 @@ E3C:
 ```
 
 MorFITT:
+
 ```bibtex
-Comming Soon
+@inproceedings{labrak2023morfitt,
+  title={MORFITT: A multi-label corpus of French scientific articles in the biomedical domain},
+  author={Labrak, Yanis and Rouvier, Micka{\"e}l and Dufour, Richard},
+  booktitle={30e Conf{\'e}rence sur le Traitement Automatique des Langues Naturelles (TALN) Atelier sur l'Analyse et la Recherche de Textes Scientifiques},
+  year={2023}
+}
 ```
 
 FrenchMedMCQA:
 
 ```bibtex
 @inproceedings{labrak:hal-03824241,
-  TITLE = {{FrenchMedMCQA: A French Multiple-Choice Question Answering Dataset for Medical domain}},
-  AUTHOR = {Labrak, Yanis and Bazoge, Adrien and Dufour, Richard and Daille, B{\'e}atrice and Gourraud, Pierre-Antoine and Morin, Emmanuel and Rouvier, Mickael},
-  URL = {https://hal.archives-ouvertes.fr/hal-03824241},
-  BOOKTITLE = {{Proceedings of the 13th International Workshop on Health Text Mining and Information Analysis (LOUHI)}},
-  ADDRESS = {Abou Dhabi, United Arab Emirates},
-  YEAR = {2022},
-  MONTH = Dec,
-  PDF = {https://hal.archives-ouvertes.fr/hal-03824241/file/LOUHI_2022___QA-3.pdf},
-  HAL_ID = {hal-03824241},
-  HAL_VERSION = {v1},
+  title = {{FrenchMedMCQA: A French Multiple-Choice Question Answering Dataset for Medical domain}},
+  author = {Labrak, Yanis and Bazoge, Adrien and Dufour, Richard and Daille, B{\'e}atrice and Gourraud, Pierre-Antoine and Morin, Emmanuel and Rouvier, Mickael},
+  url = {https://hal.archives-ouvertes.fr/hal-03824241},
+  booktitle = {{Proceedings of the 13th International Workshop on Health Text Mining and Information Analysis (LOUHI)}},
+  address = {Abou Dhabi, United Arab Emirates},
+  year = {2022},
+  month = Dec,
+  pdf = {https://hal.archives-ouvertes.fr/hal-03824241/file/LOUHI_2022___QA-3.pdf},
+  hal_id = {hal-03824241},
+  hal_version = {v1},
 }
 ```
 
@@ -251,19 +257,19 @@ Mantra-GSC:
 
 ```bibtex
 @article{10.1093/jamia/ocv037,
-    author = {Kors, Jan A and Clematide, Simon and Akhondi, Saber A and van Mulligen, Erik M and Rebholz-Schuhmann, Dietrich},
-    title = "{A multilingual gold-standard corpus for biomedical concept recognition: the Mantra GSC}",
-    journal = {Journal of the American Medical Informatics Association},
-    volume = {22},
-    number = {5},
-    pages = {948-956},
-    year = {2015},
-    month = {05},
-    abstract = "{Objective To create a multilingual gold-standard corpus for biomedical concept recognition.Materials and methods We selected text units from different parallel corpora (Medline abstract titles, drug labels, biomedical patent claims) in English, French, German, Spanish, and Dutch. Three annotators per language independently annotated the biomedical concepts, based on a subset of the Unified Medical Language System and covering a wide range of semantic groups. To reduce the annotation workload, automatically generated preannotations were provided. Individual annotations were automatically harmonized and then adjudicated, and cross-language consistency checks were carried out to arrive at the final annotations.Results The number of final annotations was 5530. Inter-annotator agreement scores indicate good agreement (median F-score 0.79), and are similar to those between individual annotators and the gold standard. The automatically generated harmonized annotation set for each language performed equally well as the best annotator for that language.Discussion The use of automatic preannotations, harmonized annotations, and parallel corpora helped to keep the manual annotation efforts manageable. The inter-annotator agreement scores provide a reference standard for gauging the performance of automatic annotation techniques.Conclusion To our knowledge, this is the first gold-standard corpus for biomedical concept recognition in languages other than English. Other distinguishing features are the wide variety of semantic groups that are being covered, and the diversity of text genres that were annotated.}",
-    issn = {1067-5027},
-    doi = {10.1093/jamia/ocv037},
-    url = {https://doi.org/10.1093/jamia/ocv037},
-    eprint = {https://academic.oup.com/jamia/article-pdf/22/5/948/34146393/ocv037.pdf},
+  author = {Kors, Jan A and Clematide, Simon and Akhondi, Saber A and van Mulligen, Erik M and Rebholz-Schuhmann, Dietrich},
+  title = "{A multilingual gold-standard corpus for biomedical concept recognition: the Mantra GSC}",
+  journal = {Journal of the American Medical Informatics Association},
+  volume = {22},
+  number = {5},
+  pages = {948-956},
+  year = {2015},
+  month = {05},
+  abstract = "{Objective To create a multilingual gold-standard corpus for biomedical concept recognition.Materials and methods We selected text units from different parallel corpora (Medline abstract titles, drug labels, biomedical patent claims) in English, French, German, Spanish, and Dutch. Three annotators per language independently annotated the biomedical concepts, based on a subset of the Unified Medical Language System and covering a wide range of semantic groups. To reduce the annotation workload, automatically generated preannotations were provided. Individual annotations were automatically harmonized and then adjudicated, and cross-language consistency checks were carried out to arrive at the final annotations.Results The number of final annotations was 5530. Inter-annotator agreement scores indicate good agreement (median F-score 0.79), and are similar to those between individual annotators and the gold standard. The automatically generated harmonized annotation set for each language performed equally well as the best annotator for that language.Discussion The use of automatic preannotations, harmonized annotations, and parallel corpora helped to keep the manual annotation efforts manageable. The inter-annotator agreement scores provide a reference standard for gauging the performance of automatic annotation techniques.Conclusion To our knowledge, this is the first gold-standard corpus for biomedical concept recognition in languages other than English. Other distinguishing features are the wide variety of semantic groups that are being covered, and the diversity of text genres that were annotated.}",
+  issn = {1067-5027},
+  doi = {10.1093/jamia/ocv037},
+  url = {https://doi.org/10.1093/jamia/ocv037},
+  eprint = {https://academic.oup.com/jamia/article-pdf/22/5/948/34146393/ocv037.pdf},
 }
 ```
 
@@ -271,19 +277,16 @@ CLISTER:
 
 ```bibtex
 @inproceedings{hiebel-etal-2022-clister-corpus,
-    title = "{CLISTER} : A Corpus for Semantic Textual Similarity in {F}rench Clinical Narratives",
-    author = {Hiebel, Nicolas  and
-      Ferret, Olivier  and
-      Fort, Kar{\"e}n  and
-      N{\'e}v{\'e}ol, Aur{\'e}lie},
-    booktitle = "Proceedings of the Thirteenth Language Resources and Evaluation Conference",
-    month = jun,
-    year = "2022",
-    address = "Marseille, France",
-    publisher = "European Language Resources Association",
-    url = "https://aclanthology.org/2022.lrec-1.459",
-    pages = "4306--4315",
-    abstract = "Modern Natural Language Processing relies on the availability of annotated corpora for training and evaluating models. Such resources are scarce, especially for specialized domains in languages other than English. In particular, there are very few resources for semantic similarity in the clinical domain in French. This can be useful for many biomedical natural language processing applications, including text generation. We introduce a definition of similarity that is guided by clinical facts and apply it to the development of a new French corpus of 1,000 sentence pairs manually annotated according to similarity scores. This new sentence similarity corpus is made freely available to the community. We further evaluate the corpus through experiments of automatic similarity measurement. We show that a model of sentence embeddings can capture similarity with state-of-the-art performance on the DEFT STS shared task evaluation data set (Spearman=0.8343). We also show that the corpus is complementary to DEFT STS.",
+  title = "{CLISTER} : A Corpus for Semantic Textual Similarity in {F}rench Clinical Narratives",
+  author = {Hiebel, Nicolas  and Ferret, Olivier and Fort, Kar{\"e}n and N{\'e}v{\'e}ol, Aur{\'e}lie},
+  booktitle = "Proceedings of the Thirteenth Language Resources and Evaluation Conference",
+  month = jun,
+  year = "2022",
+  address = "Marseille, France",
+  publisher = "European Language Resources Association",
+  url = "https://aclanthology.org/2022.lrec-1.459",
+  pages = "4306--4315",
+  abstract = "Modern Natural Language Processing relies on the availability of annotated corpora for training and evaluating models. Such resources are scarce, especially for specialized domains in languages other than English. In particular, there are very few resources for semantic similarity in the clinical domain in French. This can be useful for many biomedical natural language processing applications, including text generation. We introduce a definition of similarity that is guided by clinical facts and apply it to the development of a new French corpus of 1,000 sentence pairs manually annotated according to similarity scores. This new sentence similarity corpus is made freely available to the community. We further evaluate the corpus through experiments of automatic similarity measurement. We show that a model of sentence embeddings can capture similarity with state-of-the-art performance on the DEFT STS shared task evaluation data set (Spearman=0.8343). We also show that the corpus is complementary to DEFT STS.",
 }
 ```
 
@@ -291,18 +294,18 @@ DEFT-2019:
 
 ```bibtex
 @inproceedings{Grabar-Grouin-Hamon-Claveau:DEFT:2019,
-    author = "Grabar, Natalia and Grouin, Cyril and Hamon, Thierry and Claveau, Vincent",
-    title = "Recherche et extraction d'information dans des cas cliniques. Pr\'esentation de la campagne d'\'evaluation DEFT 2019",
-    booktitle = "Actes de la Conf\'erence sur le Traitement Automatique des Langues Naturelles (TALN)  PFIA 2019. D\'efi Fouille de Textes (atelier TALN-RECITAL)",
-    month = "7",
-    year = "2019",
-    address = "Toulouse, France",
-    publisher = "Association pour le Traitement Automatique des Langues",
-    pages = "7-16",
-    note = "Information Retrieval and Information Extraction from Clinical Cases",
-    abstract = "Cet article pr\'esente la campagne d'\'evaluation DEFT 2019 sur l'analyse de textes cliniques r\'edig\'es en fran\c{c}ais. Le corpus se compose de cas cliniques publi\'es et discut\'es dans des articles scientifiques, et index\'es par des mots-cl\'es. Nous proposons trois t\^aches ind\'ependantes : l'indexation des cas cliniques et discussions, \'evalu\'ee prioritairement par la MAP (mean average precision), l'appariement entre cas cliniques et discussions, \'evalu\'e au moyen d'une pr\'ecision, et l'extraction d'information parmi quatre cat\'egories (\^age, genre, origine de la consultation, issue), \'evalu\'ee en termes de rappel, pr\'ecision et F-mesure. Nous pr\'esentons les r\'esultats obtenus par les participants sur chaque t\^ache.",
-    keywords = "Cas clinique, fouille de texte, extraction d'information, recherche d'information,  \'evaluation.",
-    url = "http://talnarchives.atala.org/ateliers/2019/DEFT/1.pdf"
+  author = "Grabar, Natalia and Grouin, Cyril and Hamon, Thierry and Claveau, Vincent",
+  title = "Recherche et extraction d'information dans des cas cliniques. Pr\'esentation de la campagne d'\'evaluation DEFT 2019",
+  booktitle = "Actes de la Conf\'erence sur le Traitement Automatique des Langues Naturelles (TALN)  PFIA 2019. D\'efi Fouille de Textes (atelier TALN-RECITAL)",
+  month = "7",
+  year = "2019",
+  address = "Toulouse, France",
+  publisher = "Association pour le Traitement Automatique des Langues",
+  pages = "7-16",
+  note = "Information Retrieval and Information Extraction from Clinical Cases",
+  abstract = "Cet article pr\'esente la campagne d'\'evaluation DEFT 2019 sur l'analyse de textes cliniques r\'edig\'es en fran\c{c}ais. Le corpus se compose de cas cliniques publi\'es et discut\'es dans des articles scientifiques, et index\'es par des mots-cl\'es. Nous proposons trois t\^aches ind\'ependantes : l'indexation des cas cliniques et discussions, \'evalu\'ee prioritairement par la MAP (mean average precision), l'appariement entre cas cliniques et discussions, \'evalu\'e au moyen d'une pr\'ecision, et l'extraction d'information parmi quatre cat\'egories (\^age, genre, origine de la consultation, issue), \'evalu\'ee en termes de rappel, pr\'ecision et F-mesure. Nous pr\'esentons les r\'esultats obtenus par les participants sur chaque t\^ache.",
+  keywords = "Cas clinique, fouille de texte, extraction d'information, recherche d'information,  \'evaluation.",
+  url = "http://talnarchives.atala.org/ateliers/2019/DEFT/1.pdf"
 }
 ```
 
@@ -310,20 +313,17 @@ DEFT-2020:
 
 ```bibtex
 @inproceedings{cardon-etal-2020-presentation,
-    title = "Pr{\'e}sentation de la campagne d{'}{\'e}valuation {DEFT} 2020 : similarit{\'e} textuelle en domaine ouvert et extraction d{'}information pr{\'e}cise dans des cas cliniques (Presentation of the {DEFT} 2020 Challenge : open domain textual similarity and precise information extraction from clinical cases )",
-    author = "Cardon, R{\'e}mi  and
-      Grabar, Natalia  and
-      Grouin, Cyril  and
-      Hamon, Thierry",
-    booktitle = "Actes de la 6e conf{\'e}rence conjointe Journ{\'e}es d'{\'E}tudes sur la Parole (JEP, 33e {\'e}dition), Traitement Automatique des Langues Naturelles (TALN, 27e {\'e}dition), Rencontre des {\'E}tudiants Chercheurs en Informatique pour le Traitement Automatique des Langues (R{\'E}CITAL, 22e {\'e}dition). Atelier D{\'E}fi Fouille de Textes",
-    month = "6",
-    year = "2020",
-    address = "Nancy, France",
-    publisher = "ATALA et AFCP",
-    url = "https://aclanthology.org/2020.jeptalnrecital-deft.1",
-    pages = "1--13",
-    abstract = "L{'}{\'e}dition 2020 du d{\'e}fi fouille de texte (DEFT) a propos{\'e} deux t{\^a}ches autour de la similarit{\'e} textuelle et une t{\^a}che d{'}extraction d{'}information. La premi{\`e}re t{\^a}che vise {\`a} identifier le degr{\'e} de similarit{\'e} entre paires de phrases sur une {\'e}chelle de 0 (le moins similaire) {\`a} 5 (le plus similaire). Les r{\'e}sultats varient de 0,65 {\`a} 0,82 d{'}EDRM. La deuxi{\`e}me t{\^a}che consiste {\`a} d{\'e}terminer la phrase la plus proche d{'}une phrase source parmi trois phrases cibles fournies, avec des r{\'e}sultats tr{\`e}s {\'e}lev{\'e}s, variant de 0,94 {\`a} 0,99 de pr{\'e}cision. Ces deux t{\^a}ches reposent sur un corpus du domaine g{\'e}n{\'e}ral et de sant{\'e}. La troisi{\`e}me t{\^a}che propose d{'}extraire dix cat{\'e}gories d{'}informations du domaine m{\'e}dical depuis le corpus de cas cliniques de DEFT 2019. Les r{\'e}sultats varient de 0,07 {\`a} 0,66 de F-mesure globale pour la sous-t{\^a}che des pathologies et signes ou sympt{\^o}mes, et de 0,14 {\`a} 0,76 pour la sous-t{\^a}che sur huit cat{\'e}gories m{\'e}dicales. Les m{\'e}thodes utilis{\'e}es reposent sur des CRF et des r{\'e}seaux de neurones.",
-    language = "French",
+  title = "Pr{\'e}sentation de la campagne d{'}{\'e}valuation {DEFT} 2020 : similarit{\'e} textuelle en domaine ouvert et extraction d{'}information pr{\'e}cise dans des cas cliniques (Presentation of the {DEFT} 2020 Challenge : open domain textual similarity and precise information extraction from clinical cases )",
+  author = "Cardon, R{\'e}mi  and Grabar, Natalia and Grouin, Cyril and Hamon, Thierry",
+  booktitle = "Actes de la 6e conf{\'e}rence conjointe Journ{\'e}es d'{\'E}tudes sur la Parole (JEP, 33e {\'e}dition), Traitement Automatique des Langues Naturelles (TALN, 27e {\'e}dition), Rencontre des {\'E}tudiants Chercheurs en Informatique pour le Traitement Automatique des Langues (R{\'E}CITAL, 22e {\'e}dition). Atelier D{\'E}fi Fouille de Textes",
+  month = "6",
+  year = "2020",
+  address = "Nancy, France",
+  publisher = "ATALA et AFCP",
+  url = "https://aclanthology.org/2020.jeptalnrecital-deft.1",
+  pages = "1--13",
+  abstract = "L{'}{\'e}dition 2020 du d{\'e}fi fouille de texte (DEFT) a propos{\'e} deux t{\^a}ches autour de la similarit{\'e} textuelle et une t{\^a}che d{'}extraction d{'}information. La premi{\`e}re t{\^a}che vise {\`a} identifier le degr{\'e} de similarit{\'e} entre paires de phrases sur une {\'e}chelle de 0 (le moins similaire) {\`a} 5 (le plus similaire). Les r{\'e}sultats varient de 0,65 {\`a} 0,82 d{'}EDRM. La deuxi{\`e}me t{\^a}che consiste {\`a} d{\'e}terminer la phrase la plus proche d{'}une phrase source parmi trois phrases cibles fournies, avec des r{\'e}sultats tr{\`e}s {\'e}lev{\'e}s, variant de 0,94 {\`a} 0,99 de pr{\'e}cision. Ces deux t{\^a}ches reposent sur un corpus du domaine g{\'e}n{\'e}ral et de sant{\'e}. La troisi{\`e}me t{\^a}che propose d{'}extraire dix cat{\'e}gories d{'}informations du domaine m{\'e}dical depuis le corpus de cas cliniques de DEFT 2019. Les r{\'e}sultats varient de 0,07 {\`a} 0,66 de F-mesure globale pour la sous-t{\^a}che des pathologies et signes ou sympt{\^o}mes, et de 0,14 {\`a} 0,76 pour la sous-t{\^a}che sur huit cat{\'e}gories m{\'e}dicales. Les m{\'e}thodes utilis{\'e}es reposent sur des CRF et des r{\'e}seaux de neurones.",
+  language = "French",
 }
 ```
 
@@ -331,19 +331,17 @@ DEFT-2021:
 
 ```bibtex
 @inproceedings{grouin-etal-2021-classification,
-    title = "Classification de cas cliniques et {\'e}valuation automatique de r{\'e}ponses d{'}{\'e}tudiants : pr{\'e}sentation de la campagne {DEFT} 2021 (Clinical cases classification and automatic evaluation of student answers : Presentation of the {DEFT} 2021 Challenge)",
-    author = "Grouin, Cyril  and
-      Grabar, Natalia  and
-      Illouz, Gabriel",
-    booktitle = "Actes de la 28e Conf{\'e}rence sur le Traitement Automatique des Langues Naturelles. Atelier D{\'E}fi Fouille de Textes (DEFT)",
-    month = "6",
-    year = "2021",
-    address = "Lille, France",
-    publisher = "ATALA",
-    url = "https://aclanthology.org/2021.jeptalnrecital-deft.1",
-    pages = "1--13",
-    abstract = "Le d{\'e}fi fouille de textes (DEFT) est une campagne d{'}{\'e}valuation annuelle francophone. Nous pr{\'e}sentons les corpus et baselines {\'e}labor{\'e}es pour trois t{\^a}ches : (i) identifier le profil clinique de patients d{\'e}crits dans des cas cliniques, (ii) {\'e}valuer automatiquement les r{\'e}ponses d{'}{\'e}tudiants sur des questionnaires en ligne (Moodle) {\`a} partir de la correction de l{'}enseignant, et (iii) poursuivre une {\'e}valuation de r{\'e}ponses d{'}{\'e}tudiants {\`a} partir de r{\'e}ponses d{\'e}j{\`a} {\'e}valu{\'e}es par l{'}enseignant. Les r{\'e}sultats varient de 0,394 {\`a} 0,814 de F-mesure sur la premi{\`e}re t{\^a}che (7 {\'e}quipes), de 0,448 {\`a} 0,682 de pr{\'e}cision sur la deuxi{\`e}me (3 {\'e}quipes), et de 0,133 {\`a} 0,510 de pr{\'e}cision sur la derni{\`e}re (3 {\'e}quipes).",
-    language = "French",
+  title = "Classification de cas cliniques et {\'e}valuation automatique de r{\'e}ponses d{'}{\'e}tudiants : pr{\'e}sentation de la campagne {DEFT} 2021 (Clinical cases classification and automatic evaluation of student answers : Presentation of the {DEFT} 2021 Challenge)",
+  author = "Grouin, Cyril and Grabar, Natalia  and Illouz, Gabriel",
+  booktitle = "Actes de la 28e Conf{\'e}rence sur le Traitement Automatique des Langues Naturelles. Atelier D{\'E}fi Fouille de Textes (DEFT)",
+  month = "6",
+  year = "2021",
+  address = "Lille, France",
+  publisher = "ATALA",
+  url = "https://aclanthology.org/2021.jeptalnrecital-deft.1",
+  pages = "1--13",
+  abstract = "Le d{\'e}fi fouille de textes (DEFT) est une campagne d{'}{\'e}valuation annuelle francophone. Nous pr{\'e}sentons les corpus et baselines {\'e}labor{\'e}es pour trois t{\^a}ches : (i) identifier le profil clinique de patients d{\'e}crits dans des cas cliniques, (ii) {\'e}valuer automatiquement les r{\'e}ponses d{'}{\'e}tudiants sur des questionnaires en ligne (Moodle) {\`a} partir de la correction de l{'}enseignant, et (iii) poursuivre une {\'e}valuation de r{\'e}ponses d{'}{\'e}tudiants {\`a} partir de r{\'e}ponses d{\'e}j{\`a} {\'e}valu{\'e}es par l{'}enseignant. Les r{\'e}sultats varient de 0,394 {\`a} 0,814 de F-mesure sur la premi{\`e}re t{\^a}che (7 {\'e}quipes), de 0,448 {\`a} 0,682 de pr{\'e}cision sur la deuxi{\`e}me (3 {\'e}quipes), et de 0,133 {\`a} 0,510 de pr{\'e}cision sur la derni{\`e}re (3 {\'e}quipes).",
+  language = "French",
 }
 ```
 
@@ -351,18 +349,18 @@ DiaMED:
 
 ```bibtex
 @inproceedings{labrak:hal-04470938,
-  TITLE = {{DrBenchmark: A Large Language Understanding Evaluation Benchmark for French Biomedical Domain}},
-  AUTHOR = {Labrak, Yanis and Bazoge, Adrien and El Khettari, Oumaima and Rouvier, Micka{\"e}l and Constant Dit Beaufils, Pac{\^o}me and Grabar, Natalia and Daille, B{\'e}atrice and Quiniou, Solen and Morin, Emmanuel and Gourraud, Pierre-antoine and Dufour, Richard},
-  URL = {https://hal.science/hal-04470938},
-  BOOKTITLE = {{Fourteenth Language Resources and Evaluation Conference (LREC-COLING 2024)}},
-  ADDRESS = {Torino, Italy},
-  ORGANIZATION = {{Nicoletta Calzolari and Min-Yen Kan}},
-  YEAR = {2024},
-  MONTH = May,
-  KEYWORDS = {NLP evaluation ; Benchmarking ; Medical domain ; French language ; Transformers},
-  PDF = {https://hal.science/hal-04470938/file/DrBenchmark.pdf},
-  HAL_ID = {hal-04470938},
-  HAL_VERSION = {v1},
+  title = {{DrBenchmark: A Large Language Understanding Evaluation Benchmark for French Biomedical Domain}},
+  author = {Labrak, Yanis and Bazoge, Adrien and El Khettari, Oumaima and Rouvier, Micka{\"e}l and Constant Dit Beaufils, Pac{\^o}me and Grabar, Natalia and Daille, B{\'e}atrice and Quiniou, Solen and Morin, Emmanuel and Gourraud, Pierre-antoine and Dufour, Richard},
+  url = {https://hal.science/hal-04470938},
+  booktitle = {{Fourteenth Language Resources and Evaluation Conference (LREC-COLING 2024)}},
+  address = {Torino, Italy},
+  organization = {{Nicoletta Calzolari and Min-Yen Kan}},
+  year = {2024},
+  month = May,
+  keywords = {NLP evaluation ; Benchmarking ; Medical domain ; French language ; Transformers},
+  pdf = {https://hal.science/hal-04470938/file/DrBenchmark.pdf},
+  hal_id = {hal-04470938},
+  hal_version = {v1},
 }
 ```
 
@@ -370,11 +368,11 @@ PxCorpus:
 
 ```bibtex
 @InProceedings{Kocabiyikoglu2022,
-  author =     "Alican Kocabiyikoglu and Fran{\c c}ois Portet and Prudence Gibert and Hervé Blanchon and Jean-Marc Babouchkine and Gaëtan Gavazzi",
-  title =     "A Spoken Drug Prescription Dataset in French for Spoken Language Understanding",
-  booktitle =     "13th Language Resources and Evaluation Conference (LREC 2022)",
-  year =     "2022",
-  location =     "Marseille, France"
+  author = "Alican Kocabiyikoglu and Fran{\c c}ois Portet and Prudence Gibert and Hervé Blanchon and Jean-Marc Babouchkine and Gaëtan Gavazzi",
+  title = "A Spoken Drug Prescription Dataset in French for Spoken Language Understanding",
+  booktitle = "13th Language Resources and Evaluation Conference (LREC 2022)",
+  year = "2022",
+  location = "Marseille, France"
 }
 ```
 
