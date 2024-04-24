@@ -3,7 +3,6 @@ nbrun=1
 models=`cat models.txt | grep -v "#" | tr "\n" " "`
 
 
-
 # Download datasets
 if [ $stage -le 0 ]
 then
@@ -259,7 +258,7 @@ then
     do
         for iteration in `seq 1 1 $nbrun`
         do
-            pushd recipes/mantragsc/scripts/
+            pushd recipes/morfitt/scripts/
             ./run.sh ${model_name}
             popd
         done
