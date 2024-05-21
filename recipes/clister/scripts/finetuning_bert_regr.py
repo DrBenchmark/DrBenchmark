@@ -29,30 +29,25 @@ def compute_metrics(eval_pred):
     rmse = mean_squared_error(labels, predictions, squared=False)
     return {"rmse": rmse}
 
-def EDRM(ref, systm, debug=False):
-    maxVal = 5
-    dsum = 0
+def EDRM(ref, systm, minVal=0, maxVal=5, boundAdjustment=True):
+    n = len(ref)
+    total_distance = 0
 
     for id in ref.keys():
-        if id in systm and systm[id] >= 0 and systm[id] <= 5:
-            d = abs(ref[id] - systm[id])
-            if debug:
-                print("d: " , d)
-            if abs(0 - systm[id]) > abs(maxVal - systm[id]):
-                dmax = abs(0 - systm[id])
-            else:
-                dmax = abs(maxVal - systm[id])
+        r = ref[id]
+
+        if id not in systm:
+            raise ValueError(f"System did not provide a score for the id {id}")
+        elif boundAdjustment:
+            # As the task delimits a range score from 0 to 5, every system should bound its output to this range
+            h = max(min(systm[id], maxVal), minVal)
         else:
-            print(id, " not in system answers!!!")
-            d = maxVal
-            dmax = maxVal
-        if debug:
-            print("dmax: " , dmax)
-        dsum += 1 - d/dmax
-        if debug:
-            print("dsum: ", dsum)
-    edrm = dsum / len(ref)
-    return(edrm)
+            h = systm[id]
+
+        max_distance = max(abs(minVal - r), abs(maxVal - r))
+        total_distance += 1 - abs(r - h) / max_distance
+
+    return total_distance / n
 
 def SpMnCorr(ref, systm, alpha=0.05):
     r = [v for k, v in sorted(ref.items())]
