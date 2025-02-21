@@ -1,5 +1,5 @@
 transformers>=4.0.0
-datasets>=2.13.0
+datasets>=2.13.0,<3
 seqeval>=1.2.2
 evaluate>=0.4.1
 pyyaml>=6.0
@@ -10,3 +10,7 @@ xmltodict>=0.13.0
 accelerate>=0.20.3
 tensorboardX>=2.6.2.2
 absl-py>=2.1.0
+sentencepiece
+bs4
+lxml
+Pillow

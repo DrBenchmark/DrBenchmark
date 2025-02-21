@@ -39,7 +39,7 @@ def save_locally(arr):
     corpus, subset = arr
 
     dataset = load_dataset(
-        f"data_loaders_hf/{corpus}.py",
+        f"DrBenchmark/{corpus}",
         subset,
         data_dir=f"./recipes/{corpus.lower()}/data/",
     )
