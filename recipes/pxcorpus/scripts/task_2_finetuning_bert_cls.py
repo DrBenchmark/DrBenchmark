@@ -49,8 +49,8 @@ def main():
         dataset = load_from_disk(f"{args.data_dir.rstrip('/')}/local_hf_{args.subset}/")
     else:            
         dataset = load_dataset(
-            "Dr-BERT/PxCorpus",
-            data_dir=args.data_dir,
+            "DrBenchmark/PxCorpus",
+            trust_remote_code=True,
         )
 
     labels_list = dataset["train"].features["label"].names

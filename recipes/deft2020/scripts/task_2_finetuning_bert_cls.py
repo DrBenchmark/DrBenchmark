@@ -50,9 +50,9 @@ def main():
         dataset = load_from_disk(f"{args.data_dir.rstrip('/')}/local_hf_task_2/")
     else:            
         dataset = load_dataset(
-            "Dr-BERT/DEFT2020",
+            "DrBenchmark/DEFT2020",
             name="task_2",
-            data_dir=args.data_dir,
+            trust_remote_code=True,
         )
 
     labels_list = dataset["train"].features["correct_cible"].names

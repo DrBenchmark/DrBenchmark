@@ -38,9 +38,9 @@ def main():
         dataset = load_from_disk(f"{args.data_dir.rstrip('/')}/local_hf_{args.subset}/")
     else:            
         dataset = load_dataset(
-            "Dr-BERT/CAS",
+            "DrBenchmark/CAS",
             name=str(args.subset),
-            data_dir=args.data_dir,
+            trust_remote_code=True,
         )
 
     label_list = dataset["train"].features["pos_tags"][0].names

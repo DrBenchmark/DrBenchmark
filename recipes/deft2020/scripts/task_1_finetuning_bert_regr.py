@@ -81,9 +81,9 @@ def main():
         dataset = load_from_disk(f"{args.data_dir.rstrip('/')}/local_hf_task_1/")
     else:            
         dataset = load_dataset(
-            "Dr-BERT/DEFT2020",
+            "DrBenchmark/DEFT2020",
             name="task_1",
-            data_dir=args.data_dir,
+            trust_remote_code=True,
         )
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)

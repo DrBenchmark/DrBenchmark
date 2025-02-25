@@ -53,9 +53,9 @@ def main():
         dataset = load_from_disk(f"{args.data_dir.rstrip('/')}/local_hf_{args.subset}/")
     else:            
         dataset = load_dataset(
-            "Dr-BERT/E3C",
+            "DrBenchmark/E3C",
             name=args.subset,
-            data_dir=args.data_dir,
+            trust_remote_code=True,
         )
 
     train_dataset = dataset["train"]

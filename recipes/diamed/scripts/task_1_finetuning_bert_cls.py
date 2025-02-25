@@ -49,8 +49,8 @@ def main():
         dataset = load_from_disk(f"{args.data_dir.rstrip('/')}/local_hf_{args.subset}/")
     else:            
         dataset = load_dataset(
-            "Dr-BERT/DiaMED",
-            data_dir=args.data_dir,
+            "DrBenchmark/DiaMED",
+            trust_remote_code=True,
         )
 
     labels_list = dataset["train"].features["icd-10"].names
