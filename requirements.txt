@@ -1,5 +1,6 @@
 transformers>=4.0.0
-datasets>=2.13.0,<3
+datasets>=2.13.0,<3  # <3 for "datasets.load_metric"
+scikit-learn>1.4  #  >1.4 for clister.root_mean_square_error
 seqeval>=1.2.2
 evaluate>=0.4.1
 pyyaml>=6.0
@@ -11,6 +12,7 @@ accelerate>=0.20.3
 tensorboardX>=2.6.2.2
 absl-py>=2.1.0
 sentencepiece
-bs4
-lxml
-Pillow
+bs4  # for E3C
+lxml  # for E3C
+Pillow  # for DiaMED
+xmltodict  # for DEFT2020
