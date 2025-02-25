@@ -20,13 +20,13 @@ import numpy as np
 from scipy import stats
 from datasets import load_dataset, load_from_disk
 
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import root_mean_squared_error
 
 from transformers import AutoTokenizer, EvalPrediction, AutoModelForSequenceClassification, Trainer, TrainingArguments, TextClassificationPipeline
 
 def compute_metrics(eval_pred):
     predictions, labels = eval_pred
-    rmse = mean_squared_error(labels, predictions, squared=False)
+    rmse = root_mean_squared_error(labels, predictions, squared=False)
     return {"rmse": rmse}
 
 def EDRM(ref, systm, debug=False):
