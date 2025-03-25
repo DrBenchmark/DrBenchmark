@@ -26,7 +26,7 @@ from transformers import AutoTokenizer, EvalPrediction, AutoModelForSequenceClas
 
 def compute_metrics(eval_pred):
     predictions, labels = eval_pred
-    rmse = root_mean_squared_error(labels, predictions, squared=False)
+    rmse = root_mean_squared_error(labels, predictions)
     return {"rmse": rmse}
 
 def EDRM(ref, systm, debug=False):
