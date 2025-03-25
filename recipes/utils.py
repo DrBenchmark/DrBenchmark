@@ -34,13 +34,25 @@ def parse_args():
     parser.add_argument("--fewshot",                 type=float, required=False, help="Percentage of the train subset used during training", default=1.0)
     parser.add_argument("--offline",                 type=bool,  required=False, help="Use local huggingface dataset", default=False)
 
-    args = parser.parse_args()
-    args = vars(args)
+    # Load command line arguments
+    args_cli = parser.parse_args()
+    args_cli = vars(args_cli)
 
-    overall_args_yaml = yaml.load(open("../../../config.yaml"), Loader=yaml.FullLoader)
-    args["offline"] = overall_args_yaml["offline"]
+    args = {}
+    # Load local config arguments is any
+    args_local = {}
+    if args_cli["config"]:
+        args_local = yaml.safe_load(open(args_cli["config"]))
+    # Load global config arguments
+    args_global = yaml.safe_load(open("../../../config.yaml"))
 
-    args_yaml = yaml.load(open(args["config"]), Loader=yaml.FullLoader)
+    # Update args with local arguments (which contains great default for each task)
+    args.update({k: v for k, v in args_local.items() if v is not None})
+    # Overwrite local args with global arguments (which allow changing params for all tasks)
+    args.update({k: v for k, v in args_global.items() if v is not None})
+    # Overwrite local and global with command line arguments (which allow precise param changing)
+    #  and fills missing arguments with default values
+    args.update({k: v for k, v in args_cli.items() if v is not None or k not in args})
 
     for k in args.keys():
 
