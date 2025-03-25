@@ -35,6 +35,14 @@ task2script = {
 
     'Morfitt': './run.sh {model_name}',
 
+    'DEFT2019': './run.sh {model_name}',
+
+    'DEFT2020_REG': './run_task_1.sh {model_name}',
+    'DEFT2020_CLS': './run_task_2.sh {model_name}',
+
+    'DEFT2021_NER': './run_task_1.sh {model_name}',
+    'DEFT2021_CLS': './run_task_2.sh {model_name}',
+
     'PXCorpus_NER': './run_task_1.sh {model_name}',
     'PXCorpus_CLS': './run_task_2.sh {model_name}',
 
@@ -65,7 +73,7 @@ if __name__ == '__main__':
         datefmt='%Y-%m-%d %H:%M:%S'
     )
 
-    if args.tasks == 'all':
+    if args.tasks == ['all']:
         args.tasks = list(task2script.keys())
 
     for task in args.tasks:

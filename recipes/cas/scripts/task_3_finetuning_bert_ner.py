@@ -143,13 +143,20 @@ def main():
     train_tokenized_datasets      = dataset["train"].map(tokenize_and_align_labels, batched=True).shuffle(seed=42).shuffle(seed=42).shuffle(seed=42)
     if args.fewshot != 1.0:
         train_tokenized_datasets = train_tokenized_datasets.select(range(int(len(train_tokenized_datasets) * args.fewshot)))
+    if args.max_train_samples:
+        train_tokenized_datasets = train_tokenized_datasets.select(range(args.max_train_samples))
     # train_tokenized_datasets      = train_tokenized_datasets.remove_columns(["label"])
 
     validation_tokenized_datasets = dataset["validation"].map(tokenize_and_align_labels, batched=True)
     # validation_tokenized_datasets = validation_tokenized_datasets.remove_columns(["label"])
+    if args.max_val_samples:
+        validation_tokenized_datasets = validation_tokenized_datasets.select(range(args.max_val_samples))
 
     test_tokenized_datasets       = dataset["test"].map(tokenize_and_align_labels, batched=True)
     # test_tokenized_datasets       = test_tokenized_datasets.remove_columns(["label"])
+    if args.max_test_samples:
+        test_tokenized_datasets = test_tokenized_datasets.select(range(args.max_test_samples))
+
 
     os.makedirs(args.output_dir, exist_ok=True)
     output_name = f"DrBenchmark-CAS-{str(args.subset)}-{uuid.uuid4()}"

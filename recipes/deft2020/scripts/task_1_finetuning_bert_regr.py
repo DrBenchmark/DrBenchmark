@@ -103,14 +103,20 @@ def main():
     dataset_train = dataset["train"].map(preprocess_function, batched=False).shuffle(seed=42).shuffle(seed=42).shuffle(seed=42)
     if args.fewshot != 1.0:
         dataset_train = dataset_train.select(range(int(len(dataset_train) * args.fewshot)))
+    if args.max_train_samples:
+        dataset_train = dataset_train.select(range(args.max_train_samples))
     dataset_train = dataset_train.remove_columns(["text"])
     dataset_train.set_format("torch")
 
     dataset_val = dataset["validation"].map(preprocess_function, batched=False)
+    if args.max_val_samples:
+        dataset_val = dataset_val.select(range(args.max_val_samples))
     dataset_val = dataset_val.remove_columns(["text"])
     dataset_val.set_format("torch")
 
     dataset_test = dataset["test"].map(preprocess_function, batched=False)
+    if args.max_test_samples:
+        dataset_test = dataset_test.select(range(args.max_test_samples))
     dataset_test_ids = list(dataset["test"]["id"])
     dataset_test = dataset_test.remove_columns(["text"])
     dataset_test.set_format("torch")

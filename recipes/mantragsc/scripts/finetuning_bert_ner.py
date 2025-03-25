@@ -149,8 +149,14 @@ def main():
     train_tokenized_datasets = train_dataset.map(tokenize_and_align_labels, batched=True, keep_in_memory=True).shuffle(seed=42).shuffle(seed=42).shuffle(seed=42)
     if args.fewshot != 1.0:
         train_tokenized_datasets = train_tokenized_datasets.select(range(int(len(train_tokenized_datasets) * args.fewshot)))
+    if args.max_train_samples:
+        train_tokenized_datasets = train_tokenized_datasets.select(range(args.max_train_samples))
     dev_tokenized_datasets = dev_dataset.map(tokenize_and_align_labels, batched=True, keep_in_memory=True)
+    if args.max_val_samples:
+        dev_tokenized_datasets = dev_tokenized_datasets.select(range(args.max_val_samples))
     test_tokenized_datasets = test_dataset.map(tokenize_and_align_labels, batched=True, keep_in_memory=True)
+    if args.max_test_samples:
+        test_tokenized_datasets = test_tokenized_datasets.select(range(args.max_test_samples))
 
     os.makedirs(args.output_dir, exist_ok=True)
     output_name = f"DrBenchmark-MANTRAGSC-{args.subset}-ner-{str(uuid.uuid4().hex)}"
