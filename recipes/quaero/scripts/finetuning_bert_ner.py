@@ -174,6 +174,9 @@ def main():
         metric_for_best_model="accuracy",
         load_best_model_at_end=True,
         greater_is_better=True,
+        save_only_model=True,
+        save_total_limit=1,
+        report_to='none',
     )
 
     print('Load Metrics')

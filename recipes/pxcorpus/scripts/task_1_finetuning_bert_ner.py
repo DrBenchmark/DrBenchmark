@@ -172,6 +172,9 @@ def main():
         metric_for_best_model="f1",
         load_best_model_at_end=True,
         greater_is_better=True,
+        save_only_model=True,
+        save_total_limit=1,
+        report_to='none',
     )
 
     metric  = evaluate.load("../../../metrics/seqeval.py", experiment_id=output_name)

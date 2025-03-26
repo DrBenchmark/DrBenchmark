@@ -121,6 +121,9 @@ def main():
         load_best_model_at_end=True,
         metric_for_best_model="f1_weighted",
         push_to_hub=False,
+        save_only_model=True,
+        save_total_limit=1,
+        report_to='none',
     )
 
     trainer = Trainer(
