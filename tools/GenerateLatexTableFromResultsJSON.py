@@ -5,7 +5,7 @@ data = json.load(f)
 f.close()
 
 f_in = open("./models.txt","r")
-models = ["../../../models/" + m.lower().replace("/","_") for m in f_in.read().split("\n")]
+models = ["../../../models/" + m.lower().replace("/","_") for m in f_in.read().strip().split("\n")]
 f_in.close()
 
 print(models)

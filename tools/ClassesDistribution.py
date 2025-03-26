@@ -1,5 +1,6 @@
 # python BiasMaskFilling.py
 
+import os
 import json
 from collections import Counter
 
@@ -144,6 +145,8 @@ for subset in ["train","validation","test"]:
 
             tasks_classes[t_key][subset].extend(current_classes)
             del current_classes
+
+os.makedirs("./stats/distributions", exist_ok=True)
 
 for subset in ["train","validation","test"]:
     

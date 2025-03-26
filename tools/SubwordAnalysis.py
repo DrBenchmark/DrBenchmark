@@ -65,7 +65,7 @@ for m in models:
     for task in tasks:
 
         if task['dataset'] == None:
-            task['dataset'] = load_dataset(task['model'], task['subset'], data_dir=task['data_path'])["test"]
+            task['dataset'] = load_dataset(task['model'], task['subset'], trust_remote_code=True)["test"]
 
         t_key = f"{task['model']}-{task['subset']}"
         print(f">> {t_key}")
@@ -157,7 +157,7 @@ print(first_row)
 
 for t in list(matrix_avg_tokens_per_word.keys()):
 
-    print(f"{t.replace('Dr-BERT/','').replace('-',' ').replace('_',' ').replace('None','')} & ", end="")
+    print(f"{t.replace('DrBenchmark/','').replace('-',' ').replace('_',' ').replace('None','')} & ", end="")
 
     values = []
 

@@ -6,7 +6,7 @@ from collections import Counter
 from transformers import pipeline, AutoTokenizer
 
 f_in = open("./models.txt","r")
-models = f_in.read().split("\n")
+models = f_in.read().strip().split("\n")
 f_in.close()
 
 matrix = []

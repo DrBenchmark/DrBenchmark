@@ -97,6 +97,8 @@ mapping_line = {
     "XLM-RoBERTa": "-",
 }
 
+os.makedirs("./stats/fewshot", exist_ok=True)
+
 for key in results_fewshot:
     
     corpus, task = key.split("|")
