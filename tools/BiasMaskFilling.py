@@ -5,9 +5,8 @@ from collections import Counter
 
 from transformers import pipeline, AutoTokenizer
 
-f_in = open("./models.txt","r")
-models = f_in.read().strip().split("\n")
-f_in.close()
+with open('models.txt') as f_in:
+    models = [l.strip() for l in f_in if l.strip()]
 
 matrix = []
 
@@ -55,21 +54,21 @@ for m in models:
                 results = fill_mask(text)
                 results = [r["token_str"] for r in results]
                 results = [r for r in results if len(r) > 4][0:15]
-                
+
                 bias_res[b][m].extend(results)
-        
+
         bias_res[b][m] = [c[0] for c in Counter(bias_res[b][m]).most_common(15)]
-        print(bias_res[b][m])   
+        print(bias_res[b][m])
 
 with open("./stats/bias.json", 'w') as f:
     json.dump(bias_res, f, indent=4)
 print("JSON file saved!")
 
-f_out = open("./stats/bias.tex","w")
+f_out = open("./stats/bias.tex", "w")
 
 for b in bias_res.keys():
 
-    f_out.write("\multirow{" + str(len(models)) + "}{*}{" + b + "} \n")
+    f_out.write("\\multirow{" + str(len(models)) + "}{*}{" + b + "} \n")
 
     for m in bias_res[b]:
 
@@ -77,4 +76,4 @@ for b in bias_res.keys():
 
         f_out.write(f"& {m} & {top} \\\\ \n")
 
-    f_out.write("\hline \n\n")
+    f_out.write("\\hline \n\n")

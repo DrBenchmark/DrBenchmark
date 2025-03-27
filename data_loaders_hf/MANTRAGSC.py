@@ -85,6 +85,7 @@ _DATASET_TYPES = {
 	"patents": "Patent",
 }
 
+
 @dataclass
 class DrBenchmarkConfig(datasets.BuilderConfig):
 	name: str = None
@@ -92,6 +93,7 @@ class DrBenchmarkConfig(datasets.BuilderConfig):
 	description: str = None
 	schema: str = None
 	subset_id: str = None
+
 
 class MANTRAGSC(datasets.GeneratorBasedBuilder):
 
@@ -124,14 +126,14 @@ class MANTRAGSC(datasets.GeneratorBasedBuilder):
 			names = ['B-ANAT', 'I-ANAT', 'B-PROC', 'I-CHEM', 'I-PHYS', 'B-GEOG', 'B-DEVI', 'O', 'B-PHYS', 'I-LIVB', 'B-OBJC', 'I-DISO', 'I-DEVI', 'B-PHEN', 'B-DISO', 'B-LIVB', 'B-CHEM', 'I-PROC']
 		elif self.config.name.find("patents") != -1:
 			names = ['B-ANAT', 'I-ANAT', 'B-PROC', 'I-CHEM', 'I-PHYS', 'B-DEVI', 'O', 'I-LIVB', 'B-OBJC', 'I-DISO', 'B-PHEN', 'I-PROC', 'B-DISO', 'I-DEVI', 'B-LIVB', 'B-CHEM', 'B-PHYS']
-		
+
 		features = datasets.Features(
 			{
 				"id": datasets.Value("string"),
 				"tokens": [datasets.Value("string")],
 				"ner_tags": datasets.Sequence(
 					datasets.features.ClassLabel(
-						names = names,
+						names=names,
 					)
 				),
 			}
@@ -196,7 +198,7 @@ class MANTRAGSC(datasets.GeneratorBasedBuilder):
 
 					if type(u["e"]) != type(list()):
 						u["e"] = [u["e"]]
-					
+
 					tags = [{
 						"label": current["@grp"].upper(),
 						"offset_start": int(current["@offset"]),
@@ -210,7 +212,7 @@ class MANTRAGSC(datasets.GeneratorBasedBuilder):
 				tokens = []
 				for i, t in enumerate(_tokens):
 
-					concat = " ".join(_tokens[0:i+1])
+					concat = " ".join(_tokens[0:i + 1])
 
 					offset_start = len(concat) - len(t)
 					offset_end = len(concat)
@@ -229,15 +231,15 @@ class MANTRAGSC(datasets.GeneratorBasedBuilder):
 
 					for idx, token in enumerate(tokens):
 
-						rtok = range(token["offset_start"], token["offset_end"]+1)
-						rtag = range(tag["offset_start"], tag["offset_end"]+1)
+						rtok = range(token["offset_start"], token["offset_end"] + 1)
+						rtag = range(tag["offset_start"], tag["offset_end"] + 1)
 
 						# Check if the ranges are overlapping
 						if bool(set(rtok) & set(rtag)):
 
 							# if ner_tags[idx] != "O" and ner_tags[idx] != tag['label']:
 							# 	print(f"{token} - currently: {ner_tags[idx]} - after: {tag['label']}")
-							
+
 							if ner_tags[idx][0] == "O":
 								cpt += 1
 								ner_tags[idx][0] = tag["label"]
@@ -261,7 +263,7 @@ class MANTRAGSC(datasets.GeneratorBasedBuilder):
 				}
 
 				all_res.append(obj)
-		
+
 		ids = [r["id"] for r in all_res]
 
 		random.seed(4)
@@ -269,7 +271,7 @@ class MANTRAGSC(datasets.GeneratorBasedBuilder):
 		random.shuffle(ids)
 		random.shuffle(ids)
 
-		train, validation, test = np.split(ids, [int(len(ids)*0.70), int(len(ids)*0.80)])
+		train, validation, test = np.split(ids, [int(len(ids) * 0.70), int(len(ids) * 0.80)])
 
 		if split == "train":
 			allowed_ids = list(train)
@@ -277,8 +279,8 @@ class MANTRAGSC(datasets.GeneratorBasedBuilder):
 			allowed_ids = list(validation)
 		elif split == "test":
 			allowed_ids = list(test)
-		
+
 		for r in all_res:
 			identifier = r["id"]
 			if identifier in allowed_ids:
-				yield identifier, r 
+				yield identifier, r

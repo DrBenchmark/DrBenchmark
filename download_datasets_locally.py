@@ -1,4 +1,7 @@
+import logging
+
 from datasets import load_dataset
+
 
 ds = [
     ["CLISTER", None],
@@ -18,7 +21,7 @@ ds = [
     # ["DEFT2019", None],
     ["DEFT2021", "cls"],
     ["DEFT2021", "ner"],
-    
+
     ["CAS", "pos"],
     ["CAS", "cls"],
     ["CAS", "ner_neg"],
@@ -27,16 +30,14 @@ ds = [
     ["ESSAI", "pos"],
     ["ESSAI", "cls"],
     ["ESSAI", "ner_neg"],
-    ["ESSAI", "ner_spec"],    
+    ["ESSAI", "ner_spec"],
 ]
 
 
-
 def save_locally(arr):
-
-    print(arr)
-
     corpus, subset = arr
+
+    logging.info(f">> Downloading {corpus}{' - '+subset if subset else ''}")
 
     dataset = load_dataset(
         f"DrBenchmark/{corpus}",
@@ -45,5 +46,13 @@ def save_locally(arr):
     )
     dataset.save_to_disk(f"./recipes/{corpus.lower()}/data/local_hf_{subset}/")
 
-for d in ds:
-    save_locally(d)
+
+if __name__ == '__main__':
+    logging.basicConfig(
+        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+        datefmt="%m/%d/%Y %H:%M:%S",
+        level=logging.INFO
+    )
+
+    for d in ds:
+        save_locally(d)

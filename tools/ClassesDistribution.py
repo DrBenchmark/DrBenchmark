@@ -9,7 +9,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 from datasets import load_dataset
-from transformers import AutoTokenizer
+
 
 tasks = [
     {"corpus": "DrBenchmark/QUAERO", "subset": "emea", "dataset": None, "data_path": "./recipes/quaero/data/", "task": None},
@@ -28,7 +28,7 @@ tasks = [
     {"corpus": "DrBenchmark/PxCorpus", "subset": None, "dataset": None, "data_path": "./recipes/pxcorpus/data/", "task": 1},
     {"corpus": "DrBenchmark/PxCorpus", "subset": None, "dataset": None, "data_path": "./recipes/pxcorpus/data/", "task": 2},
     {"corpus": "DrBenchmark/DiaMED", "subset": None, "dataset": None, "data_path": "./recipes/diamed/data/", "task": None},
-    {"corpus": "DrBenchmark/DEFT2019", "subset": None, "dataset": None, "data_path": "./recipes/deft2019/data/", "task": None},
+    # {"corpus": "DrBenchmark/DEFT2019", "subset": None, "dataset": None, "data_path": "./recipes/deft2019/data/", "task": None},
     {"corpus": "DrBenchmark/DEFT2021", "subset": "cls", "dataset": None, "data_path": "./recipes/deft2021/data/", "task": None},
     {"corpus": "DrBenchmark/DEFT2021", "subset": "ner", "dataset": None, "data_path": "./recipes/deft2021/data/", "task": None},
 
@@ -49,7 +49,7 @@ tasks_classes = {f"{t['corpus']}-{t['subset']}-{t['task']}": {
     "test": [],
 } for t in tasks}
 
-for subset in ["train","validation","test"]:
+for subset in ["train", "validation", "test"]:
 
     for task in tasks:
 
@@ -61,7 +61,7 @@ for subset in ["train","validation","test"]:
         for e in dataset:
 
             # print(e)
-            
+
             if task["corpus"].lower().find("quaero") != -1 or task["corpus"].lower().find("mantragsc") != -1:
 
                 label_list = dataset.features[f"ner_tags"].feature.names
@@ -71,7 +71,7 @@ for subset in ["train","validation","test"]:
 
                 label_list = dataset.features[f"ner_tags"].feature.names
                 current_classes = [label_list[n] for n in e['ner_tags']]
-            
+
             if (task["corpus"].lower().find("essai") != -1 or task["corpus"].lower().find("cas") != -1) and task["subset"] == "pos":
 
                 label_list = dataset.features["pos_tags"][0].names
@@ -81,17 +81,17 @@ for subset in ["train","validation","test"]:
 
                 label_list = dataset.features["ner_tags"][0].names
                 current_classes = [label_list[n] for n in e['ner_tags']]
-            
+
             if (task["corpus"].lower().find("essai") != -1 or task["corpus"].lower().find("cas") != -1) and task["subset"] == "cls":
 
                 label_list = dataset.features["label"].names
                 current_classes = [label_list[e['label']]]
-            
+
             if task["corpus"].lower().find("frenchmedmcqa") != -1 and task["task"] == 1:
 
                 label_list = dataset.features["correct_answers"].feature.names
                 current_classes = [label_list[n] for n in e['correct_answers']]
-            
+
             if task["corpus"].lower().find("frenchmedmcqa") != -1 and task["task"] == 2:
 
                 label_list = dataset.features["number_correct_answers"].names
@@ -131,10 +131,10 @@ for subset in ["train","validation","test"]:
 
                 label_list = dataset.features["icd-10"].names
                 current_classes = [label_list[n] for n in [e['icd-10']]]
-            
+
             if task["corpus"].lower().find("deft2020") != -1 and task["subset"] == "task_1":
                 current_classes = [e['moy']]
-            
+
             if task["corpus"].lower().find("deft2020") != -1 and task["subset"] == "task_2":
 
                 label_list = dataset.features["correct_cible"].names
@@ -148,8 +148,8 @@ for subset in ["train","validation","test"]:
 
 os.makedirs("./stats/distributions", exist_ok=True)
 
-for subset in ["train","validation","test"]:
-    
+for subset in ["train", "validation", "test"]:
+
     print(subset)
 
     for task in tasks:
@@ -158,7 +158,7 @@ for subset in ["train","validation","test"]:
         print(t_key)
 
         if (task["corpus"].lower().find("deft2020") != -1 and task["subset"] == "task_1") or (task["corpus"].lower().find("clister") != -1):
-            sns.boxplot(x=tasks_classes[t_key][subset])            
+            sns.boxplot(x=tasks_classes[t_key][subset])
             plt.title('Distribution of the values', fontsize=16)
             plt.xlabel('Frequencies')
             plt.ylabel('Classes')

@@ -1,12 +1,12 @@
 import json
 
-f = open("./stats/overall_averaged_metrics.json")
-data = json.load(f)
-f.close()
 
-f_in = open("./models.txt","r")
-models = ["../../../models/" + m.lower().replace("/","_") for m in f_in.read().strip().split("\n")]
-f_in.close()
+with open("./stats/overall_averaged_metrics.json") as f:
+    data = json.load(f)
+
+with open('models.txt') as f_in:
+    models = [l.strip() for l in f_in if l.strip()]
+    models = ["../../../models/" + m.lower().replace("/", "_") for m in models]
 
 print(models)
 
@@ -24,17 +24,24 @@ output.append("""
 """)
 
 mapping = {
-    "almanach_camemberta-base": "CamemBERTa",
+    "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext": "PubMedBERT",
+    "microsoft/Biomednlp-PubmedBERT-base-uncased-abstract": "OLD-PubMedBERT",
+    "Dr-BERT/DrBERT-7GB": "DrBERT-FS",
+    "Dr-BERT/DrBERT-4GB-CP-PubMedBERT": "DrBERT-CP",
     "camembert-base": "CamemBERT",
-    "almanach_camembert-bio-base": "CamemBERT-BIO",
-    "dr-bert_drbert-7gb": "DrBERT 7GB",
-    "dr-bert_drbert-4gb-cp-pubmedbert": "DrBERT CP PubMedBERT",
-    "microsoft_biomednlp-pubmedbert-base-uncased-abstract-fulltext": "PubMedBERT",
-    "microsoft_biomednlp-pubmedbert-base-uncased-abstract": "OLD-PubMedBERT",
-    "flaubert_flaubert_base_uncased": "FlauBERT",
+    "almanach/camembert-base": "CamemBERT",
+    "almanach/camemberta-base": "CamemBERTa",
+    "almanach/camembert-bio-base": "CamemBERT-BIO",
+    "flaubert/flaubert_base_uncased": "FlauBERT",
+    "emilyalsentzer/Bio_ClinicalBERT": "ClinicalBERT",
+    "xlm-roberta-base": "XLM-RoBERTa",
+    "FacebookAI/xlm-roberta-base": "XLM-RoBERTa",
+    "distilbert-base-uncased": "DistilBERT",
+    "distilbert/distilbert-base-uncased": "DistilBERT",
 }
+mapping = {k.lower().replace('/', '_'): v for k, v in mapping.items()}
 
-output.append("\\textbf{Dataset} & \\textbf{Task} & " + " & ".join(["\\textbf{" + mapping[m.replace("../../../models/","")] + "}" for m in models]) + " \\\\ ")
+output.append("\\textbf{Dataset} & \\textbf{Task} & " + " & ".join(["\\textbf{" + mapping[m.replace("../../../models/", "")] + "}" for m in models]) + " \\\\ ")
 
 latest_corpus = None
 # latest_corpus = tasks[0].split("|")[0]
@@ -43,17 +50,19 @@ for t in tasks:
 
     corpus, task, fewshot = t.split("|")
 
-    runs_metrics = []    
+    runs_metrics = []
 
     for m in models:
 
-        if t.find("deft2020|regr") != -1 or t.find("clister|regr") != -1:
+        if m not in data:
+            metric = "-"
+        elif t.find("deft2020|regr") != -1 or t.find("clister|regr") != -1:
             metric = f"{round(data[m][t]['edrm'], 2)}" + " / " + f"{round(data[m][t]['spearman_correlation_coef'], 2)}"
-        
+
         elif t.find("frenchmedmcqa|mcqa") != -1:
             # metric = float(f"{round(data[m][t]['hamming_score'], 2)}")
             metric = f"{round(data[m][t]['hamming_score'] * 100, 2)} / {round(data[m][t]['exact_match'] * 100, 2)}"
-        
+
         elif t.find("|ner") != -1 or t.find("|pos") != -1:
             # metric = float(f"{round(data[m][t]['overall_f1'], 2)}")
             metric = f"{round(data[m][t]['overall_f1'] * 100, 2)}"
@@ -63,12 +72,12 @@ for t in tasks:
 
         runs_metrics.append(metric)
 
-    tt = corpus.replace('_','-').upper()
+    tt = corpus.replace('_', '-').upper()
 
     breakline = ""
 
-    if latest_corpus != corpus or latest_corpus == None:
-        breakline = "\\hline \n\n \multirow{2}{*}{" + f"{tt}" + "}"
+    if latest_corpus != corpus or latest_corpus is None:
+        breakline = "\\hline \n\n \\multirow{2}{*}{" + f"{tt}" + "}"
 
     # runs_metrics = ["\\textbf{" + f"{rm}" + "}" if rm == max(runs_metrics) else f"{rm}" for rm in runs_metrics]
     line = f"{breakline} & {task.upper()} & " + " & ".join(runs_metrics) + " \\\\ "

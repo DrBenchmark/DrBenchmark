@@ -1,17 +1,16 @@
 # SubwordAnalysis.py
 
 import json
-from collections import Counter
 
 from datasets import load_dataset
 from transformers import AutoTokenizer
 
-f_in = open("./models.txt","r")
-models = [m for m in f_in.read().split("\n") if len(m) > 0]
-f_in.close()
+
+with open('models.txt') as f_in:
+    models = [l.strip() for l in f_in if l.strip()]
 
 tasks = [
-    {"model": "DrBenchmark/DEFT2019", "subset": None, "dataset": None, "data_path": "./recipes/deft2019/data/"},
+    # {"model": "DrBenchmark/DEFT2019", "subset": None, "dataset": None, "data_path": "./recipes/deft2019/data/"},
     {"model": "DrBenchmark/DEFT2021", "subset": "cls", "dataset": None, "data_path": "./recipes/deft2021/data/"},
     {"model": "DrBenchmark/DEFT2021", "subset": "ner", "dataset": None, "data_path": "./recipes/deft2021/data/"},
 
@@ -46,12 +45,15 @@ mapping = {
     "Dr-BERT/DrBERT-7GB": "DrBERT 7GB",
     "Dr-BERT/DrBERT-4GB-CP-PubMedBERT": "DrBERT CP PubMedBERT",
     "camembert-base": "CamemBERT",
+    "almanach/camembert-base": "CamemBERT",
     "almanach/camemberta-base": "CamemBERTa",
     "almanach/camembert-bio-base": "CamemBERT-BIO",
     "flaubert/flaubert_base_uncased": "FlauBERT",
     "emilyalsentzer/Bio_ClinicalBERT": "ClinicalBERT",
     "xlm-roberta-base": "XLM-RoBERTa",
+    "FacebookAI/xlm-roberta-base": "XLM-RoBERTa",
     "distilbert-base-uncased": "DistilBERT",
+    "distilbert/distilbert-base-uncased": "DistilBERT",
 }
 
 matrix_avg_tokens_per_word = {f"{t['model']}-{t['subset']}": {m: [] for m in models} for t in tasks}
@@ -64,7 +66,7 @@ for m in models:
 
     for task in tasks:
 
-        if task['dataset'] == None:
+        if task['dataset'] is None:
             task['dataset'] = load_dataset(task['model'], task['subset'], trust_remote_code=True)["test"]
 
         t_key = f"{task['model']}-{task['subset']}"
@@ -73,9 +75,9 @@ for m in models:
         for e in task['dataset']:
 
             # print(e)
-            
+
             if task["model"].lower().find("quaero") != -1 or task["model"].lower().find("e3c") != -1 or task["model"].lower().find("mantragsc") != -1 or task["model"].lower().find("essai") != -1 or task["model"].lower().find("cas") != -1:
-                
+
                 if len(e["tokens"]) == 0:
                     nbr_tokens = 0
                 else:
@@ -83,9 +85,9 @@ for m in models:
                     nbr_tokens = float(len(output) / len(e["tokens"]))
                     # print(float(len(output)))
                     # print(len(e["tokens"]))
-            
+
             if task["model"].lower().find("frenchmedmcqa") != -1:
-                text = f"{e['question']} {tokenizer.sep_token} " + f" {tokenizer.sep_token} ".join([e[f"answer_{letter}"] for letter in ["a","b","c","d","e"]])
+                text = f"{e['question']} {tokenizer.sep_token} " + f" {tokenizer.sep_token} ".join([e[f"answer_{letter}"] for letter in ["a", "b", "c", "d", "e"]])
                 tokens = text.split(" ")
                 output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
                 nbr_tokens = float(len(output) / len(tokens))
@@ -94,13 +96,13 @@ for m in models:
                 tokens = e['abstract'].split(" ")
                 output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
                 nbr_tokens = float(len(output) / len(tokens))
-            
+
             if task["model"].lower().find("deft") != -1 and task["subset"] == "task_1":
                 text = f"{tokenizer.cls_token} {e['source']} {tokenizer.sep_token}  {e['cible']} {tokenizer.eos_token}"
                 tokens = text.split(" ")
                 output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
                 nbr_tokens = float(len(output) / len(tokens))
-            
+
             if task["model"].lower().find("deft") != -1 and task["subset"] == "task_2":
                 text = f"{e['source']} {tokenizer.sep_token} (1) {e['cible_1']} {tokenizer.sep_token} (2) {e['cible_2']} {tokenizer.sep_token} (3) {e['cible_3']}"
                 tokens = text.split(" ")
@@ -164,7 +166,7 @@ for t in list(matrix_avg_tokens_per_word.keys()):
     for m in matrix_avg_tokens_per_word[t]:
 
         v = sum(matrix_avg_tokens_per_word[t][m]) / len(matrix_avg_tokens_per_word[t][m])
-        values.append(str(round(v,2)))
+        values.append(str(round(v, 2)))
 
-    print(" & ".join(values) + " \\\\", end="")    
+    print(" & ".join(values) + " \\\\", end="")
     print()

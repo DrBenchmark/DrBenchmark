@@ -5,19 +5,19 @@
 # Apache 2.0
 
 import os
-import shutil
-
-import uuid
 import json
-import argparse
+import uuid
+import shutil
 import logging
+
 from datasets import load_dataset, load_from_disk
+from transformers import Trainer, TrainingArguments
+from transformers import TextClassificationPipeline
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
-from utils import parse_args, TrainingArgumentsWithMPSSupport
+from utils import parse_args
 
-import torch
-from sklearn.metrics import precision_recall_fscore_support, accuracy_score, f1_score, roc_auc_score, accuracy_score, classification_report
-from transformers import AutoTokenizer, EvalPrediction, AutoModelForSequenceClassification, Trainer, TrainingArguments, TextClassificationPipeline
 
 def compute_metrics(pred):
     labels = pred.label_ids
@@ -31,25 +31,26 @@ def compute_metrics(pred):
         'recall': recall
     }
 
+
 def main():
 
     args = parse_args()
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-        datefmt="%m/%d/%Y %H:%M:%S"
+        datefmt="%m/%d/%Y %H:%M:%S",
+        level=logging.INFO
     )
-    #logger.setLevel(logging.INFO)
 
-    if args.offline == True:   
+    if args.offline:
         dataset = load_from_disk(f"{args.data_dir.rstrip('/')}/local_hf_{args.subset}/")
-    else:            
+    else:
         dataset = load_dataset(
             "DrBenchmark/FrenchMedMCQA",
             trust_remote_code=True,
         )
 
-    labels_list = ["c","a","e","d","b","be","ae","bc","bd","ab","de","cd","ac","ad","ce","bce","abc","cde","bcd","ace","ade","abe","acd","bde","abd","abde","abcd","bcde","abce","acde","abcde"]
+    labels_list = ["c", "a", "e", "d", "b", "be", "ae", "bc", "bd", "ab", "de", "cd", "ac", "ad", "ce", "bce", "abc", "cde", "bcd", "ace", "ade", "abe", "acd", "bde", "abd", "abde", "abcd", "bcde", "abce", "acde", "abcde"]
     original_labels_list = dataset["train"].features["correct_answers"].feature.names
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
@@ -57,15 +58,15 @@ def main():
 
     def preprocess_function(e):
 
-        concatenated_choices = f" {tokenizer.sep_token} ".join([e[f"answer_{letter}"] for letter in ["a","b","c","d","e"]])
+        concatenated_choices = f" {tokenizer.sep_token} ".join([e[f"answer_{letter}"] for letter in ["a", "b", "c", "d", "e"]])
         text = f"{tokenizer.cls_token} {e['question']} {tokenizer.sep_token} {concatenated_choices} {tokenizer.eos_token}"
 
         res = tokenizer(text, truncation=True, max_length=args.max_position_embeddings, padding="max_length")
         res["text"] = text
 
-        labels_letters = [original_labels_list[l] for l in e["correct_answers"]] # Get from the answers indexes to the original letters
-        labels_letters = "".join(sorted(labels_letters)) # Transform the multi-label answers into a multi-class problem
-        labels_letters = labels_list.index(labels_letters) # Get the corresponding index of the class
+        labels_letters = [original_labels_list[l] for l in e["correct_answers"]]  # Get from the answers indexes to the original letters
+        labels_letters = "".join(sorted(labels_letters))  # Transform the multi-label answers into a multi-class problem
+        labels_letters = labels_list.index(labels_letters)  # Get the corresponding index of the class
         res["label"] = labels_letters
 
         return res
@@ -86,7 +87,7 @@ def main():
     dataset_val = dataset_val.remove_columns(["text"])
     dataset_val.set_format("torch")
 
-    dataset_test   = dataset["test"].map(preprocess_function, batched=False)
+    dataset_test = dataset["test"].map(preprocess_function, batched=False)
     if args.max_test_samples:
         dataset_test = dataset_test.select(range(args.max_test_samples))
 
@@ -95,8 +96,8 @@ def main():
 
     training_args = TrainingArguments(
         f"{args.output_dir}/{output_name}",
-        evaluation_strategy = "epoch",
-        save_strategy = "epoch",
+        evaluation_strategy="epoch",
+        save_strategy="epoch",
         learning_rate=float(args.learning_rate),
         per_device_train_batch_size=int(args.batch_size),
         per_device_eval_batch_size=int(args.batch_size),
@@ -170,11 +171,11 @@ def main():
 
     logging.info(">> Hamming Score")
     hamming_score = sum(hamming_scores) / len(hamming_scores)
-    print(hamming_score)
+    logging.info(hamming_score)
 
     logging.info(">> Exact Match Ratio (EMR)")
     exact_match = compute_accuracy_exact_match(y_true, y_pred)
-    print(exact_match)
+    logging.info(exact_match)
 
     with open(f"../runs/{output_name}.json", 'w', encoding='utf-8') as f:
         json.dump({
@@ -190,6 +191,7 @@ def main():
                 "system_predictions": y_pred,
             },
         }, f, ensure_ascii=False, indent=4)
+
 
 if __name__ == '__main__':
     main()

@@ -1,11 +1,11 @@
 import os
-import argparse
-from argparse import Namespace
-
 import yaml
-import torch
+import logging
+import argparse
 
+import torch
 from transformers import TrainingArguments
+
 
 class TrainingArgumentsWithMPSSupport(TrainingArguments):
 
@@ -76,13 +76,13 @@ def parse_args():
         raise ValueError('Cannot use `max_train_samples` and `fewshot` at the same time. Please check local and global config files.')
 
     args["output_dir"] = args["output_dir"].rstrip('/')
-    
-    if args["offline"] == True:
+
+    if args["offline"]:
         os.environ["WANDB_DISABLED"] = "true"
-        os.environ['TRANSFORMERS_OFFLINE']='1'
+        os.environ['TRANSFORMERS_OFFLINE'] = '1'
         model_name_clean = args['model_name'].lower().replace('/', '_')
         args["model_name"] = f"../../../models/{model_name_clean}"
 
     # print(f">> Model path: >>{args['model_name']}<<")
-    
-    return Namespace(**args)
+
+    return argparse.Namespace(**args)

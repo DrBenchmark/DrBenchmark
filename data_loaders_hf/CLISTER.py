@@ -80,8 +80,8 @@ class CLISTER(datasets.GeneratorBasedBuilder):
     def _split_generators(self, dl_manager):
         data_dir = dl_manager.download_and_extract(_URL).rstrip("/")
 
-        #data_dir = self.config.data_dir.rstrip("/")
-            
+        # data_dir = self.config.data_dir.rstrip("/")
+
         return [
             datasets.SplitGenerator(
                 name=datasets.Split.TRAIN,
@@ -114,11 +114,10 @@ class CLISTER(datasets.GeneratorBasedBuilder):
         all_res = []
 
         key = 0
-        
+
         # Load JSON file
-        f_json = open(json_file)
-        data_map = json.load(f_json)
-        f_json.close()
+        with open(json_file) as f_json:
+            data_map = json.load(f_json)
 
         # Load CSV file
         df = pd.read_csv(csv_file, sep="\t")
@@ -137,25 +136,25 @@ class CLISTER(datasets.GeneratorBasedBuilder):
             key += 1
 
         if split != "test":
-            
+
             ids = [r["id"] for r in all_res]
-    
+
             random.seed(4)
             random.shuffle(ids)
             random.shuffle(ids)
             random.shuffle(ids)
-            
-            train, validation = np.split(ids, [int(len(ids)*0.8333)])
-    
+
+            train, validation = np.split(ids, [int(len(ids) * 0.8333)])
+
             if split == "train":
                 allowed_ids = list(train)
             elif split == "validation":
                 allowed_ids = list(validation)
-            
+
             for r in all_res:
                 if r["id"] in allowed_ids:
                     yield r["id"], r
         else:
-            
+
             for r in all_res:
                 yield r["id"], r

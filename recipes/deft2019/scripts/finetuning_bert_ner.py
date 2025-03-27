@@ -6,27 +6,20 @@
 # Apache 2.0
 
 import os
-import shutil
-
-import uuid
 import json
+import uuid
+import shutil
 import logging
-import argparse
-import itertools
 
-import torch
 import evaluate
 import numpy as np
-from sklearn.metrics import classification_report
-
-from utils import parse_args, TrainingArgumentsWithMPSSupport
-
 from datasets import load_dataset, load_from_disk
-
-from transformers import AutoTokenizer
+from transformers import Trainer, TrainingArguments
 from transformers import DataCollatorForTokenClassification
-from transformers import AutoModelForTokenClassification, TrainingArguments, Trainer
-from transformers import EarlyStoppingCallback, IntervalStrategy
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+
+from utils import parse_args
+
 
 def getConfig(raw_labels):
 
@@ -39,19 +32,20 @@ def getConfig(raw_labels):
 
     return label2id, id2label
 
+
 def main():
 
     args = parse_args()
-    
+
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-        datefmt="%m/%d/%Y %H:%M:%S"
+        datefmt="%m/%d/%Y %H:%M:%S",
+        level=logging.INFO
     )
-    #logger.setLevel(logging.INFO)
 
-    if args.offline == True:   
+    if args.offline:
         dataset = load_from_disk(f"{args.data_dir.rstrip('/')}/local_hf_{args.subset}/")
-    else:            
+    else:
         dataset = load_dataset(
             "DrBenchmark/DEFT2019",
             name=str(args.subset),
@@ -91,34 +85,34 @@ def main():
                 for _i, (_t, _lb) in enumerate(zip(_e, _label)):
                     tokens_word = tokenizer(_t)["input_ids"][1:-1]
                     _local.extend(tokens_word)
-                    _local_labels.extend([_lb]*len(tokens_word))
-                
-                if len(_local) > 250:
-                    print(f">> {len(_local)}")
+                    _local_labels.extend([_lb] * len(tokens_word))
 
-                _local = _local[0:args.max_position_embeddings-1]
-                _local_labels = _local_labels[0:args.max_position_embeddings-1]
+                if len(_local) > 250:
+                    logging.info(f">> {len(_local)}")
+
+                _local = _local[0:args.max_position_embeddings - 1]
+                _local_labels = _local_labels[0:args.max_position_embeddings - 1]
 
                 _local.append(tokenizer("</s>")["input_ids"][1])
                 _local_labels.append(-100)
 
                 padding_left = args.max_position_embeddings - len(_local)
                 if padding_left > 0:
-                    _local.extend([tokenizer("<pad>")["input_ids"][1]]*padding_left)
-                    _local_labels.extend([-100]*padding_left)
+                    _local.extend([tokenizer("<pad>")["input_ids"][1]] * padding_left)
+                    _local_labels.extend([-100] * padding_left)
 
                 tokenized_inputs.append(_local)
                 _labels.append(_local_labels)
-            
+
             tokenized_inputs = {
                 "input_ids": tokenized_inputs,
                 "labels": _labels,
             }
 
         else:
-            
+
             tokenized_inputs = tokenizer(list(examples["tokens"]), truncation=True, max_length=args.max_position_embeddings, padding='max_length', is_split_into_words=True)
-        
+
             labels = []
 
             for i, label in enumerate(examples[f"ner_tags"]):
@@ -138,11 +132,11 @@ def main():
 
                     else:
                         label_ids.append(label[word_idx] if label_all_tokens else -100)
-                    
+
                     previous_word_idx = word_idx
 
                 labels.append(label_ids)
-            
+
             tokenized_inputs["labels"] = labels
 
         return tokenized_inputs
@@ -158,7 +152,6 @@ def main():
     test_tokenized_datasets = test_dataset.map(tokenize_and_align_labels, batched=True, keep_in_memory=True)
     if args.max_test_samples:
         test_tokenized_datasets = test_tokenized_datasets.select(range(args.max_test_samples))
-
 
     os.makedirs(args.output_dir, exist_ok=True)
     output_name = f"DrBenchmark-DEFT2019-ner-{args.subset}-{str(uuid.uuid4().hex)}"
@@ -180,19 +173,19 @@ def main():
         report_to='none',
     )
 
-    print('Load Metrics')
-    metric  = evaluate.load("../../../metrics/seqeval.py", experiment_id=output_name)
+    logging.info('Load Metrics')
+    metric = evaluate.load("../../../metrics/seqeval.py", experiment_id=output_name)
     data_collator = DataCollatorForTokenClassification(tokenizer)
 
     def compute_metrics(p):
-        
+
         predictions, labels = p
         predictions = np.argmax(predictions, axis=2)
 
         true_predictions = [[label_list[p] for (p, l) in zip(prediction, label) if l != -100] for prediction, label in zip(predictions, labels)]
         true_labels = [[label_list[l] for (p, l) in zip(prediction, label) if l != -100] for prediction, label in zip(predictions, labels)]
 
-        results = metric.compute(predictions=true_predictions, references=true_labels)
+        results = metric.compute(predictions=true_predictions, references=true_labels, zero_division=.0)
 
         macro_values = [results[r]["f1"] for r in results if "overall_" not in r]
         macro_f1 = sum(macro_values) / len(macro_values)
@@ -232,9 +225,9 @@ def main():
         for prediction, label in zip(predictions, labels)
     ]
 
-    cr_metric = metric.compute(predictions=_true_predictions, references=_true_labels)
-    print(cr_metric)
-        
+    cr_metric = metric.compute(predictions=_true_predictions, references=_true_labels, zero_division=.0)
+    logging.info(cr_metric)
+
     def np_encoder(object):
         if isinstance(object, np.generic):
             return object.item()
@@ -250,6 +243,7 @@ def main():
                 "system_predictions": _true_predictions,
             },
         }, f, ensure_ascii=False, indent=4, default=np_encoder)
+
 
 if __name__ == '__main__':
     main()

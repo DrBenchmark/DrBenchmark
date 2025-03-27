@@ -11,7 +11,7 @@ _CITATION = """\
     url={http://clementdalloux.fr/?page_id=28},
     journal={Clément Dalloux},
     author={Dalloux, Clément}
-} 
+}
 """
 
 _DESCRIPTION = """\
@@ -41,6 +41,7 @@ _LICENSE = 'Data User Agreement'
 
 _URL = "https://drbenchmark.univ-avignon.fr/corpus/cas_essai.zip"
 
+
 class ESSAI(datasets.GeneratorBasedBuilder):
 
     DEFAULT_CONFIG_NAME = "pos"
@@ -65,11 +66,11 @@ class ESSAI(datasets.GeneratorBasedBuilder):
                     "tokens": [datasets.Value("string")],
                     "lemmas": [datasets.Value("string")],
                     "pos_tags": [datasets.features.ClassLabel(
-                        names = ['B-INT', 'B-PRO:POS', 'B-PRP', 'B-SENT', 'B-PRO', 'B-ABR', 'B-VER:pres', 'B-KON', 'B-SYM', 'B-DET:POS', 'B-VER:', 'B-PRO:IND', 'B-NAM', 'B-ADV', 'B-PRO:DEM', 'B-NN', 'B-PRO:PER', 'B-VER:pper', 'B-VER:ppre', 'B-PUN', 'B-VER:simp', 'B-PREF', 'B-NUM', 'B-VER:futu', 'B-NOM', 'B-VER:impf', 'B-VER:subp', 'B-VER:infi', 'B-DET:ART', 'B-PUN:cit', 'B-ADJ', 'B-PRP:det', 'B-PRO:REL', 'B-VER:cond', 'B-VER:subi'],
+                        names=['B-INT', 'B-PRO:POS', 'B-PRP', 'B-SENT', 'B-PRO', 'B-ABR', 'B-VER:pres', 'B-KON', 'B-SYM', 'B-DET:POS', 'B-VER:', 'B-PRO:IND', 'B-NAM', 'B-ADV', 'B-PRO:DEM', 'B-NN', 'B-PRO:PER', 'B-VER:pper', 'B-VER:ppre', 'B-PUN', 'B-VER:simp', 'B-PREF', 'B-NUM', 'B-VER:futu', 'B-NOM', 'B-VER:impf', 'B-VER:subp', 'B-VER:infi', 'B-DET:ART', 'B-PUN:cit', 'B-ADJ', 'B-PRP:det', 'B-PRO:REL', 'B-VER:cond', 'B-VER:subi'],
                     )],
                 }
             )
-        
+
         elif self.config.name.find("cls") != -1:
 
             features = datasets.Features(
@@ -78,11 +79,11 @@ class ESSAI(datasets.GeneratorBasedBuilder):
                     "document_id": datasets.Value("string"),
                     "tokens": [datasets.Value("string")],
                     "label": datasets.features.ClassLabel(
-                        names = ['negation_speculation', 'negation', 'neutral', 'speculation'],
+                        names=['negation_speculation', 'negation', 'neutral', 'speculation'],
                     ),
                 }
             )
-        
+
         elif self.config.name.find("ner") != -1:
 
             if self.config.name.find("_spec") != -1:
@@ -97,7 +98,7 @@ class ESSAI(datasets.GeneratorBasedBuilder):
                     "tokens": [datasets.Value("string")],
                     "lemmas": [datasets.Value("string")],
                     "ner_tags": [datasets.features.ClassLabel(
-                        names = names,
+                        names=names,
                     )],
                 }
             )
@@ -118,11 +119,11 @@ class ESSAI(datasets.GeneratorBasedBuilder):
         '''
         if self.config.data_dir is None:
             raise ValueError("This is a local dataset. Please pass the data_dir kwarg to load_dataset.")
-        
+
         else:
             data_dir = self.config.data_dir
         '''
-            
+
         return [
             datasets.SplitGenerator(
                 name=datasets.Split.TRAIN,
@@ -186,7 +187,7 @@ class ESSAI(datasets.GeneratorBasedBuilder):
                         id_doc, id_word, word, lemma, tag = splitted[0:5]
                         if len(splitted) >= 8:
                             tag = splitted[6]
-                        
+
                         if tag == "@card@":
                             print(splitted)
 
@@ -207,13 +208,13 @@ class ESSAI(datasets.GeneratorBasedBuilder):
                         id_words.append(id_word)
                         words.append(word)
                         lemmas.append(lemma)
-                        POS_tags.append('B-'+tag)
+                        POS_tags.append('B-' + tag)
 
                 dic = {
-                    "id_docs":  np.array(list(map(int, id_docs))),
+                    "id_docs": np.array(list(map(int, id_docs))),
                     "id_words": id_words,
-                    "words":    words,
-                    "lemmas":   lemmas,
+                    "words": words,
+                    "lemmas": lemmas,
                     "POS_tags": POS_tags,
                 }
 
@@ -253,7 +254,7 @@ class ESSAI(datasets.GeneratorBasedBuilder):
                             continue
 
                         id_doc, id_word, word, lemma, _ = line.split("\t")[0:5]
-                        tag = line.replace("\n","").split("\t")[-1]
+                        tag = line.replace("\n", "").split("\t")[-1]
 
                         if tag == "***" or tag == "_":
                             tag = "O"
@@ -271,10 +272,10 @@ class ESSAI(datasets.GeneratorBasedBuilder):
                         ner_tags.append(tag)
 
                 dic = {
-                    "id_docs":  np.array(list(map(int, id_docs))),
+                    "id_docs": np.array(list(map(int, id_docs))),
                     "id_words": id_words,
-                    "words":    words,
-                    "lemmas":   lemmas,
+                    "words": words,
+                    "lemmas": lemmas,
                     "ner_tags": ner_tags,
                 }
 
@@ -296,13 +297,11 @@ class ESSAI(datasets.GeneratorBasedBuilder):
                     key += 1
 
             elif self.config.name.find("cls") != -1:
-
-                f_in = open(filename, "r")
-                conll = [
-                    [b.split("\t") for b in a.split("\n")]
-                    for a in f_in.read().split("\n\n")
-                ]
-                f_in.close()
+                with open(filename) as f_in:
+                    conll = [
+                        [b.split("\t") for b in a.split("\n")]
+                        for a in f_in.read().split("\n\n")
+                    ]
 
                 classe = "negation" if filename.find("_neg") != -1 else "speculation"
 
@@ -356,7 +355,7 @@ class ESSAI(datasets.GeneratorBasedBuilder):
         random.shuffle(ids)
         random.shuffle(ids)
 
-        train, validation, test = np.split(ids, [int(len(ids)*0.70), int(len(ids)*0.80)])
+        train, validation, test = np.split(ids, [int(len(ids) * 0.70), int(len(ids) * 0.80)])
 
         if split == "train":
             allowed_ids = list(train)

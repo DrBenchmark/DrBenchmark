@@ -6,22 +6,19 @@
 # Apache 2.0
 
 import os
-import shutil
-
-import uuid
 import json
-import argparse
+import uuid
+import shutil
 import logging
 
-from utils import parse_args, TrainingArgumentsWithMPSSupport
-
-import torch
 import numpy as np
 from datasets import load_dataset, load_from_disk
+from transformers import Trainer, TrainingArguments
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score, classification_report
 
-from sklearn.metrics import precision_recall_fscore_support, accuracy_score, f1_score, roc_auc_score, accuracy_score, classification_report
+from utils import parse_args
 
-from transformers import AutoTokenizer, EvalPrediction, AutoModelForSequenceClassification, Trainer, TrainingArguments, TextClassificationPipeline
 
 def compute_metrics(pred):
     labels = pred.label_ids
@@ -35,19 +32,20 @@ def compute_metrics(pred):
         'recall': recall
     }
 
+
 def main():
 
     args = parse_args()
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-        datefmt="%m/%d/%Y %H:%M:%S"
+        datefmt="%m/%d/%Y %H:%M:%S",
+        level=logging.INFO
     )
-    #logger.setLevel(logging.INFO)
 
-    if args.offline == True:   
+    if args.offline:
         dataset = load_from_disk(f"{args.data_dir.rstrip('/')}/local_hf_{args.subset}/")
-    else:            
+    else:
         dataset = load_dataset(
             "DrBenchmark/PxCorpus",
             trust_remote_code=True,
@@ -89,13 +87,13 @@ def main():
     dataset_test = dataset_test.remove_columns(["text"])
     dataset_test.set_format("torch")
 
-    os.makedirs(args.output_dir, exist_ok=True)    
+    os.makedirs(args.output_dir, exist_ok=True)
     output_name = f"DrBenchmark-CAS-cls-{str(uuid.uuid4().hex)}"
 
     training_args = TrainingArguments(
         f"{args.output_dir}/{output_name}",
-        evaluation_strategy = "epoch",
-        save_strategy = "epoch",
+        evaluation_strategy="epoch",
+        save_strategy="epoch",
         learning_rate=float(args.learning_rate),
         per_device_train_batch_size=int(args.batch_size),
         per_device_eval_batch_size=int(args.batch_size),
@@ -130,19 +128,20 @@ def main():
     predictions, labels, _ = trainer.predict(dataset_test)
     predictions = np.argmax(predictions, axis=1)
 
-    f1_score = classification_report(
+    cr_metrics = classification_report(
         labels,
         predictions,
         digits=4,
         labels=range(len(labels_list)),
         target_names=labels_list,
+        zero_division=.0
     )
-    print(f1_score)
-        
+    logging.info(cr_metrics)
+
     with open(f"../runs/{output_name}.json", 'w', encoding='utf-8') as f:
         json.dump({
             "model_name": f"{args.output_dir}/{output_name}_best_model",
-            "metrics": classification_report(labels, predictions, output_dict=True),
+            "metrics": classification_report(labels, predictions, zero_division=.0, output_dict=True),
             "hyperparameters": vars(args),
             "predictions": {
                 "identifiers": dataset["test"]["id"],
@@ -150,6 +149,7 @@ def main():
                 "system_predictions": predictions.tolist(),
             },
         }, f, ensure_ascii=False, indent=4)
+
 
 if __name__ == '__main__':
     main()

@@ -22,6 +22,7 @@ _LICENSE = "unknown"
 
 _SPECIALITIES = ['microbiology', 'etiology', 'virology', 'physiology', 'immunology', 'parasitology', 'genetics', 'chemistry', 'veterinary', 'surgery', 'pharmacology', 'psychology']
 
+
 class MORFITT(datasets.GeneratorBasedBuilder):
 
     DEFAULT_CONFIG_NAME = "source"
@@ -57,7 +58,7 @@ class MORFITT(datasets.GeneratorBasedBuilder):
     def _split_generators(self, dl_manager):
 
         data_dir = dl_manager.download_and_extract(_URL).rstrip("/")
-            
+
         return [
             datasets.SplitGenerator(
                 name=datasets.Split.TRAIN,

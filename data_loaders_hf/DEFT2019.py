@@ -67,6 +67,7 @@ _LICENSE = "ddd"
 
 _LABELS_BASE = ['age', 'genre', 'issue', 'origine']
 
+
 @dataclass
 class DrBenchmarkConfig(datasets.BuilderConfig):
 	name: str = None
@@ -74,6 +75,7 @@ class DrBenchmarkConfig(datasets.BuilderConfig):
 	description: str = None
 	schema: str = None
 	subset_id: str = None
+
 
 class DEFT2019(datasets.GeneratorBasedBuilder):
 
@@ -101,7 +103,7 @@ class DEFT2019(datasets.GeneratorBasedBuilder):
 					"tokens": datasets.Sequence(datasets.Value("string")),
 					"ner_tags": datasets.Sequence(
 						datasets.features.ClassLabel(
-							names = ['O', 'B-age', 'I-age', 'B-genre', 'I-genre', 'B-issue', 'I-issue', 'B-origine', 'I-origine'],
+							names=['O', 'B-age', 'I-age', 'B-genre', 'I-genre', 'B-issue', 'I-issue', 'B-origine', 'I-origine'],
 						)
 					),
 				}
@@ -116,10 +118,10 @@ class DEFT2019(datasets.GeneratorBasedBuilder):
 
 		if self.config.data_dir is None:
 			raise ValueError("This is a local dataset. Please pass the data_dir kwarg to load_dataset.")
-		
+
 		else:
 			data_dir = self.config.data_dir
-			
+
 		return [
 			datasets.SplitGenerator(
 				name=datasets.Split.TRAIN,
@@ -146,9 +148,9 @@ class DEFT2019(datasets.GeneratorBasedBuilder):
 
 	def remove_prefix(self, a: str, prefix: str) -> str:
 		if a.startswith(prefix):
-			a = a[len(prefix) :]
+			a = a[len(prefix):]
 		return a
-		
+
 	def parse_brat_file(self, txt_file: Path, annotation_file_suffixes: List[str] = None, parse_notes: bool = False) -> Dict:
 
 		example = {}
@@ -207,7 +209,7 @@ class DEFT2019(datasets.GeneratorBasedBuilder):
 					i = 0
 					for start, end in ann["offsets"]:
 						chunk_len = end - start
-						ann["text"].append(text[i : chunk_len + i])
+						ann["text"].append(text[i: chunk_len + i])
 						i += chunk_len
 						while i < len(text) and text[i] == " ":
 							i += 1
@@ -341,30 +343,30 @@ class DEFT2019(datasets.GeneratorBasedBuilder):
 			rep_both = ['-', '/', '[', ']', ':', ')', '(', ',', '.']
 
 			for i in rep_before:
-				text = text.replace(i, ' '+i)
+				text = text.replace(i, ' ' + i)
 
 			for i in rep_after:
-				text = text.replace(i, i+' ')
+				text = text.replace(i, i + ' ')
 
 			for i in rep_both:
-				text = text.replace(i, ' '+i+' ')
+				text = text.replace(i, ' ' + i + ' ')
 
 			text_split = text.split()
 
 			punctuations = [',', '.']
-			for j in range(0, len(text_split)-1):
-				if j-1 >= 0 and j+1 <= len(text_split)-1 and text_split[j-1][-1].isdigit() and text_split[j+1][0].isdigit():
+			for j in range(0, len(text_split) - 1):
+				if j - 1 >= 0 and j + 1 <= len(text_split) - 1 and text_split[j - 1][-1].isdigit() and text_split[j + 1][0].isdigit():
 					if text_split[j] in punctuations:
-						text_split[j-1:j+2] = [''.join(text_split[j-1:j+2])]
+						text_split[j - 1:j + 2] = [''.join(text_split[j - 1:j + 2])]
 
 			text = ' '.join(text_split)
 
 			return text
-		
+
 		new_json = []
 
 		for ex in [json_object]:
-			
+
 			text = prepare_split(ex['text'])
 
 			tokenized_text = text.split()
@@ -409,7 +411,7 @@ class DEFT2019(datasets.GeneratorBasedBuilder):
 			}
 
 			new_json.append(res)
-			
+
 		return new_json
 
 	def convert_to_hf_format(self, json_object):
@@ -425,15 +427,15 @@ class DEFT2019(datasets.GeneratorBasedBuilder):
 
 				for idx_j, j in enumerate(i['spans']):
 
-					len_j = int(j['end'])-int(j['start'])
-					range_j = [l for l in range(int(j['start']),int(j['end']),1)]
+					len_j = int(j['end']) - int(j['start'])
+					range_j = [l for l in range(int(j['start']), int(j['end']), 1)]
 
 					keep = True
 
-					for idx_k, k in enumerate(i['spans'][idx_j+1:]):
+					for idx_k, k in enumerate(i['spans'][idx_j + 1:]):
 
-						len_k = int(k['end'])-int(k['start'])
-						range_k = [l for l in range(int(k['start']),int(k['end']),1)]
+						len_k = int(k['end']) - int(k['start'])
+						range_k = [l for l in range(int(k['start']), int(k['end']), 1)]
 
 						inter = list(set(range_k).intersection(set(range_j)))
 						if len(inter) > 0 and len_j < len_k:
@@ -444,18 +446,18 @@ class DEFT2019(datasets.GeneratorBasedBuilder):
 
 			# Create list of labels + id to separate different annotation and prepare IOB2 format
 			nb_tokens = len(i['tokens'])
-			ner_tags = ['O']*nb_tokens
-			
+			ner_tags = ['O'] * nb_tokens
+
 			for slct in selected_annotations:
 
-				for x in range(slct['token_start'], slct['token_end']+1, 1):
+				for x in range(slct['token_start'], slct['token_end'] + 1, 1):
 
 					if i['tokens'][x] not in slct['text']:
-						if ner_tags[x-1] == 'O':
-							ner_tags[x-1] = slct['label']+'-'+slct['id']
+						if ner_tags[x - 1] == 'O':
+							ner_tags[x - 1] = slct['label'] + '-' + slct['id']
 					else:
 						if ner_tags[x] == 'O':
-							ner_tags[x] = slct['label']+'-'+slct['id']
+							ner_tags[x] = slct['label'] + '-' + slct['id']
 
 			# Make IOB2 format
 			ner_tags_IOB2 = []
@@ -467,14 +469,14 @@ class DEFT2019(datasets.GeneratorBasedBuilder):
 					current_label = label.split('-')[0]
 					current_id = label.split('-')[1]
 					if idx_l == 0:
-						ner_tags_IOB2.append('B-'+current_label)
-					elif current_label in ner_tags[idx_l-1]:
-						if current_id == ner_tags[idx_l-1].split('-')[1]:
-							ner_tags_IOB2.append('I-'+current_label)
+						ner_tags_IOB2.append('B-' + current_label)
+					elif current_label in ner_tags[idx_l - 1]:
+						if current_id == ner_tags[idx_l - 1].split('-')[1]:
+							ner_tags_IOB2.append('I-' + current_label)
 						else:
-							ner_tags_IOB2.append('B-'+current_label)
+							ner_tags_IOB2.append('B-' + current_label)
 					else:
-						ner_tags_IOB2.append('B-'+current_label)
+						ner_tags_IOB2.append('B-' + current_label)
 
 			dict_out.append({
 				'id': i['id'],
@@ -482,38 +484,37 @@ class DEFT2019(datasets.GeneratorBasedBuilder):
 				"ner_tags": ner_tags_IOB2,
 				"tokens": i['tokens'],
 			})
-		
-		return dict_out
 
+		return dict_out
 
 	def split_sentences(self, json_o):
 		"""
 			Split each document in sentences to fit the 512 maximum tokens of BERT.
 
 		"""
-		
+
 		final_json = []
-		
+
 		for i in json_o:
 
-			ind_punc = [index for index, value in enumerate(i['tokens']) if value=='.'] + [len(i['tokens'])]
-			
+			ind_punc = [index for index, value in enumerate(i['tokens']) if value == '.'] + [len(i['tokens'])]
+
 			for index, value in enumerate(ind_punc):
-				
-				if index==0:
-					final_json.append({'id': i['id']+'_'+str(index),
+
+				if index == 0:
+					final_json.append({'id': i['id'] + '_' + str(index),
 									'document_id': i['document_id'],
-									'ner_tags': i['ner_tags'][:value+1],
-									'tokens': i['tokens'][:value+1]
+									'ner_tags': i['ner_tags'][:value + 1],
+									'tokens': i['tokens'][:value + 1]
 									})
 				else:
-					prev_value = ind_punc[index-1]
-					final_json.append({'id': i['id']+'_'+str(index),
+					prev_value = ind_punc[index - 1]
+					final_json.append({'id': i['id'] + '_' + str(index),
 									'document_id': i['document_id'],
-									'ner_tags': i['ner_tags'][prev_value+1:value+1],
-									'tokens': i['tokens'][prev_value+1:value+1]
-									}) 
-		
+									'ner_tags': i['ner_tags'][prev_value + 1:value + 1],
+									'tokens': i['tokens'][prev_value + 1:value + 1]
+									})
+
 		return final_json
 
 	def _generate_examples(self, data_dir, split):
@@ -532,7 +533,7 @@ class DEFT2019(datasets.GeneratorBasedBuilder):
 			random.shuffle(train)
 			random.shuffle(train)
 			random.shuffle(train)
-			train, validation = np.split(train, [int(len(train)*0.7096)])
+			train, validation = np.split(train, [int(len(train) * 0.7096)])
 			test = [raw.split('\t')[0] for raw in distribution if len(raw.split('\t')) == 4 and raw.split('\t')[1] == 'test 2019']
 
 			ann_path = Path(data_dir) / "DEFT-cas-cliniques"
@@ -569,6 +570,6 @@ class DEFT2019(datasets.GeneratorBasedBuilder):
 				allowed_ids = list(validation)
 
 			for r in all_res:
-				if r["document_id"]+'.txt' in allowed_ids:
+				if r["document_id"] + '.txt' in allowed_ids:
 					yield r["id"], r
 

@@ -1,13 +1,15 @@
 import os
 import json
-from glob import glob
+
 
 path = "./recipes/"
-dirs = [ f.path for f in os.scandir(path) if f.is_dir() ]
+dirs = [f.path for f in os.scandir(path) if f.is_dir()]
 print(dirs)
+
 
 def contains(p, t):
     return p.find(t) != -1
+
 
 results = {}
 
@@ -19,14 +21,13 @@ for d in dirs:
     print(d)
 
     d_path = f"{d}/runs/"
-    files = [ f.path for f in os.scandir(d_path) if f.is_file() and str(f).find(".json") != -1 ]
+    files = [f.path for f in os.scandir(d_path) if f.is_file() and str(f).find(".json") != -1]
     print(files)
 
     for file_path in files:
 
-        f_json = open(file_path, "r")
-        data = json.load(f_json)
-        f_json.close()
+        with open(file_path) as f_json:
+            data = json.load(f_json)
 
         print(file_path)
         corpus = ""
@@ -77,7 +78,7 @@ for d in dirs:
             corpus = "frenchmedmcqa"
         elif contains(file_path, "/mantragsc/"):
             corpus = "mantragsc"
-        elif contains(file_path, "/morfitt/"):            
+        elif contains(file_path, "/morfitt/"):
             corpus = "morfitt"
         elif contains(file_path, "/quaero/"):
             corpus = "quaero"
@@ -97,7 +98,7 @@ for d in dirs:
 
         fewshot = data["hyperparameters"]["fewshot"]
         key = f"{corpus}|{task}|{fewshot}"
-        
+
         print(key + "-" + model_name)
 
         if model_name not in results:
@@ -107,15 +108,15 @@ for d in dirs:
 
             if key not in results[model_name]:
                 results[model_name][key] = {"overall_f1": [], "overall_accuracy": []}
-            
+
             results[model_name][key]["overall_f1"].append(data["metrics"]["overall_f1"])
             results[model_name][key]["overall_accuracy"].append(data["metrics"]["overall_accuracy"])
-        
+
         elif task.find("cls") != -1:
 
             if key not in results[model_name]:
                 results[model_name][key] = {"macro_f1": [], "weighted_f1": []}
-            
+
             results[model_name][key]["macro_f1"].append(data["metrics"]["macro avg"]["f1-score"])
             results[model_name][key]["weighted_f1"].append(data["metrics"]["weighted avg"]["f1-score"])
 
@@ -123,15 +124,15 @@ for d in dirs:
 
             if key not in results[model_name]:
                 results[model_name][key] = {"hamming_score": [], "exact_match": []}
-            
+
             results[model_name][key]["hamming_score"].append(data["metrics"]["hamming_score"])
             results[model_name][key]["exact_match"].append(data["metrics"]["exact_match"])
-        
+
         elif task.find("regr") != -1:
 
             if key not in results[model_name]:
                 results[model_name][key] = {"edrm": [], "spearman_correlation_coef": []}
-            
+
             results[model_name][key]["edrm"].append(data["metrics"]["EDRM"])
             results[model_name][key]["spearman_correlation_coef"].append(data["metrics"]["spearman_correlation_coef"])
 
@@ -141,12 +142,12 @@ with open("./stats/results.json", 'w') as f:
 avg_results = {}
 
 for model in results:
-    
+
     print(model)
 
     if model not in avg_results:
         avg_results[model] = {}
-    
+
     for task in results[model]:
 
         if not task.endswith("|1.0"):
@@ -154,17 +155,17 @@ for model in results:
 
         if task not in avg_results[model]:
             avg_results[model][task] = {}
-        
+
         print(task)
 
         for metric in results[model][task].keys():
 
             avg = sum(results[model][task][metric]) / len(results[model][task][metric])
-            print(">> ", metric , "-", avg)
+            print(">> ", metric, "-", avg)
 
             if metric not in avg_results[model][task]:
                 avg_results[model][task][metric] = -1
-            
+
             avg_results[model][task][metric] = avg
 
 with open("./stats/overall_averaged_metrics.json", 'w') as f:
