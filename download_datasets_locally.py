@@ -1,3 +1,4 @@
+import aiohttp
 import logging
 
 from datasets import load_dataset
@@ -42,7 +43,10 @@ def save_locally(arr):
     dataset = load_dataset(
         f"DrBenchmark/{corpus}",
         subset,
-        trust_remote_code=True
+        trust_remote_code=True,
+        storage_options={
+            'client_kwargs': {'timeout': aiohttp.ClientTimeout(20 * 60)}
+        }
     )
     dataset.save_to_disk(f"./recipes/{corpus.lower()}/data/local_hf_{subset}/")
 
