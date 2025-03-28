@@ -1,5 +1,5 @@
-import os
 import logging
+import subprocess
 
 try:
     with open('models.txt') as f:
@@ -86,4 +86,9 @@ if __name__ == '__main__':
                 logging.info('=============================')
                 logging.info('')
 
-                os.system(f'cd recipes/{corpus.lower()}/scripts/ ; {task2script[task].format(model_name=model)}')
+                command = f'cd recipes/{corpus.lower()}/scripts/ ; {task2script[task].format(model_name=model)}'
+                try:
+                    subprocess.call(command, shell=True)
+                except KeyboardInterrupt:
+                    logging.info('KeyboardInterrupt Exiting...')
+                    exit()
