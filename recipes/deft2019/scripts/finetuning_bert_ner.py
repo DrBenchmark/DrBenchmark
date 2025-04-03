@@ -47,9 +47,10 @@ def main():
         dataset = load_from_disk(f"{args.data_dir.rstrip('/')}/local_hf_{args.subset}/")
     else:
         dataset = load_dataset(
-            "DrBenchmark/DEFT2019",
+            "../../../data_loaders_hf/DEFT2019.py",
             name=str(args.subset),
             trust_remote_code=True,
+            data_dir=args.data_dir,
         )
 
     train_dataset = dataset["train"]
