@@ -77,11 +77,28 @@ def parse_args():
 
     args["output_dir"] = args["output_dir"].rstrip('/')
 
+    # Resolve path to model, it can be either hub, full path, rel path
+    m = args["model_name"]
+    # If path exists, no problem
+    if not os.path.exists(m):
+        # If path not exist, it's either a model from the hub model or a
+        #  relative path that broke since we `cd` to `recipes/task/scripts`
+        # Try to fix the relative path
+        fixed_path = os.path.join('..', '..', '..', m)
+        if os.path.exists(fixed_path):
+            # Great it's a local path
+            m = fixed_path
+        else:
+            # Still do not exist, it must me a model from the hub
+            if args['offline']:
+                # If online
+                model_name_clean = m.lower().replace('/', '_')
+                m = os.path.join('..', '..', '..', 'models', model_name_clean)
+    args['model_name'] = m
+
     if args["offline"]:
         os.environ["WANDB_DISABLED"] = "true"
         os.environ['TRANSFORMERS_OFFLINE'] = '1'
-        model_name_clean = args['model_name'].lower().replace('/', '_')
-        args["model_name"] = f"../../../models/{model_name_clean}"
 
     # print(f">> Model path: >>{args['model_name']}<<")
 
