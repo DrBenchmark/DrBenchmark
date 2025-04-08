@@ -98,7 +98,8 @@ def parse_args():
 
     if args["offline"]:
         os.environ["WANDB_DISABLED"] = "true"
-        os.environ['TRANSFORMERS_OFFLINE'] = '1'
+        os.environ['TRANSFORMERS_OFFLINE'] = '1'  # transformers<4.42
+        os.environ['HF_HUB_OFFLINE'] = '1'  # datasets>=2.21, transformers>=4.42
 
     # print(f">> Model path: >>{args['model_name']}<<")
 
