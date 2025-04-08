@@ -1,13 +1,6 @@
 import logging
 import subprocess
 
-try:
-    with open('models.txt') as f:
-        MODELS_TO_EVALUATE = [l.strip() for l in f if not l.startswith('#') and l.strip()]
-except FileNotFoundError:
-    # logging.warning('`models.txt` not found. Please provide models in --models')
-    MODELS_TO_EVALUATE = []
-
 task2script = {
     'CAS_POS': './run_task_1.sh {model_name}',
     'CAS_CLS': './run_task_2.sh {model_name}',
@@ -54,13 +47,24 @@ task2script = {
 if __name__ == '__main__':
     import argparse
 
+    try:
+        with open('models.txt') as f:
+            MODELS_TO_EVALUATE = [l.strip() for l in f if not l.startswith('#') and l.strip()]
+    except FileNotFoundError:
+        logging.warning('`models.txt` not found. Please provide models in --models')
+        MODELS_TO_EVALUATE = []
+
     def arguments():
         parser = argparse.ArgumentParser(
             description='Run selected DrBenchmark\'s task on selected models.')
-        parser.add_argument("--tasks", type=str, nargs='+', required=False, help="Tasks to evaluate or 'all'", choices=list(task2script.keys()) + ['all'])
-        parser.add_argument("--models", type=str, nargs='+', required=False, help="Space separated list of models to evaluate (overrides models defined in ./models.txt)", default=MODELS_TO_EVALUATE)
-        parser.add_argument("--nb-run", type=int, required=False, help="Number of run to launch", default=1)
-        parser.add_argument("--log-level", type=str, required=False, help="Level of logging (default: INFO)", default='INFO')
+        parser.add_argument("--tasks", type=str, nargs='+', required=True, metavar="TASK",
+                            help="Tasks to evaluate or 'all'. Choose from %(choices)s", choices=list(task2script.keys()) + ['all'])
+        parser.add_argument("--models", type=str, nargs='+', required=False,
+                            help="Name or path of models to evaluate (overrides models defined in ./models.txt)", default=MODELS_TO_EVALUATE)
+        parser.add_argument("--nb-run", type=int, required=False,
+                            help="Number of runs to launch", default=1)
+        parser.add_argument("--log-level", type=str, required=False,
+                            help="Level of logging (default: INFO)", default='INFO')
         args = parser.parse_args()
 
         return args
@@ -74,7 +78,7 @@ if __name__ == '__main__':
     )
 
     if args.tasks == ['all']:
-        args.tasks = list(task2script.keys())
+        args.tasks = sorted(list(task2script.keys()))
 
     for task in args.tasks:
         corpus, subset = (task if '_' in task else task + '_').split('_', 1)

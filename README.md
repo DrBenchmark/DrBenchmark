@@ -8,76 +8,57 @@
 
 The biomedical domain has sparked a significant interest in the field of Natural Language Processing (NLP), which has seen substantial advancements with pre-trained language models (PLMs). However, comparing these models has proven challenging due to variations in evaluation protocols across different models. A fair solution is to aggregate diverse downstream tasks into a benchmark, allowing for the assessment of intrinsic PLMs qualities from various perspectives. Although still limited to few languages, this initiative has been undertaken in the biomedical field, notably English and Chinese. This limitation hampers the evaluation of the latest French biomedical models, as they are either assessed on a minimal number of tasks with non-standardized protocols or evaluated using general downstream tasks. To bridge this research gap and account for the unique sensitivities of French, we present the first-ever publicly available French biomedical language understanding benchmark called DrBenchmark. It encompasses 20 diversified tasks, including named-entity recognition, part-of-speech tagging, question-answering, semantic textual similarity, and classification. We evaluate 8 state-of-the-art pre-trained masked language models (MLMs) on general and biomedical-specific data, as well as English specific MLMs to assess their cross-lingual capabilities. Our experiments reveal that no single model excels across all tasks, while generalist models are sometimes still competitive.
 
-## Steps
-
-1. Add the files for the restricted corpus (CAS, ESSAI and CLISTER) in the `./recipes/<corpus_name>/data/` folder.
-2. Setup and activate the conda environement
-3. (Optionnal) In case you are running the benchmark on a offline machine / cluster, please build and save locally each datasets by simply using `python ./download_datasets_locally.py`, download all the models locally by using `python ./download_models_locally.py` and finally, set the value of `offline` to `True` in the `./config.yaml` file.
-4. Run the benchmark.
-
-## Anaconda setup
+## Running the benchmark
 
 ```bash
-conda create --name DrBenchmark python=3.9 -y
+git clone https://github.com/DrBenchmark/DrBenchmark
+cd DrBenchmark
+conda env create -f environment.yml
 conda activate DrBenchmark
+
+# Run the benchmark for a specific task and model
+python run.py --tasks FrenchMedMCQA_MCQA --model Dr-BERT/DrBERT-7GB --nb-run 4
+# or to run all tasks for all models in ./models.txt
+python run.py --tasks all --nb-run 4
 ```
+
+Note: The access to DEFT-2019 data is restricted. Once data is acquired, add the files to `./recipes/deft2019/data/`.
+Note: In case you are running the benchmark on an **offline machine / cluster**, execute `python ./download_datasets_locally.py` and `python ./download_models_locally.py` to locally build and save datasets and models. Then, set `offline` to `True` in `./config.yaml`.
 
 More information on managing environments with Anaconda can be found in [the conda cheat sheet](https://docs.conda.io/projects/conda/en/4.6.0/_downloads/52a95608c49671267e40c689e0bc00ca/conda-cheatsheet.pdf).
 
-Once you have created your Python environment (Python 3.9+) you can simply type:
-
-```bash
-git clone https://github.com/DrBenchmark/DrBenchmark.git
-cd DrBenchmark
-pip install -r requirements.txt
-```
-
-## Jean-zay setup
-
-```bash
-module purge
-module load git-lfs/3.3.0
-module load pytorch-gpu/py3/1.12.1
-git lfs install
-```
-
-```bash
-git clone https://github.com/DrBenchmark/DrBenchmark.git
-cd DrBenchmark
-pip install -r requirements.txt
-```
-
-## Add models to the benchmark
-
-1. Open the `./models.txt` file.
-2. Add HuggingFace remote or local path the models you are wanting to evaluate.
-
-For example, we choose the following models:
-
-```plain
-Dr-BERT/DrBERT-7GB
-camembert-base
-almanach/camemberta-base
-almanach/camembert-bio-base
-microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract
-flaubert/flaubert_base_uncased
-```
-
-## Run the benchmark
-
-**On local:**
-
-1. `run.sh`
-
-**On local SLURM:**
+### Running with SLURM
 
 1. `sbatch run_slurm.sh`
 
-**On Jean-Zay SLURM:**
+### Running with SLURM on Jean-Zay
 
-1. `idr_compuse`
-2. `nano run_jean_zay.sh` (replace the account identifier with the one from idr_compuse)
+```bash
+module purge
+module load pytorch-gpu/py3/1.12.1
+```
+
+1. Find your account identifier with `idr_compuse` command
+2. Edit `run_jean_zay.sh` to replace `<ACCOUNT>` by your account identifier
 3. `sbatch run_jean_zay.sh`
+
+## Evaluate other models
+
+1. Open the `./models.txt` file.
+2. Add HuggingFace repo name or local model path (_prefer absolute file path_) for the models you wish to evaluate.
+
+For example, we chose the following models for the DrBenchmark paper:
+
+```plain
+almanach/camembert-base
+almanach/camemberta-base
+flaubert/flaubert_base_uncased
+FacebookAI/xlm-roberta-base
+microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext
+Dr-BERT/DrBERT-7GB
+Dr-BERT/DrBERT-4GB-CP-PubMedBERT
+almanach/camembert-bio-base
+```
 
 ## Tasks
 
