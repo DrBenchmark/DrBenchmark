@@ -22,8 +22,9 @@ python run.py --tasks FrenchMedMCQA_MCQA --model Dr-BERT/DrBERT-7GB --nb-run 4
 python run.py --tasks all --nb-run 4
 ```
 
-Note: The access to DEFT-2019 data is restricted. Once data is acquired, add the files to `./recipes/deft2019/data/`.
-Note: In case you are running the benchmark on an **offline machine / cluster**, execute `python ./download_datasets_locally.py` and `python ./download_models_locally.py` to locally build and save datasets and models. Then, set `offline` to `True` in `./config.yaml`.
+**Note**: The access to **DEFT-2019** data is restricted. Once data is acquired, add the files to `./recipes/deft2019/data/`.
+
+**Note**: In case you are running the benchmark on an **offline machine / cluster**, execute `python ./download_datasets_locally.py` and `python ./download_models_locally.py` to locally build and save datasets and models. Then, set `offline` to `True` in `./config.yaml`.
 
 More information on managing environments with Anaconda can be found in [the conda cheat sheet](https://docs.conda.io/projects/conda/en/4.6.0/_downloads/52a95608c49671267e40c689e0bc00ca/conda-cheatsheet.pdf).
 
@@ -32,11 +33,6 @@ More information on managing environments with Anaconda can be found in [the con
 1. `sbatch run_slurm.sh`
 
 ### Running with SLURM on Jean-Zay
-
-```bash
-module purge
-module load pytorch-gpu/py3/1.12.1
-```
 
 1. Find your account identifier with `idr_compuse` command
 2. Edit `run_jean_zay.sh` to replace `<ACCOUNT>` by your account identifier
@@ -62,31 +58,31 @@ almanach/camembert-bio-base
 
 ## Tasks
 
-|  **Dataset**           |  Train          | Validation            | Test                     | Task                                       | Metrics                       | HuggingFace                                                   |
-|:----------------------:|:---------------:|:---------------------:|:------------------------:|:------------------------------------------:|:-----------------------------:|:-------------------------------------------------------------:|
-| CAS - Task 1           |      5306       |        758            |         1516             | Part-Of-Speech Tagging (POS)               |     F1                        | [LINK](https://huggingface.co/datasets/Dr-BERT/CAS)           |
-| CAS - Task 2           |      5306       |        758            |         1516             | Multi-class Classification (CLS)           |     F1                        | [LINK](https://huggingface.co/datasets/Dr-BERT/CAS)           |
-| ESSAI - Task 1         |      9693       |       1385            |         2770             | Part-Of-Speech Tagging (POS)               |     F1                        | [LINK](https://huggingface.co/datasets/Dr-BERT/ESSAI)         |
-| ESSAI - Task 2         |      9693       |       1385            |         2770             | Multi-class Classification(CLS)            |     F1                        | [LINK](https://huggingface.co/datasets/Dr-BERT/ESSAI)         |
-| QUAERO - EMEA          |      429        |       389             |         348              | Named Entity Recognition (NER)             |     F1                        | [LINK](https://huggingface.co/datasets/Dr-BERT/QUAERO)        |
-| QUAERO - MEDLINE       |      833        |       832             |         833              | Named Entity Recognition (NER)             |     F1                        | [LINK](https://huggingface.co/datasets/Dr-BERT/QUAERO)        |
-| E3C Task 1             |      969        |       140             |         293              | Named Entity Recognition (NER)             |     F1                        | [LINK](https://huggingface.co/datasets/Dr-BERT/E3C)           |
-| E3C Task 2             |      969        |       140             |         293              | Named Entity Recognition (NER)             |     F1                        | [LINK](https://huggingface.co/datasets/Dr-BERT/E3C)           |
-| MorFITT                |      1514       |       1022            |         1088             | Multi-label Classification (CLS)           |     F1                        | [LINK](https://huggingface.co/datasets/Dr-BERT/MORFITT)       |
-| FrenchMedMCQA - Task 1 |      2171       |        312            |         622              | Multiple-Choice Question Answering (MCQA)  |     Hamming Score / EMR       | [LINK](https://huggingface.co/datasets/Dr-BERT/FrenchMedMCQA) |
-| FrenchMedMCQA - Task 2 |      2171       |        312            |         622              | Multi-class Classification (CLS)           |     F1                        | [LINK](https://huggingface.co/datasets/Dr-BERT/FrenchMedMCQA) |
-| Mantra-GSC - EMEA      |        70       |         10            |           20             | Named Entity Recognition (NER)             |     F1                        | [LINK](https://huggingface.co/datasets/Dr-BERT/Mantra-GSC)    |
-| Mantra-GSC - MEDLINE   |        70       |         10            |           20             | Named Entity Recognition (NER)             |     F1                        | [LINK](https://huggingface.co/datasets/Dr-BERT/Mantra-GSC)    |
-| Mantra-GSC - PATENT    |        35       |          5            |           10             | Named Entity Recognition (NER)             |     F1                        | [LINK](https://huggingface.co/datasets/Dr-BERT/Mantra-GSC)    |
-| CLISTER                |      499        |        101            |          400             | Semantic textual similarity (STS)          |     EDRM / Spearman           | [LINK](https://huggingface.co/datasets/Dr-BERT/CLISTER)       |
-| DEFT-2019              |      3543       |        1340           |          7202            | Named Entity Recognition (NER)             |     F1                        | [LINK](https://huggingface.co/datasets/Dr-BERT/DEFT2019)      |
-| DEFT-2020 - Task 1     |      498        |        102            |          410             | Semantic textual similarity (STS)          |     EDRM / Spearman           | [LINK](https://huggingface.co/datasets/Dr-BERT/DEFT2020)      |
-| DEFT-2020 - Task 2     |      460        |        112            |          530             | Multi-class Classification (CLS)           |     F1                        | [LINK](https://huggingface.co/datasets/Dr-BERT/DEFT2020)      |
-| DEFT-2021 - Task 1     |      118        |         49            |          108             | Multi-label Classification (CLS)           |     F1                        | [LINK](https://huggingface.co/datasets/Dr-BERT/DEFT2021)      |
-| DEFT-2021 - Task 1     |      2153       |         793           |          1766            | Named Entity Recognition (NER)             |     F1                        | [LINK](https://huggingface.co/datasets/Dr-BERT/DEFT2021)      |
-| DiaMED                 |        509      |         76            |           154            | Multi-class Classification (CLS)           |     F1                        | [LINK](https://huggingface.co/datasets/Dr-BERT/DiaMed)        |
-| PxCorpus               |        1386     |         198           |            397           | Named Entity Recognition (NER)             |     F1                        | [LINK](https://huggingface.co/datasets/Dr-BERT/PxCorpus)      |
-| PxCorpus               |        1386     |         198           |            397           | Multi-class Classification (CLS)           |     F1                        | [LINK](https://huggingface.co/datasets/Dr-BERT/PxCorpus)      |
+|  **Dataset**           | Train | Validation | Test | Task                                       | Metrics             | HuggingFace                                                       |
+|:----------------------:| -----:| ----------:| -----:|:------------------------------------------:|:------------------:|:-----------------------------------------------------------------:|
+| CAS - Task 1           |  5306 |        758 | 1516 | Part-Of-Speech Tagging (POS)               | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/CAS)           |
+| CAS - Task 2           |  5306 |        758 | 1516 | Multi-class Classification (CLS)           | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/CAS)           |
+| ESSAI - Task 1         |  9693 |       1385 | 2770 | Part-Of-Speech Tagging (POS)               | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/ESSAI)         |
+| ESSAI - Task 2         |  9693 |       1385 | 2770 | Multi-class Classification(CLS)            | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/ESSAI)         |
+| QUAERO - EMEA          |   429 |        389 |  348 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/QUAERO)        |
+| QUAERO - MEDLINE       |   833 |        832 |  833 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/QUAERO)        |
+| E3C Task 1             |   969 |        140 |  293 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/E3C)           |
+| E3C Task 2             |   969 |        140 |  293 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/E3C)           |
+| MorFITT                |  1514 |       1022 | 1088 | Multi-label Classification (CLS)           | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/MORFITT)       |
+| FrenchMedMCQA - Task 1 |  2171 |        312 |  622 | Multiple-Choice Question Answering (MCQA)  | Hamming Score / EMR | [LINK](https://huggingface.co/datasets/DrBenchmark/FrenchMedMCQA) |
+| FrenchMedMCQA - Task 2 |  2171 |        312 |  622 | Multi-class Classification (CLS)           | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/FrenchMedMCQA) |
+| Mantra-GSC - EMEA      |    70 |         10 |   20 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/Mantra-GSC)    |
+| Mantra-GSC - MEDLINE   |    70 |         10 |   20 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/Mantra-GSC)    |
+| Mantra-GSC - PATENT    |    35 |          5 |   10 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/Mantra-GSC)    |
+| CLISTER                |   499 |        101 |  400 | Semantic textual similarity (STS)          | EDRM / Spearman     | [LINK](https://huggingface.co/datasets/DrBenchmark/CLISTER)       |
+| DEFT-2019 (restricted) |  3543 |       1340 | 7202 | Named Entity Recognition (NER)             | F1                  | [LINK](https://web.archive.org/web/20221203123027/https://deft.lisn.upsaclay.fr/2019/) |
+| DEFT-2020 - Task 1     |   498 |        102 |  410 | Semantic textual similarity (STS)          | EDRM / Spearman     | [LINK](https://huggingface.co/datasets/DrBenchmark/DEFT2020)      |
+| DEFT-2020 - Task 2     |   460 |        112 |  530 | Multi-class Classification (CLS)           | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/DEFT2020)      |
+| DEFT-2021 - Task 1     |   118 |         49 |  108 | Multi-label Classification (CLS)           | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/DEFT2021)      |
+| DEFT-2021 - Task 1     |  2153 |        793 | 1766 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/DEFT2021)      |
+| DiaMED                 |   509 |         76 |  154 | Multi-class Classification (CLS)           | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/DiaMed)        |
+| PxCorpus               |  1386 |        198 |  397 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/PxCorpus)      |
+| PxCorpus               |  1386 |        198 |  397 | Multi-class Classification (CLS)           | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/PxCorpus)      |
 
 ## Datasets
 
