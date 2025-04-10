@@ -6,8 +6,10 @@ dependencies:
   - python>3.7,<3.13
   - pip
   - transformers>=4.0,<=4.49  # to prevent future version breakage (cf. warning tokenizer arg) 
+  - pytorch
   - datasets>=2.21  # >2.21 for HF_HUB_OFFLINE
   - evaluate>=0.4.1
+  - accelerate>=0.26
   - sentencepiece
   - tensorboardX
   - scikit-learn>1.4  # >1.4 for clister.root_mean_square_error
@@ -15,6 +17,7 @@ dependencies:
   - beautifulsoup4  # for E3C
   - lxml  # for E3C
   - pillow  # for DiaMED
+  - filelock  # for MANTRAGSC
   - sacremoses  # for flaubert
   - xmltodict
   - pyyaml
