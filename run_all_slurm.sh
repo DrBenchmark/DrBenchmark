@@ -9,11 +9,14 @@
 #SBATCH --time=01:30:00
 #SBATCH --output=./logs/%x_%A_%a.out
 #SBATCH --error=./logs/%x_%A_%a.err
-#SBATCH --array=0-863%100      # 864 jobs overall but 100 jobs max in the queue
+#SBATCH --array=0-863%100      # 27tasks*8models*4runs = 864 jobs overall but 100 jobs max in the queue
 #SBATCH --partition=gpu
 #SBATCH --constraint='GPURAM_Min_12GB'
 
-source ~/.bashrc  # or your local configuration file that activates conda for example
+# 1. Edit NBR_RUNS and --array to match (if --array is too low, not all experiments will be run)
+# 2. Edit source ~/.profile for your environment file
+
+source ~/.profile  # or your local configuration file that activates conda for example
 conda activate DrBenchmark
 
 NBR_RUNS=4
@@ -24,7 +27,7 @@ declare -a MODELS
 while read m ; do
     MODELS+=("$m")
 done < models.txt
-# If there is no newline at the end of the file $m is not empty; add the last line
+# If there is no newline at the end of the file $m contains the last model
 test "$m" && MODELS+=("$m")
 
 declare -a JOBS
@@ -78,13 +81,9 @@ for MODEL_NAME in "${MODELS[@]}"; do
 done
 
 # To list every job's command
-for com in "${JOBS[@]}"; do echo $com; done
-# echo ${JOBS[@]};
+# for com in "${JOBS[@]}"; do echo $com; done
 # To list number of jobs
-echo ${#JOBS[@]};
-exit
-
-nvidia-smi
+# echo ${#JOBS[@]};
 
 # Select which job to run
 CURRENT=$SLURM_ARRAY_TASK_ID

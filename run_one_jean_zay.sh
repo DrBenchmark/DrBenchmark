@@ -9,59 +9,49 @@
 #SBATCH --time=01:30:00
 #SBATCH --output=./logs/%x_%A_%a.out
 #SBATCH --error=./logs/%x_%A_%a.err
-#SBATCH --array=0-863%100      # 864 jobs overall but 100 jobs max in the queue
 #SBATCH --partition=gpu_p2
 #SBATCH --qos=qos_gpu-t3
-#SBATCH -A <ACCOUNT>@v100
+#SBATCH --account=<ACCOUNT>@v100
+
+# 1. Edit source ~/.profile for your environment file
+# 2. Edit --account for your JZ account
+# 3. Edit MODEL_NAME and 
 
 module purge
 module load pytorch-gpu/py3/1.12.1
 
-source ~/.bashrc  # or your local configuration file that activates conda for example
+source ~/.profile  # or your local configuration file that activates conda for example
 conda activate DrBenchmark
 
 MODEL_NAME="Dr-BERT/DrBERT-7GB"
+NBR_RUNS=1
 
-COMMAND="cd ./recipes/cas/scripts/ && srun bash run_task_1.sh '$MODEL_NAME'"
-# COMMAND="cd ./recipes/cas/scripts/ && srun bash run_task_2.sh '$MODEL_NAME'"
-# COMMAND="cd ./recipes/cas/scripts/ && srun bash run_task_3.sh '$MODEL_NAME'"
-# COMMAND="cd ./recipes/cas/scripts/ && srun bash run_task_4.sh '$MODEL_NAME'"
+# TASK='CAS_POS'
+# TASK='CAS_CLS'
+# TASK='CAS_NER NEG'
+# TASK='CAS_NER SPEC'
+# TASK='CLISTER'
+# TASK='Diamed'
+# TASK='E3C_French_clinical'
+# TASK='E3C_French_temporal'
+# TASK='ESSAI_POS'
+# TASK='ESSAI_CLS'
+# TASK='ESSAI_NER NEG'
+# TASK='ESSAI_NER SPEC'
+TASK='FrenchMedMCQA_MCQA'
+# TASK='FrenchMedMCQA_CLS'
+# TASK='MantraGSC_fr_emea'
+# TASK='MantraGSC_fr_medline'
+# TASK='MantraGSC_fr_patents'
+# TASK='Morfitt'
+# TASK='DEFT2019'
+# TASK='DEFT2020_REG'
+# TASK='DEFT2020_CLS'
+# TASK='DEFT2021_NER'
+# TASK='DEFT2021_CLS'
+# TASK='PXCorpus_NER'
+# TASK='PXCorpus_CLS'
+# TASK='QUAERO_EMEA'
+# TASK='QUAERO_MEDLINE'
 
-# COMMAND="cd ./recipes/clister/scripts/ && srun bash run.sh '$MODEL_NAME'"
-
-# COMMAND="cd ./recipes/deft2019/scripts/ && srun bash run.sh '$MODEL_NAME'"
-
-# COMMAND="cd ./recipes/deft2020/scripts/ && srun bash run_task_1.sh '$MODEL_NAME'"
-# COMMAND="cd ./recipes/deft2020/scripts/ && srun bash run_task_2.sh '$MODEL_NAME'"
-
-# COMMAND="cd ./recipes/deft2021/scripts/ && srun bash run_task_1.sh '$MODEL_NAME'"
-# COMMAND="cd ./recipes/deft2021/scripts/ && srun bash run_task_2.sh '$MODEL_NAME'"
-
-# COMMAND="cd ./recipes/diamed/scripts/ && srun bash run.sh '$MODEL_NAME'"
-
-# COMMAND="cd ./recipes/e3c/scripts/ && srun bash run.sh '$MODEL_NAME' 'French_clinical'"
-# COMMAND="cd ./recipes/e3c/scripts/ && srun bash run.sh '$MODEL_NAME' 'French_temporal'"
-
-# COMMAND="cd ./recipes/essai/scripts/ && srun bash run_task_1.sh '$MODEL_NAME'"
-# COMMAND="cd ./recipes/essai/scripts/ && srun bash run_task_2.sh '$MODEL_NAME'"
-# COMMAND="cd ./recipes/essai/scripts/ && srun bash run_task_3.sh '$MODEL_NAME'"
-# COMMAND="cd ./recipes/essai/scripts/ && srun bash run_task_4.sh '$MODEL_NAME'"
-
-# COMMAND="cd ./recipes/frenchmedmcqa/scripts/ && srun bash run_task_1.sh '$MODEL_NAME'"
-# COMMAND="cd ./recipes/frenchmedmcqa/scripts/ && srun bash run_task_2.sh '$MODEL_NAME'"
-
-# COMMAND="cd ./recipes/mantragsc/scripts/ && srun bash run.sh '$MODEL_NAME' 'fr_emea'"
-# COMMAND="cd ./recipes/mantragsc/scripts/ && srun bash run.sh '$MODEL_NAME' 'fr_medline'"
-# COMMAND="cd ./recipes/mantragsc/scripts/ && srun bash run.sh '$MODEL_NAME' 'fr_patents'"
-
-# COMMAND="cd ./recipes/morfitt/scripts/ && srun bash run.sh '$MODEL_NAME'"
-
-# COMMAND="cd ./recipes/pxcorpus/scripts/ && srun bash run_task_1.sh '$MODEL_NAME'"
-# COMMAND="cd ./recipes/pxcorpus/scripts/ && srun bash run_task_2.sh '$MODEL_NAME'"
-
-# COMMAND="cd ./recipes/quaero/scripts/ && srun bash run.sh '$MODEL_NAME' 'emea'"
-# COMMAND="cd ./recipes/quaero/scripts/ && srun bash run.sh '$MODEL_NAME' 'medline'"
-
-nvidia-smi
-
-eval $COMMAND
+python run.py --tasks "$TASK" --models "$MODEL_NAME" --nb-run "$NBR_RUNS"

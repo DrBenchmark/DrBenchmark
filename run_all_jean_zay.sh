@@ -9,15 +9,19 @@
 #SBATCH --time=01:30:00
 #SBATCH --output=./logs/%x_%A_%a.out
 #SBATCH --error=./logs/%x_%A_%a.err
-#SBATCH --array=0-863%100      # 864 jobs overall but 100 jobs max in the queue
+#SBATCH --array=0-863%100      # 27tasks*8models*4runs = 864 jobs overall but 100 jobs max in the queue
 #SBATCH --partition=gpu_p2
 #SBATCH --qos=qos_gpu-t3
-#SBATCH -A <ACCOUNT>@v100
+#SBATCH --account=<ACCOUNT>@v100
+
+# 1. Edit NBR_RUNS and --array to match (if --array is too low, not all experiments will be run)
+# 2. Edit source ~/.profile for your environment file
+# 3. Edit --account for your JZ account
 
 module purge
 module load pytorch-gpu/py3/1.12.1
 
-source ~/.bashrc  # or your local configuration file that activates conda for example
+source ~/.profile  # or your local configuration file that activates conda for example
 conda activate DrBenchmark
 
 NBR_RUNS=4
@@ -28,7 +32,7 @@ declare -a MODELS
 while read m ; do
     MODELS+=("$m")
 done < models.txt
-# If there is no newline at the end of the file add the last line
+# If there is no newline at the end of the file $m contains the last model
 test "$m" && MODELS+=("$m")
 
 declare -a JOBS
@@ -85,8 +89,6 @@ done
 # for com in "${JOBS[@]}"; do echo $com; done
 # To list number of jobs
 # echo ${#JOBS[@]};
-
-nvidia-smi
 
 # Select which job to run
 CURRENT=$SLURM_ARRAY_TASK_ID
