@@ -160,6 +160,7 @@ def main():
 
     logging.info("***** Starting Evaluation *****")
     _predictions, _labels, _ = trainer.predict(dataset_test)
+    _predictions = _predictions.reshape(-1)
     predictions = {id: p for id, p in zip(dataset_test_ids, _predictions)}
     labels = {id: p for id, p in zip(dataset_test_ids, _labels)}
 
