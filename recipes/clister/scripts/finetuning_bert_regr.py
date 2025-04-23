@@ -10,6 +10,7 @@ import json
 import uuid
 import shutil
 import logging
+import dataclasses
 
 from scipy import stats
 from datasets import load_dataset, load_from_disk
@@ -184,6 +185,7 @@ def main():
                 "real_labels": _labels.tolist(),
                 "system_predictions": [p for p in _predictions.tolist()],
             },
+            'trainer_state': dataclasses.asdict(trainer.state),
         }, f, ensure_ascii=False, indent=4)
 
 

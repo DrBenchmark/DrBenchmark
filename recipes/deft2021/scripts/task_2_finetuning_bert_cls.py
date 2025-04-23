@@ -10,6 +10,7 @@ import json
 import uuid
 import shutil
 import logging
+import dataclasses
 
 import torch
 import numpy as np
@@ -168,6 +169,7 @@ def main():
                 "real_labels": labels.tolist(),
                 "system_predictions": predictions.tolist(),
             },
+            'trainer_state': dataclasses.asdict(trainer.state),
         }, f, ensure_ascii=False, indent=4)
 
 

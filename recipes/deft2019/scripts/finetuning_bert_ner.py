@@ -10,6 +10,7 @@ import json
 import uuid
 import shutil
 import logging
+import dataclasses
 
 import evaluate
 import numpy as np
@@ -243,6 +244,7 @@ def main():
                 "real_labels": _true_labels,
                 "system_predictions": _true_predictions,
             },
+            'trainer_state': dataclasses.asdict(trainer.state),
         }, f, ensure_ascii=False, indent=4, default=np_encoder)
 
 

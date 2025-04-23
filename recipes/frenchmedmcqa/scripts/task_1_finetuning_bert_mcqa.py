@@ -9,6 +9,7 @@ import json
 import uuid
 import shutil
 import logging
+import dataclasses
 
 from datasets import load_dataset, load_from_disk
 from transformers import Trainer, TrainingArguments
@@ -190,6 +191,7 @@ def main():
                 "real_labels": y_true,
                 "system_predictions": y_pred,
             },
+            'trainer_state': dataclasses.asdict(trainer.state),
         }, f, ensure_ascii=False, indent=4)
 
 
