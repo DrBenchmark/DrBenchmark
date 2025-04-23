@@ -23,3 +23,5 @@ dependencies:
   - pyyaml
   - pip:
     - syntok>=1.4.4  # for PXCorpus
+    - torch  # conda version does not support CUDA
+    - accelerate>=0.26
