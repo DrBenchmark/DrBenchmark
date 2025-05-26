@@ -17,7 +17,7 @@ conda env create -f environment.yml
 conda activate DrBenchmark
 
 # Run the benchmark for a specific task and model
-python run.py --tasks FrenchMedMCQA_MCQA --model Dr-BERT/DrBERT-7GB --nb-run 4
+python run.py --tasks frenchmedmcqa-mcqa --model Dr-BERT/DrBERT-7GB --nb-run 4
 # or to run all tasks for all models in ./models.txt
 python run.py --tasks all --nb-run 4
 ```

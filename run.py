@@ -81,7 +81,7 @@ if __name__ == '__main__':
         args.tasks = sorted(list(task2script.keys()))
 
     for task in args.tasks:
-        corpus, subset = (task if '_' in task else task + '_').split('_', 1)
+        corpus, subset = task.split('-')
 
         for model in args.models:
             for iteration in range(args.nb_run):
