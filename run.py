@@ -2,45 +2,45 @@ import logging
 import subprocess
 
 task2script = {
-    'CAS_POS': './run_task_1.sh {model_name}',
-    'CAS_CLS': './run_task_2.sh {model_name}',
-    'CAS_NER NEG': './run_task_3.sh {model_name}',
-    'CAS_NER SPEC': './run_task_4.sh {model_name}',
+    'cas-pos': './run_task_1.sh {model_name}',
+    'cas-cls': './run_task_2.sh {model_name}',
+    'cas-ner_neg': './run_task_3.sh {model_name}',
+    'cas-ner_spec': './run_task_4.sh {model_name}',
 
-    'CLISTER': './run.sh {model_name}',
+    'clister-regr': './run.sh {model_name}',
 
-    'Diamed': './run.sh {model_name}',
+    'diamed-cls': './run.sh {model_name}',
 
-    'E3C_French_clinical': './run.sh {model_name} French_clinical',
-    'E3C_French_temporal': './run.sh {model_name} French_temporal',
+    'e3c-ner_clinical': './run.sh {model_name} French_clinical',
+    'e3c-ner_temporal': './run.sh {model_name} French_temporal',
 
-    'ESSAI_POS': './run_task_1.sh {model_name}',
-    'ESSAI_CLS': './run_task_2.sh {model_name}',
-    'ESSAI_NER NEG': './run_task_3.sh {model_name}',
-    'ESSAI_NER SPEC': './run_task_4.sh {model_name}',
+    'essai-pos': './run_task_1.sh {model_name}',
+    'essai-cls': './run_task_2.sh {model_name}',
+    'essai-ner_neg': './run_task_3.sh {model_name}',
+    'essai-ner_spec': './run_task_4.sh {model_name}',
 
-    'FrenchMedMCQA_MCQA': './run_task_1.sh {model_name}',
-    'FrenchMedMCQA_CLS': './run_task_2.sh {model_name}',
+    'frenchmedmcqa-mcqa': './run_task_1.sh {model_name}',
+    'frenchmedmcqa-cls': './run_task_2.sh {model_name}',
 
-    'MantraGSC_fr_emea': './run.sh {model_name} fr_emea',
-    'MantraGSC_fr_medline': './run.sh {model_name} fr_medline',
-    'MantraGSC_fr_patents': './run.sh {model_name} fr_patents',
+    'mantragsc-ner_emea': './run.sh {model_name} fr_emea',
+    'mantragsc-ner_medline': './run.sh {model_name} fr_medline',
+    'mantragsc-ner_patents': './run.sh {model_name} fr_patents',
 
-    'Morfitt': './run.sh {model_name}',
+    'morfitt-cls': './run.sh {model_name}',
 
-    'DEFT2019': './run.sh {model_name}',
+    'deft2019-ner': './run.sh {model_name}',
 
-    'DEFT2020_REG': './run_task_1.sh {model_name}',
-    'DEFT2020_CLS': './run_task_2.sh {model_name}',
+    'deft2020-regr': './run_task_1.sh {model_name}',
+    'deft2020-cls': './run_task_2.sh {model_name}',
 
-    'DEFT2021_NER': './run_task_1.sh {model_name}',
-    'DEFT2021_CLS': './run_task_2.sh {model_name}',
+    'deft2021-ner': './run_task_1.sh {model_name}',
+    'deft2021-cls': './run_task_2.sh {model_name}',
 
-    'PXCorpus_NER': './run_task_1.sh {model_name}',
-    'PXCorpus_CLS': './run_task_2.sh {model_name}',
+    'pxcorpus-ner': './run_task_1.sh {model_name}',
+    'pxcorpus-cls': './run_task_2.sh {model_name}',
 
-    'QUAERO_EMEA': './run.sh {model_name} emea',
-    'QUAERO_MEDLINE': './run.sh {model_name} medline',
+    'quaero-ner_emea': './run.sh {model_name} emea',
+    'quaero-ner_medline': './run.sh {model_name} medline',
 }
 
 
