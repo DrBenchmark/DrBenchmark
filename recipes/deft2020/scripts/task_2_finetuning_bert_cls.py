@@ -90,7 +90,7 @@ def main():
     dataset_test.set_format("torch")
 
     os.makedirs(args.output_dir, exist_ok=True)
-    output_name = f"DrBenchmark-DEFT2020-cls-{str(uuid.uuid4().hex)}"
+    output_name = f"DrBenchmark-DEFT2020-cls-{uuid.uuid4().hex}"
 
     training_args = TrainingArguments(
         f"{args.output_dir}/{output_name}",

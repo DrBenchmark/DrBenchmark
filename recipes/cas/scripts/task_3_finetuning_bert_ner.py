@@ -156,7 +156,7 @@ def main():
         test_tokenized_datasets = test_tokenized_datasets.select(range(args.max_test_samples))
 
     os.makedirs(args.output_dir, exist_ok=True)
-    output_name = f"DrBenchmark-CAS-{str(args.subset)}-{uuid.uuid4()}"
+    output_name = f"DrBenchmark-CAS-{args.subset}-{uuid.uuid4().hex}"
 
     training_args = TrainingArguments(
         f"{args.output_dir}/{output_name}",

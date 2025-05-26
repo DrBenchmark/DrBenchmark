@@ -156,7 +156,7 @@ def main():
     # test_tokenized_datasets       = test_tokenized_datasets.remove_columns(["label"])
 
     os.makedirs(args.output_dir, exist_ok=True)
-    output_name = f"DrBenchmark-ESSAI-{str(args.subset)}-{uuid.uuid4()}"
+    output_name = f"DrBenchmark-ESSAI-{args.subset}-{uuid.uuid4().hex}"
 
     training_args = TrainingArguments(
         f"{args.output_dir}/{output_name}",
