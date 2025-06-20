@@ -85,8 +85,8 @@ order = [
     ('diamed', 'cls', 'weighted_f1'),
     ('pxcorpus', 'ner', 'overall_f1'),
     ('pxcorpus', 'cls', 'weighted_f1'),
-    # not displayed on the drbenchmark website
 
+    # not displayed on the drbenchmark website
     ('cas', 'cls', 'weighted_f1'),
     ('cas', 'ner_neg', 'overall_f1'),
     ('cas', 'ner_spec', 'overall_f1'),
@@ -94,6 +94,14 @@ order = [
     ('essai', 'ner_neg', 'overall_f1'),
     ('essai', 'ner_spec', 'overall_f1')
 ]
+
+custom_model_map = {
+    "../../../models/almanach_camembert-bio-base": "almanach/camembert-bio-base",
+    "../../../models/dr-bert_drbert-7gb": "Dr-BERT/DrBERT-7GB",
+    "../../../models/dr-bert_drbert-7gb-large": "Dr-BERT/DrBERT-7GB-Large",
+    "../../../models/flaubert_flaubert_base_cased": "flaubert/flaubert_base_cased",
+    "../../../models/flaubert_flaubert_large_cased": "flaubert/flaubert_large_cased"
+}
 
 
 if __name__ == '__main__':
@@ -114,24 +122,14 @@ if __name__ == '__main__':
     df.loc[(df['dataset'] == "deft2021") & (df['task'] == "cls"), 'task'] = 'mcls'
     df.loc[(df['dataset'] == "morfitt") & (df['task'] == "cls"), 'task'] = 'mcls'
 
-    """
-    #Only keep 4 runs and compute score's mean
-    from run import task2script
-    nb_runs = df.groupby(['model', 'dataset', 'task', 'fewshot', 'metric'])['score'].apply(len)
-    nb_runs = nb_runs[nb_runs < 4].reset_index().drop(columns='metric').drop_duplicates()
-    for i, r in nb_runs.iterrows():
-        corpus = r['dataset']
-        task = r['task']
-        model = r['model']
-        comm = f'cd recipes/{corpus}/scripts/ ; ' + task2script[corpus+'-'+task].format(model_name=model)
-        print((comm + '\n') * r['score'])
-    """
+    df['model'] = df['model'].map(lambda x: custom_model_map.get(x, x))
 
     print("Filtering out experiments with less than 4 runs...")
     nb_runs = df.groupby(['model', 'dataset', 'task', 'fewshot', 'metric'])['score'].transform(len)
-    print(
-        df.assign(n=nb_runs)[nb_runs < 4][['model', 'dataset', 'task', 'n']].drop_duplicates()
-    )
+    tmp = df.assign(n=nb_runs)[nb_runs < 4][['model', 'dataset', 'task', 'n']].drop_duplicates()
+    for i, sdf in tmp.groupby('model'):
+        print(f'For model {i}')
+        print(sdf[['dataset', 'task', 'n']])
 
     df = df[nb_runs >= 4]
 
