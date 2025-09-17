@@ -1,5 +1,6 @@
 import os
 import json
+import statistics
 from glob import glob
 
 path = "./recipes/"
@@ -14,6 +15,11 @@ results = {}
 for d in dirs:
 
     if "__pycache__" in d:
+        continue
+
+    # Skip mantragsc directories entirely
+    if contains(d, "/mantragsc/") or d.endswith("mantragsc"):
+        print(f"Skipping mantragsc directory: {d}")
         continue
 
     print(d)
@@ -75,8 +81,8 @@ for d in dirs:
             corpus = "essai"
         elif contains(file_path, "/frenchmedmcqa/"):
             corpus = "frenchmedmcqa"
-        elif contains(file_path, "/mantragsc/"):
-            corpus = "mantragsc"
+        # elif contains(file_path, "/mantragsc/"):
+        #     corpus = "mantragsc"  # REMOVED MANTRAGSC
         elif contains(file_path, "/morfitt/"):            
             corpus = "morfitt"
         elif contains(file_path, "/quaero/"):
@@ -89,6 +95,10 @@ for d in dirs:
             corpus = "deft2019"
         elif contains(file_path, "/deft2021/"):
             corpus = "deft2021"
+
+        # Skip mantragsc corpus just in case
+        if corpus == "mantragsc":
+            continue
 
         model_name = data["hyperparameters"]["model_name"]
 
@@ -159,13 +169,69 @@ for model in results:
 
         for metric in results[model][task].keys():
 
-            avg = sum(results[model][task][metric]) / len(results[model][task][metric])
-            print(">> ", metric , "-", avg)
+            values = results[model][task][metric]
+            avg = sum(values) / len(values)
+            std = statistics.stdev(values) if len(values) > 1 else 0.0
+            num_runs = len(values)
+            
+            print(">> ", metric , "- avg:", avg, "std:", std, "runs:", num_runs)
 
             if metric not in avg_results[model][task]:
-                avg_results[model][task][metric] = -1
+                avg_results[model][task][metric] = {}
             
-            avg_results[model][task][metric] = avg
+            avg_results[model][task][metric] = {
+                "avg": avg,
+                "std": std,
+                "num_runs": num_runs
+            }
 
 with open("./stats/overall_averaged_metrics.json", 'w') as f:
     json.dump(avg_results, f, indent=4)
+
+# Print summary of runs BY MODEL
+print("\n" + "="*60)
+print("SUMMARY: Number of runs BY MODEL")
+print("="*60)
+
+model_run_summary = {}
+
+for model in avg_results:
+    model_run_summary[model] = {
+        "total_runs": 0,
+        "total_tasks": 0,
+        "tasks_detail": {}
+    }
+    
+    for task in avg_results[model]:
+        # Get the number of runs from the first metric (they should all be the same for a given task)
+        first_metric = list(avg_results[model][task].keys())[0]
+        runs_for_task = avg_results[model][task][first_metric]["num_runs"]
+        
+        model_run_summary[model]["total_runs"] += runs_for_task
+        model_run_summary[model]["total_tasks"] += 1
+        model_run_summary[model]["tasks_detail"][task] = runs_for_task
+
+# Sort models by total number of runs (descending)
+sorted_models = sorted(model_run_summary.items(), key=lambda x: x[1]["total_runs"], reverse=True)
+
+for model, summary in sorted_models:
+    print(f"\n📊 Model: {model}")
+    print(f"   Total runs: {summary['total_runs']}")
+    print(f"   Total tasks: {summary['total_tasks']}")
+    print(f"   Average runs per task: {summary['total_runs'] / summary['total_tasks']:.1f}")
+    
+    print("   Task breakdown:")
+    for task, runs in summary["tasks_detail"].items():
+        print(f"     • {task}: {runs} runs")
+
+print(f"\n📈 OVERALL STATISTICS:")
+print(f"   Total models: {len(model_run_summary)}")
+total_all_runs = sum(summary["total_runs"] for summary in model_run_summary.values())
+print(f"   Total runs across all models: {total_all_runs}")
+avg_runs_per_model = total_all_runs / len(model_run_summary)
+print(f"   Average runs per model: {avg_runs_per_model:.1f}")
+
+with open("./stats/model_run_summary.json", 'w') as f:
+    json.dump(model_run_summary, f, indent=4)
+
+print(f"\n💾 Model run summary saved to: ./stats/model_run_summary.json")

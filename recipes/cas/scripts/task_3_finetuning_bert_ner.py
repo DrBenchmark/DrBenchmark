@@ -21,7 +21,7 @@ import numpy as np
 from sklearn.metrics import classification_report
 
 import evaluate
-from datasets import load_metric, load_dataset, load_from_disk
+from datasets import load_dataset, load_from_disk
 from transformers import EarlyStoppingCallback, AutoTokenizer, DataCollatorForTokenClassification, AutoModelForTokenClassification, TrainingArguments, Trainer
 
 def main():
@@ -153,11 +153,15 @@ def main():
 
     os.makedirs(args.output_dir, exist_ok=True)
     output_name = f"DrBenchmark-CAS-{str(args.subset)}-{uuid.uuid4()}"
+    tensorboard_name =  f"DrBenchmark-CAS-{str(args.subset)}-{args.model_name.split('/')[-1]}"
 
     training_args = TrainingArguments(
         f"{args.output_dir}/{output_name}",
-        evaluation_strategy = "epoch",
+        eval_strategy = "epoch",
         save_strategy = "epoch",
+        logging_strategy = "epoch",  
+        logging_dir = f"../tensorboard/{tensorboard_name}",
+        report_to = ["tensorboard"],
         learning_rate=float(args.learning_rate),
         per_device_train_batch_size=int(args.batch_size),
         per_device_eval_batch_size=int(args.batch_size),
@@ -190,7 +194,7 @@ def main():
         train_dataset=train_tokenized_datasets,
         eval_dataset=validation_tokenized_datasets,
         data_collator=data_collator,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         compute_metrics=compute_metrics,
     )
 

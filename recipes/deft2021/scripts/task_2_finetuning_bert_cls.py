@@ -105,7 +105,7 @@ def main():
 
     training_args = TrainingArguments(
         f"{args.output_dir}/{output_name}",
-        evaluation_strategy = "epoch",
+        eval_strategy = "epoch",
         save_strategy = "epoch",
         learning_rate=float(args.learning_rate),
         per_device_train_batch_size=int(args.batch_size),
@@ -122,7 +122,7 @@ def main():
         training_args,
         train_dataset=dataset_train,
         eval_dataset=dataset_val,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         compute_metrics=compute_metrics,
     )
 

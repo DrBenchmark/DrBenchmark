@@ -1,4 +1,4 @@
-stage=0
+stage=2
 nbrun=1
 models=`cat models.txt | grep -v "#" | tr "\n" " "`
 
@@ -32,38 +32,38 @@ then
         done
     done
 
-    #CLS 
-    for model_name in $models
-    do
-        for iteration in `seq 1 1 $nbrun`
-        do
-            pushd recipes/cas/scripts/
-            ./run_task_2.sh ${model_name}
-            popd
-        done
-    done
+    # #CLS 
+    # for model_name in $models
+    # do
+    #     for iteration in `seq 1 1 $nbrun`
+    #     do
+    #         pushd recipes/cas/scripts/
+    #         ./run_task_2.sh ${model_name}
+    #         popd
+    #     done
+    # done
 
-    #NER NEG
-    for model_name in $models
-    do
-        for iteration in `seq 1 1 $nbrun`
-        do
-            cd recipes/cas/scripts/
-            ./run_task_3.sh ${model_name}
-            cd ../../../
-        done
-    done
+    # #NER NEG
+    # for model_name in $models
+    # do
+    #     for iteration in `seq 1 1 $nbrun`
+    #     do
+    #         cd recipes/cas/scripts/
+    #         ./run_task_3.sh ${model_name}
+    #         cd ../../../
+    #     done
+    # done
 
-    #NER SPEC
-    for model_name in $models
-    do
-        for iteration in `seq 1 1 $nbrun`
-        do
-            pushd recipes/cas/scripts/
-            ./run_task_4.sh ${model_name}
-            popd
-        done
-    done
+    # #NER SPEC
+    # for model_name in $models
+    # do
+    #     for iteration in `seq 1 1 $nbrun`
+    #     do
+    #         pushd recipes/cas/scripts/
+    #         ./run_task_4.sh ${model_name}
+    #         popd
+    #     done
+    # done
 
 fi
 
@@ -146,38 +146,38 @@ then
         done
     done
 
-    #CLS 
-    for model_name in $models
-    do
-        for iteration in `seq 1 1 $nbrun`
-        do
-            pushd recipes/essai/scripts/
-            ./run_task_2.sh ${model_name}
-            popd
-        done
-    done
+    # #CLS 
+    # for model_name in $models
+    # do
+    #     for iteration in `seq 1 1 $nbrun`
+    #     do
+    #         pushd recipes/essai/scripts/
+    #         ./run_task_2.sh ${model_name}
+    #         popd
+    #     done
+    # done
 
-    #NER NEG
-    for model_name in $models
-    do
-        for iteration in `seq 1 1 $nbrun`
-        do
-            cd recipes/essai/scripts/
-            ./run_task_3.sh ${model_name}
-            cd ../../../
-        done
-    done
+    # #NER NEG
+    # for model_name in $models
+    # do
+    #     for iteration in `seq 1 1 $nbrun`
+    #     do
+    #         cd recipes/essai/scripts/
+    #         ./run_task_3.sh ${model_name}
+    #         cd ../../../
+    #     done
+    # done
 
-    #NER SPEC
-    for model_name in $models
-    do
-        for iteration in `seq 1 1 $nbrun`
-        do
-            pushd recipes/essai/scripts/
-            ./run_task_4.sh ${model_name}
-            popd
-        done
-    done
+    # #NER SPEC
+    # for model_name in $models
+    # do
+    #     for iteration in `seq 1 1 $nbrun`
+    #     do
+    #         pushd recipes/essai/scripts/
+    #         ./run_task_4.sh ${model_name}
+    #         popd
+    #     done
+    # done
 
 fi
 
@@ -213,40 +213,40 @@ fi
 
 
 #Corpus MantraGSC
-if [ $stage -le 8 ]
-then
+# if [ $stage -le 8 ]
+# then
 
-    for model_name in $models
-    do
-        for iteration in `seq 1 1 $nbrun`
-        do
-            pushd recipes/mantragsc/scripts/
-            ./run.sh ${model_name} fr_emea
-            popd
-        done
-    done
+#     for model_name in $models
+#     do
+#         for iteration in `seq 1 1 $nbrun`
+#         do
+#             pushd recipes/mantragsc/scripts/
+#             ./run.sh ${model_name} fr_emea
+#             popd
+#         done
+#     done
 
-    for model_name in $models
-    do
-        for iteration in `seq 1 1 $nbrun`
-        do
-            pushd recipes/mantragsc/scripts/
-            ./run.sh ${model_name} fr_medline
-            popd
-        done
-    done
+#     for model_name in $models
+#     do
+#         for iteration in `seq 1 1 $nbrun`
+#         do
+#             pushd recipes/mantragsc/scripts/
+#             ./run.sh ${model_name} fr_medline
+#             popd
+#         done
+#     done
 
-    for model_name in $models
-    do
-        for iteration in `seq 1 1 $nbrun`
-        do
-            pushd recipes/mantragsc/scripts/
-            ./run.sh ${model_name} fr_patents
-            popd
-        done
-    done
+#     for model_name in $models
+#     do
+#         for iteration in `seq 1 1 $nbrun`
+#         do
+#             pushd recipes/mantragsc/scripts/
+#             ./run.sh ${model_name} fr_patents
+#             popd
+#         done
+#     done
 
-fi
+# fi
 
 
 
@@ -323,3 +323,53 @@ then
 
 fi
 
+
+#Corpus DEFT2020
+if [ $stage -le 12 ]
+then
+
+    for model_name in $models
+    do
+        for iteration in `seq 1 1 $nbrun`
+        do
+            pushd recipes/deft2020/scripts/
+            ./run_task_1.sh ${model_name}
+            popd
+        done
+    done
+
+    for model_name in $models
+    do
+        for iteration in `seq 1 1 $nbrun`
+        do
+            pushd recipes/deft2020/scripts/
+            ./run_task_2.sh ${model_name}
+            popd
+        done
+    done
+
+fi
+
+#Corpus DEFT2021
+if [ $stage -le 13 ]
+then
+
+    for model_name in $models
+    do
+        for iteration in `seq 1 1 $nbrun`
+        do
+            pushd recipes/deft2021/scripts/
+            ./run_task_1.sh ${model_name}
+            popd
+        done
+    done
+    for model_name in $models
+    do
+        for iteration in `seq 1 1 $nbrun`
+        do
+            pushd recipes/deft2021/scripts/
+            ./run_task_2.sh ${model_name}
+            popd
+        done
+    done
+fi

@@ -20,12 +20,12 @@ from datasets import load_dataset, load_from_disk
 from utils import parse_args, TrainingArgumentsWithMPSSupport
 
 import torch
-from sklearn.metrics import mean_squared_error, precision_recall_fscore_support, accuracy_score, f1_score, roc_auc_score, accuracy_score, classification_report
+from sklearn.metrics import root_mean_squared_error, precision_recall_fscore_support, accuracy_score, f1_score, roc_auc_score, accuracy_score, classification_report
 from transformers import AutoTokenizer, EvalPrediction, AutoModelForSequenceClassification, Trainer, TrainingArguments, TextClassificationPipeline
 
 def compute_metrics(eval_pred):
     predictions, labels = eval_pred
-    rmse = mean_squared_error(labels, predictions, squared=False)
+    rmse = root_mean_squared_error(labels, predictions)
     return {"rmse": rmse}
 
 def EDRM(ref, systm, debug=False):
@@ -120,7 +120,7 @@ def main():
 
     training_args = TrainingArguments(
         f"{args.output_dir}/{output_name}",
-        evaluation_strategy = "epoch",
+        eval_strategy = "epoch",
         save_strategy = "epoch",
         learning_rate=float(args.learning_rate),
         per_device_train_batch_size=int(args.batch_size),
@@ -137,7 +137,7 @@ def main():
         training_args,
         train_dataset=dataset_train,
         eval_dataset=dataset_val,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         compute_metrics=compute_metrics,
     )
 

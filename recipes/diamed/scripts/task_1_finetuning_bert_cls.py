@@ -87,11 +87,15 @@ def main():
 
     os.makedirs(args.output_dir, exist_ok=True)    
     output_name = f"DrBenchmark-CAS-cls-{str(uuid.uuid4().hex)}"
+    tensorboard_name =  f"DrBenchmark-CAS-cls-{str(args.subset)}-{args.model_name.split('/')[-1]}"
 
     training_args = TrainingArguments(
         f"{args.output_dir}/{output_name}",
-        evaluation_strategy = "epoch",
+        eval_strategy = "epoch",
         save_strategy = "epoch",
+        logging_strategy = "epoch",  
+        logging_dir = f"../tensorboard/{tensorboard_name}",
+        report_to = ["tensorboard"],
         learning_rate=float(args.learning_rate),
         per_device_train_batch_size=int(args.batch_size),
         per_device_eval_batch_size=int(args.batch_size),
@@ -107,7 +111,7 @@ def main():
         training_args,
         train_dataset=dataset_train,
         eval_dataset=dataset_val,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         compute_metrics=compute_metrics,
     )
 
