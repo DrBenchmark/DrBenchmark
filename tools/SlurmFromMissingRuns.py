@@ -15,9 +15,8 @@ slurm_template = """#!/bin/bash
 #SBATCH --hint=nomultithread   # 1 MPI process per phisical core (no hyperthreading)
 #SBATCH --cpus-per-task=6
 #SBATCH --gpus-per-node=1
-#SBATCH --mem=16G
-#SBATCH --time=01:30:00
-#SBATCH --output=./logs/%x_%A_%a.out
+#SBATCH --time=02:00:00
+#SBATCH --output=./logs/%x_%A_%a.err
 #SBATCH --error=./logs/%x_%A_%a.err
 #SBATCH --array=0-{{ JOBS | size }}%10      # 27tasks*8models*4runs = 864 jobs overall but 100 jobs max in the queue
 {% if JEANZAY -%}
@@ -28,7 +27,7 @@ slurm_template = """#!/bin/bash
 {% endif %}
 {% if JEANZAY -%}
 module purge
-module load pytorch-gpu/py3/1.12.1
+source ~/.bashrc
 
 {% endif -%}
 
@@ -89,7 +88,15 @@ if __name__ == '__main__':
 
     # Only keep 4 runs and compute score's mean
     nb_runs = df.groupby(['model', 'dataset', 'task', 'fewshot', 'metric'])['score'].apply(len)
-    nb_runs = nb_runs[nb_runs < 4].reset_index().drop(columns='metric').drop_duplicates()
+    nb_runs = nb_runs.unstack(4).fillna(0).apply(max, axis=1)
+    # Add all datasets and tasks
+    all_models = df['model'].unique()
+    dat_tasks = [e.split('-') for e in task2script]
+    nb_runs = nb_runs.reindex([(m, d, t, '1.0') for m in all_models for d, t in dat_tasks])
+
+    nb_runs = (4 - nb_runs[nb_runs < 4]).astype(int)
+    nb_runs = nb_runs.reset_index().drop_duplicates()
+
     JOBS = []
     for i, r in nb_runs.iterrows():
         corpus = r['dataset']
@@ -98,6 +105,6 @@ if __name__ == '__main__':
         comm = f'cd recipes/{corpus}/scripts/ ; ' + task2script[f'{corpus}-{task}'].format(model_name=model)
         if any(f in comm for f in args.filter):
             continue
-        JOBS += [comm] * (4 - r['score'])
+        JOBS += [comm] * (4 - r[0])
 
     print(render(slurm_template, **{'JOBS': JOBS, 'JEANZAY': args.jeanzay}))

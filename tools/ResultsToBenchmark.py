@@ -100,13 +100,38 @@ custom_model_map = {
     "../../../models/dr-bert_drbert-7gb": "Dr-BERT/DrBERT-7GB",
     "../../../models/dr-bert_drbert-7gb-large": "Dr-BERT/DrBERT-7GB-Large",
     "../../../models/flaubert_flaubert_base_cased": "flaubert/flaubert_base_cased",
-    "../../../models/flaubert_flaubert_large_cased": "flaubert/flaubert_large_cased"
+    "../../../models/flaubert_flaubert_large_cased": "flaubert/flaubert_large_cased",
+    "../../../models/answerdotai_modernbert-base": "answerdotai/modernbert-base",
+    "../../../models/answerdotai_modernbert-large": "answerdotai/modernbert-large",
+    "../../../models/thomas-sounack_bioclinical-modernbert-base": "thomas-sounack/bioclinical-modernbert-base",
+    "../../../models/thomas-sounack_bioclinical-modernbert-large": "thomas-sounack/bioclinical-modernbert-large",
 }
 
 
 if __name__ == '__main__':
-    print("Loading results...")
-    with open('stats/results.json') as f:
+    import logging
+
+    def arguments():
+        import argparse
+        parser = argparse.ArgumentParser(
+            description='Outputs a benchmark to "stats/overall_results.xlsx".')
+        parser.add_argument(
+            "--results", type=str, required=False, default="stats/results.json",
+            help="Path to results.json (default: stats/results.json).")
+        parser.add_argument(
+            "--nb-run", type=int, required=False, default=4,
+            help="Number of runs to use (default: 4). Methods with less than requested runs won't be shown.")
+        parser.add_argument(
+            "--csv", action="store_true",
+            help="Write the benchmark in csv to stdout")
+        args = parser.parse_args()
+
+        return args
+
+    args = arguments()
+    logging.basicConfig(level=logging.INFO)
+    logging.info("Loading results...")
+    with open(args.results) as f:
         res = json.load(f)
 
     df = pd.DataFrame(
@@ -123,18 +148,17 @@ if __name__ == '__main__':
     df.loc[(df['dataset'] == "morfitt") & (df['task'] == "cls"), 'task'] = 'mcls'
 
     df['model'] = df['model'].map(lambda x: custom_model_map.get(x, x))
-
-    print("Filtering out experiments with less than 4 runs...")
+    logging.info(f"Filtering out experiments with less than {args.nb_run} runs...")
     nb_runs = df.groupby(['model', 'dataset', 'task', 'fewshot', 'metric'])['score'].transform(len)
-    tmp = df.assign(n=nb_runs)[nb_runs < 4][['model', 'dataset', 'task', 'n']].drop_duplicates()
+    tmp = df.assign(n=nb_runs)[nb_runs < args.nb_run][['model', 'dataset', 'task', 'n']].drop_duplicates()
     for i, sdf in tmp.groupby('model'):
-        print(f'For model {i}')
-        print(sdf[['dataset', 'task', 'n']])
+        logging.info(f'For model {i}')
+        logging.info(sdf[['dataset', 'task', 'n']])
 
-    df = df[nb_runs >= 4]
+    df = df[nb_runs >= args.nb_run]
 
-    print("Randomly choosing only 4 runs if more are available...")
-    df = df.groupby(['model', 'dataset', 'task', 'fewshot', 'metric'])['score'].apply(lambda x: x.sample(n=4).mean())
+    logging.info(f"Randomly choosing only {args.nb_run} runs if more are available...")
+    df = df.groupby(['model', 'dataset', 'task', 'fewshot', 'metric'])['score'].apply(lambda x: x.sample(n=args.nb_run).mean())
 
     # Pretty table
     # Reorder lines and select metrics
@@ -149,5 +173,9 @@ if __name__ == '__main__':
     df['dataset'] = df['dataset'].map(dataset2pretty.get)
     df['metric'] = df['metric'].map(metric2pretty.get)
     df = df.set_index(['dataset', 'task', 'metric'])
-    print("Dumping to stats/overall_results.xlsx...")
-    df.to_excel('stats/overall_results.xlsx')
+    if args.csv:
+        print(df.to_csv())
+    else:
+        output_file = f'stats/overall_results_{args.nb_run}runs.xlsx'
+        logging.info(f"Dumping to {output_file}...")
+        df.to_excel(output_file)
