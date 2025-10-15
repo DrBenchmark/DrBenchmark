@@ -1,171 +1,107 @@
 import os
 import json
 from glob import glob
+from collections import defaultdict
 
-path = "./recipes/"
-dirs = [ f.path for f in os.scandir(path) if f.is_dir() ]
-print(dirs)
+try:
+    from tqdm import tqdm
+except ModuleNotFoundError:
+    def tqdm(x, *args, **kwargs):
+        return x
 
-def contains(p, t):
-    return p.find(t) != -1
+# TASK
+fp2task = {
+    "-cls-": "cls",
+    "-French_clinical-": "ner_clinical",
+    "-French_temporal-": "ner_temporal",
+    "-fr_emea-": "ner_emea",
+    "-fr_medline-": "ner_medline",
+    "-fr_patents-": "ner_patents",
+    "-emea-": "ner_emea",
+    "-medline-": "ner_medline",
+    "-pos-": "pos",
+    "-regression-": "regr",
+    "-mcqa-": "mcqa",
+    "-ner-": "ner",
+    "-ner_neg-": "ner_neg",
+    "-ner_spec-": "ner_spec"
+}
 
-results = {}
+# CORPUS
+fp2corpus = {
+    "/cas/": "cas",
+    "/clister/": "clister",
+    "/deft2020/": "deft2020",
+    "/e3c/": "e3c",
+    "/essai/": "essai",
+    "/frenchmedmcqa/": "frenchmedmcqa",
+    "/mantragsc/": "mantragsc",
+    "/morfitt/": "morfitt",
+    "/quaero/": "quaero",
+    "/pxcorpus/": "pxcorpus",
+    "/diamed/": "diamed",
+    "/deft2019/": "deft2019",
+    "/deft2021/": "deft2021",
+}
 
-for d in dirs:
+if __name__ == '__main__':
+    path = "recipes"
 
-    if "__pycache__" in d:
-        continue
+    # results: model -> corpus-task -> metric -> list
+    results = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
 
-    print(d)
+    file_paths = glob(os.path.join(path, '*', 'runs', '*.json'))
+    print("Reading run results...")
+    for file_path in tqdm(file_paths):
 
-    d_path = f"{d}/runs/"
-    files = [ f.path for f in os.scandir(d_path) if f.is_file() and str(f).find(".json") != -1 ]
-    print(files)
+        with open(file_path) as f_json:
+            data = json.load(f_json)
 
-    for file_path in files:
+        task = [v for k, v in fp2task.items() if k in file_path]
+        assert len(task) != 0
+        task = task[0]
 
-        f_json = open(file_path, "r")
-        data = json.load(f_json)
-        f_json.close()
-
-        print(file_path)
-        corpus = ""
-        task = ""
-
-        # TASK
-        if contains(file_path, "-cls-"):
-            task = "cls"
-        elif contains(file_path, "-French_clinical-"):
-            task = "ner-clinical"
-        elif contains(file_path, "-French_temporal-"):
-            task = "ner-temporal"
-        elif contains(file_path, "-fr_emea-"):
-            task = "ner-fr_emea"
-        elif contains(file_path, "-fr_medline-"):
-            task = "ner-fr_medline"
-        elif contains(file_path, "-fr_patents-"):
-            task = "ner-fr_patents"
-        elif contains(file_path, "-emea-"):
-            task = "ner-emea"
-        elif contains(file_path, "-medline-"):
-            task = "ner-medline"
-        elif contains(file_path, "-pos-"):
-            task = "pos"
-        elif contains(file_path, "-regression-"):
-            task = "regr"
-        elif contains(file_path, "-mcqa-"):
-            task = "mcqa"
-        elif contains(file_path, "-ner-"):
-            task = "ner"
-        elif contains(file_path, "-ner_neg-"):
-            task = "ner-neg"
-        elif contains(file_path, "-ner_spec-"):
-            task = "ner-spec"
-
-        # CORPUS
-        if contains(file_path, "/cas/"):
-            corpus = "cas"
-        elif contains(file_path, "/clister/"):
-            corpus = "clister"
-        elif contains(file_path, "/deft2020/"):
-            corpus = "deft2020"
-        elif contains(file_path, "/e3c/"):
-            corpus = "e3c"
-        elif contains(file_path, "/essai/"):
-            corpus = "essai"
-        elif contains(file_path, "/frenchmedmcqa/"):
-            corpus = "frenchmedmcqa"
-        elif contains(file_path, "/mantragsc/"):
-            corpus = "mantragsc"
-        elif contains(file_path, "/morfitt/"):            
-            corpus = "morfitt"
-        elif contains(file_path, "/quaero/"):
-            corpus = "quaero"
-        elif contains(file_path, "/pxcorpus/"):
-            corpus = "pxcorpus"
-        elif contains(file_path, "/diamed/"):
-            corpus = "diamed"
-        elif contains(file_path, "/deft2019/"):
-            corpus = "deft2019"
-        elif contains(file_path, "/deft2021/"):
-            corpus = "deft2021"
+        corpus = [v for k, v in fp2corpus.items() if k in file_path]
+        assert len(corpus) != 0
+        corpus = corpus[0]
 
         model_name = data["hyperparameters"]["model_name"]
 
-        if model_name.find("../../../models/") == -1:
-            continue
-
         fewshot = data["hyperparameters"]["fewshot"]
         key = f"{corpus}|{task}|{fewshot}"
-        
-        print(key + "-" + model_name)
 
-        if model_name not in results:
-            results[model_name] = {}
-
-        if task.find("ner") != -1 or task.find("pos") != -1:
-
-            if key not in results[model_name]:
-                results[model_name][key] = {"overall_f1": [], "overall_accuracy": []}
-            
+        if "ner" in task or "pos" in task:
             results[model_name][key]["overall_f1"].append(data["metrics"]["overall_f1"])
             results[model_name][key]["overall_accuracy"].append(data["metrics"]["overall_accuracy"])
-        
-        elif task.find("cls") != -1:
 
-            if key not in results[model_name]:
-                results[model_name][key] = {"macro_f1": [], "weighted_f1": []}
-            
+        elif "cls" in task:
             results[model_name][key]["macro_f1"].append(data["metrics"]["macro avg"]["f1-score"])
             results[model_name][key]["weighted_f1"].append(data["metrics"]["weighted avg"]["f1-score"])
 
-        elif task.find("mcqa") != -1:
-
-            if key not in results[model_name]:
-                results[model_name][key] = {"hamming_score": [], "exact_match": []}
-            
+        elif "mcqa" in task:
             results[model_name][key]["hamming_score"].append(data["metrics"]["hamming_score"])
             results[model_name][key]["exact_match"].append(data["metrics"]["exact_match"])
-        
-        elif task.find("regr") != -1:
 
-            if key not in results[model_name]:
-                results[model_name][key] = {"edrm": [], "spearman_correlation_coef": []}
-            
+        elif "regr" in task:
             results[model_name][key]["edrm"].append(data["metrics"]["EDRM"])
             results[model_name][key]["spearman_correlation_coef"].append(data["metrics"]["spearman_correlation_coef"])
 
-with open("./stats/results.json", 'w') as f:
-    json.dump(results, f, indent=4)
+    print('Dumping to stats/results.json')
+    with open("./stats/results.json", 'w') as f:
+        json.dump(results, f, indent=4)
 
-avg_results = {}
+    print("Averaging runs...")
+    # avg_results = {}
+    avg_results = defaultdict(lambda: defaultdict(dict))
+    for model in results:
+        for task in results[model]:
+            if not task.endswith("|1.0"):
+                continue
 
-for model in results:
-    
-    print(model)
+            for metric, values in results[model][task].items():
+                avg = sum(values) / len(values)
+                avg_results[model][task][metric] = avg
 
-    if model not in avg_results:
-        avg_results[model] = {}
-    
-    for task in results[model]:
-
-        if not task.endswith("|1.0"):
-            continue
-
-        if task not in avg_results[model]:
-            avg_results[model][task] = {}
-        
-        print(task)
-
-        for metric in results[model][task].keys():
-
-            avg = sum(results[model][task][metric]) / len(results[model][task][metric])
-            print(">> ", metric , "-", avg)
-
-            if metric not in avg_results[model][task]:
-                avg_results[model][task][metric] = -1
-            
-            avg_results[model][task][metric] = avg
-
-with open("./stats/overall_averaged_metrics.json", 'w') as f:
-    json.dump(avg_results, f, indent=4)
+    print('Dumping to stats/overall_averaged_metrics.json')
+    with open("./stats/overall_averaged_metrics.json", 'w') as f:
+        json.dump(avg_results, f, indent=4)

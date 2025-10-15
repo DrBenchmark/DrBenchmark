@@ -53,6 +53,7 @@ _CITATION = """\
 }
 """
 
+
 class FrenchMedMCQA(datasets.GeneratorBasedBuilder):
     """FrenchMedMCQA : A French Multi-Choice Question Answering Corpus for Medical domain"""
 
@@ -74,10 +75,10 @@ class FrenchMedMCQA(datasets.GeneratorBasedBuilder):
                 ),
                 "type": datasets.Value("string"),
                 "subject_name": datasets.Value("string"),
-                "number_correct_answers": datasets.features.ClassLabel(names=["1","2","3","4","5"]),
+                "number_correct_answers": datasets.features.ClassLabel(names=["1", "2", "3", "4", "5"]),
             }
         )
-        
+
         return datasets.DatasetInfo(
             description=_DESCRIPTION,
             features=features,
