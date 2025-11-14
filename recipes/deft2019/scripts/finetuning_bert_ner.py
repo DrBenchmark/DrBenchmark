@@ -49,7 +49,7 @@ def main():
     else:
         dataset = load_dataset(
             "../../../data_loaders_hf/DEFT2019.py",
-            name=str(args.subset),
+            name=args.subset,
             trust_remote_code=True,
             data_dir=args.data_dir,
         )
@@ -162,11 +162,11 @@ def main():
         f"{args.output_dir}/{output_name}",
         evaluation_strategy="epoch",
         save_strategy="epoch",
-        learning_rate=float(args.learning_rate),
-        per_device_train_batch_size=int(args.batch_size),
-        per_device_eval_batch_size=int(args.batch_size),
-        num_train_epochs=int(args.epochs),
-        weight_decay=float(args.weight_decay),
+        learning_rate=args.learning_rate,
+        per_device_train_batch_size=args.batch_size,
+        per_device_eval_batch_size=args.batch_size,
+        num_train_epochs=args.epochs,
+        weight_decay=args.weight_decay,
         metric_for_best_model="accuracy",
         load_best_model_at_end=True,
         greater_is_better=True,
