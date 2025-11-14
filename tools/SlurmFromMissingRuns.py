@@ -92,11 +92,9 @@ if __name__ == '__main__':
     # Add all datasets and tasks
     all_models = df['model'].unique()
     dat_tasks = [e.split('-') for e in task2script]
-    nb_runs = nb_runs.reindex([(m, d, t, '1.0') for m in all_models for d, t in dat_tasks])
-
+    nb_runs = nb_runs.reindex([(m, d, t, '1.0') for m in all_models for d, t in dat_tasks]).fillna(0)
     nb_runs = (4 - nb_runs[nb_runs < 4]).astype(int)
     nb_runs = nb_runs.reset_index().drop_duplicates()
-
     JOBS = []
     for i, r in nb_runs.iterrows():
         corpus = r['dataset']
@@ -105,6 +103,6 @@ if __name__ == '__main__':
         comm = f'cd recipes/{corpus}/scripts/ ; ' + task2script[f'{corpus}-{task}'].format(model_name=model)
         if any(f in comm for f in args.filter):
             continue
-        JOBS += [comm] * (4 - r[0])
+        JOBS += [comm] * r[0]
 
     print(render(slurm_template, **{'JOBS': JOBS, 'JEANZAY': args.jeanzay}))
