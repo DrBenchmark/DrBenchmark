@@ -159,7 +159,7 @@ def main():
     cr = classification_report(labels, predictions, labels=range(len(labels_list)), target_names=labels_list, digits=4, zero_division=.0)
     logging.info(cr)
 
-    with open(f"../runs/{output_name}.json", 'w', encoding='utf-8') as f:
+    with open(f"{args.run_dir}/{output_name}.json", 'w', encoding='utf-8') as f:
         json.dump({
             "model_name": f"{args.output_dir}/{output_name}_best_model",
             "metrics": classification_report(labels, predictions, zero_division=.0, output_dict=True),

@@ -139,7 +139,7 @@ def main():
     )
     logging.info(cr_metrics)
 
-    with open(f"../runs/{output_name}.json", 'w', encoding='utf-8') as f:
+    with open(f"{args.run_dir}/{output_name}.json", 'w', encoding='utf-8') as f:
         json.dump({
             "model_name": f"{args.output_dir}/{output_name}_best_model",
             "metrics": classification_report(labels, predictions, zero_division=.0, output_dict=True),

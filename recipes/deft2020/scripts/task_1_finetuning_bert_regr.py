@@ -171,7 +171,7 @@ def main():
     coeff, p = SpMnCorr(labels, predictions)
     logging.info(f">> Spearman Correlation: {coeff} (p)")
 
-    with open(f"../runs/{output_name}.json", 'w', encoding='utf-8') as f:
+    with open(f"{args.run_dir}/{output_name}.json", 'w', encoding='utf-8') as f:
         json.dump({
             "model_name": f"{args.output_dir}/{output_name}_best_model",
             "metrics": {

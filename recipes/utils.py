@@ -27,6 +27,8 @@ def parse_args():
                         help="HuggingFace Hub model name")
     parser.add_argument("--output_dir", type=str, required=False,
                         help="Path were the model will be saved")
+    parser.add_argument("--run_dir", type=str, required=False,
+                        help="Path were the run output will be saved")
     parser.add_argument("--data_dir", type=str, required=False,
                         help="Path where the data are stored")
     parser.add_argument("--epochs", type=int, required=False,

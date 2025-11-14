@@ -178,7 +178,7 @@ def main():
     exact_match = compute_accuracy_exact_match(y_true, y_pred)
     logging.info(exact_match)
 
-    with open(f"../runs/{output_name}.json", 'w', encoding='utf-8') as f:
+    with open(f"{args.run_dir}/{output_name}.json", 'w', encoding='utf-8') as f:
         json.dump({
             "model_name": f"{args.output_dir}/{output_name}_best_model",
             "metrics": {
