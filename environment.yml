@@ -6,7 +6,7 @@ dependencies:
   - python>3.7,<3.13
   - pip
   - transformers>=4.0,<=4.49  # to prevent future version breakage (cf. warning tokenizer arg) 
-  - datasets>=2.21  # >2.21 for HF_HUB_OFFLINE
+  - datasets>=2.21,<4.0  # >2.21 for HF_HUB_OFFLINE
   - evaluate>=0.4.1
   - sentencepiece
   - tensorboardX
