@@ -175,6 +175,8 @@ def main():
     data_collator = DataCollatorForTokenClassification(tokenizer)
 
     def compute_metrics(p):
+        # Beware : The labels here might be truncated according to `model_max_length`
+        # These are the training metrics, not the final metrics.
 
         predictions, labels = p
         predictions = np.argmax(predictions, axis=2)
@@ -212,15 +214,17 @@ def main():
     predictions, labels, _ = trainer.predict(test_tokenized_datasets)
     predictions = np.argmax(predictions, axis=2)
 
+    # Convert predictions at the subtoken level to token level
     _true_predictions = [
         [label_list[p] for (p, l) in zip(prediction, label) if l != -100]
         for prediction, label in zip(predictions, labels)
     ]
 
-    _true_labels = [
-        [label_list[l] for (p, l) in zip(prediction, label) if l != -100]
-        for prediction, label in zip(predictions, labels)
-    ]
+    # We might have truncated the labels in `tokenize_and_align_labels`
+    # We retrieve the untruncated labels
+    _true_labels = [[label_list[l] for l in doc] for doc in test_tokenized_datasets['ner_tags']]
+    # We pad the predictions with 'O' to match untruncated labels
+    _true_predictions = [p + ['O'] * (len(l) - len(p)) for p, l in zip(_true_predictions, _true_labels)]
 
     cr_metric = metric.compute(predictions=_true_predictions, references=_true_labels, zero_division=.0)
     logging.info(cr_metric)
