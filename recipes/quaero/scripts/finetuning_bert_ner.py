@@ -37,6 +37,8 @@ def getConfig(raw_labels):
 def main():
 
     args = parse_args()
+    subset2task = {'emea': 'emea', 'medline': 'medline'}
+    args.task += '_' + subset2task[args.subset]
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
@@ -155,7 +157,7 @@ def main():
         test_tokenized_datasets = test_tokenized_datasets.select(range(args.max_test_samples))
 
     os.makedirs(args.output_dir, exist_ok=True)
-    output_name = f"DrBenchmark-QUAERO-ner-{args.subset}-{uuid.uuid4().hex}"
+    output_name = f"DrBenchmark-{args.task}-{uuid.uuid4().hex}"
 
     training_args = TrainingArguments(
         f"{args.output_dir}/{output_name}",

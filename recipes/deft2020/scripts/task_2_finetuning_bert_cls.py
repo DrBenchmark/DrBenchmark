@@ -45,11 +45,11 @@ def main():
     )
 
     if args.offline:
-        dataset = load_from_disk(f"{args.data_dir.rstrip('/')}/local_hf_task_2/")
+        dataset = load_from_disk(f"{args.data_dir.rstrip('/')}/local_hf_{args.subset}/")
     else:
         dataset = load_dataset(
             "DrBenchmark/DEFT2020",
-            name="task_2",
+            name=args.subset,
             trust_remote_code=True,
         )
 
@@ -90,7 +90,7 @@ def main():
     dataset_test.set_format("torch")
 
     os.makedirs(args.output_dir, exist_ok=True)
-    output_name = f"DrBenchmark-DEFT2020-cls-{uuid.uuid4().hex}"
+    output_name = f"DrBenchmark-{args.task}-{uuid.uuid4().hex}"
 
     training_args = TrainingArguments(
         f"{args.output_dir}/{output_name}",

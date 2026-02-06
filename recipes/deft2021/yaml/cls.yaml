@@ -9,3 +9,5 @@ run_dir: "../runs/"
 data_dir: "../data/"
 subset: "cls"
 fewshot: 1.0
+task: "deft2021-cls"
+dataset: "DrBenchmark/DEFT2021"

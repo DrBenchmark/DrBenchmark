@@ -9,3 +9,5 @@ run_dir: "../runs/"
 data_dir: "../data/"
 subset: "French_clinical"
 fewshot: 1.0
+task: "e3c-ner"
+dataset: "DrBenchmark/E3C"

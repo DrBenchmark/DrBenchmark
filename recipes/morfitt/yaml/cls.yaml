@@ -9,3 +9,5 @@ run_dir: "../runs/"
 data_dir: "../data/"
 subset: "source"
 fewshot: 1.0
+task: "morfitt-cls"
+dataset: "DrBenchmark/MORFITT"

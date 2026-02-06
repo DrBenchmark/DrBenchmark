@@ -9,3 +9,5 @@ run_dir: "../runs/"
 data_dir: "../data/"
 subset: "pos"
 fewshot: 1.0
+task: "cas-pos"
+dataset: "DrBenchmark/CAS"
