@@ -13,6 +13,7 @@ import dataclasses
 
 import torch
 import numpy as np
+from transformers import set_seed
 from datasets import load_dataset, load_from_disk
 from transformers import Trainer, TrainingArguments
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
@@ -72,6 +73,7 @@ def main():
         level=logging.INFO
     )
 
+    set_seed(args.seed)
     if args.offline:
         dataset = load_from_disk(f"{args.data_dir.rstrip('/')}/local_hf_{args.subset}/")
     else:

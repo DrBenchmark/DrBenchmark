@@ -1,6 +1,8 @@
 import os
 import yaml
-import uuid
+import json
+import random
+import hashlib
 import logging
 import argparse
 
@@ -18,7 +20,10 @@ subset2task_detail = {
 def create_run_name(args):
     if isinstance(args, argparse.Namespace):
         args = args.__dict__
-    hash_ = uuid.uuid4().hex
+    # Creating the hash using the parameters (including the seed, dataset, model, ...)
+    hash_ = hashlib.shake_128(
+        json.dumps(args, sort_keys=True, ensure_ascii=True).encode()
+    ).hexdigest(8)
     output_name = f'DrBenchmark-{args["task"]}-{hash_}'
     return output_name
 
@@ -61,6 +66,8 @@ def parse_args():
                         help="Path were the run output will be saved")
     parser.add_argument("--data_dir", type=str, required=False,
                         help="Path where the data are stored")
+    parser.add_argument("--seed", type=int, required=False,
+                        help="Seed to be used (between 0 and 2**32-1) in `transformers.set_seed` for reproducibility.")
     parser.add_argument("--epochs", type=int, required=False,
                         help="Training epochs")
     parser.add_argument("--batch_size", type=int, required=False,
@@ -136,6 +143,21 @@ def parse_args():
         os.environ['TRANSFORMERS_OFFLINE'] = '1'  # transformers<4.42
         os.environ['HF_HUB_OFFLINE'] = '1'  # datasets>=2.21, transformers>=4.42
 
+    if args['seed'] is None:
+        # If no seed was provided: Pick a seed
+        args['seed'] = random.randrange(2**32)
+        # Check if it already was computed
+        while os.path.exists(get_run_path(args)):
+            # If yes pick another seed
+            args['seed'] = (args['seed'] + 1) % (2**32)
+    else:
+        # If a seed was provided: checl whether it was already computed
+        if os.path.exists(get_run_path(args)):
+            # If yes do nothing
+            print(f"This configuration was already computed (seed: {args['seed']}, model: {args['model_name']}).")
+            print(json.dumps(args))
+            print("Exiting...")
+            exit(0)
     # print(f">> Model path: >>{args['model_name']}<<")
 
     return argparse.Namespace(**args)
