@@ -1,10 +1,40 @@
 import os
 import yaml
+import uuid
 import logging
 import argparse
 
 import torch
 from transformers import TrainingArguments
+
+
+subset2task_detail = {
+    'emea': 'emea', 'medline': 'medline',  # pxcorpus
+    'fr_emea': 'emea', 'fr_medline': 'medline', 'fr_patents': 'patents',  # mantragsc
+    'French_clinical': 'clinical', 'French_temporal': 'temporal'  # e3c
+}
+
+
+def create_run_name(args):
+    if isinstance(args, argparse.Namespace):
+        args = args.__dict__
+    hash_ = uuid.uuid4().hex
+    output_name = f'DrBenchmark-{args["task"]}-{hash_}'
+    return output_name
+
+
+def get_run_path(args):
+    if isinstance(args, argparse.Namespace):
+        args = args.__dict__
+    output_name = create_run_name(args)
+    return os.path.join(args['run_dir'], f'{output_name}.json')
+
+
+def get_model_path(args):
+    if isinstance(args, argparse.Namespace):
+        args = args.__dict__
+    output_name = create_run_name(args)
+    return os.path.join(args['output_dir'], f'{output_name}')
 
 
 class TrainingArgumentsWithMPSSupport(TrainingArguments):
@@ -97,6 +127,9 @@ def parse_args():
                 model_name_clean = m.lower().replace('/', '_')
                 m = os.path.join('..', '..', '..', 'models', model_name_clean)
     args['model_name'] = m
+
+    if args['subset'] in subset2task_detail:
+        args['task'] += '_' + subset2task_detail[args['subset']]
 
     if args["offline"]:
         os.environ["WANDB_DISABLED"] = "true"

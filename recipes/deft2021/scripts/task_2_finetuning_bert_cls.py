@@ -7,7 +7,6 @@
 
 import os
 import json
-import uuid
 import shutil
 import logging
 import dataclasses
@@ -19,7 +18,7 @@ from transformers import Trainer, TrainingArguments
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from sklearn.metrics import f1_score, roc_auc_score, accuracy_score, classification_report
 
-from utils import parse_args
+import utils
 
 THRESHOLD_VALUE = 0.70
 
@@ -62,7 +61,10 @@ def compute_metrics(p):
 
 def main():
 
-    args = parse_args()
+    args = utils.parse_args()
+    run_name = utils.create_run_name(args)
+    run_path = utils.get_run_path(args)
+    model_path = utils.get_model_path(args)
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
@@ -111,10 +113,9 @@ def main():
     dataset_test.set_format("torch")
 
     os.makedirs(args.output_dir, exist_ok=True)
-    output_name = f"DrBenchmark-{args.task}-{uuid.uuid4().hex}"
 
     training_args = TrainingArguments(
-        f"{args.output_dir}/{output_name}",
+        model_path,
         evaluation_strategy="epoch",
         save_strategy="epoch",
         learning_rate=args.learning_rate,
@@ -144,8 +145,8 @@ def main():
     trainer.evaluate()
 
     logging.info("***** Save the best model *****")
-    trainer.save_model(f"{args.output_dir}/{output_name}_best_model")
-    shutil.rmtree(f"{args.output_dir}/{output_name}")
+    trainer.save_model(model_path + "_best_model")
+    shutil.rmtree(model_path)
 
     logging.info("***** Starting Evaluation *****")
 
@@ -159,9 +160,9 @@ def main():
     cr = classification_report(labels, predictions, labels=range(len(labels_list)), target_names=labels_list, digits=4, zero_division=.0)
     logging.info(cr)
 
-    with open(f"{args.run_dir}/{output_name}.json", 'w', encoding='utf-8') as f:
+    with open(run_path, 'w', encoding='utf-8') as f:
         json.dump({
-            "model_name": f"{args.output_dir}/{output_name}_best_model",
+            "model_name": model_path + "_best_model",
             "metrics": classification_report(labels, predictions, zero_division=.0, output_dict=True),
             "hyperparameters": vars(args),
             "predictions": {

@@ -7,7 +7,6 @@
 
 import os
 import json
-import uuid
 import shutil
 import logging
 import dataclasses
@@ -19,7 +18,7 @@ from transformers import Trainer, TrainingArguments
 from transformers import DataCollatorForTokenClassification
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 
-from utils import parse_args
+import utils
 
 
 def getConfig(raw_labels):
@@ -36,9 +35,10 @@ def getConfig(raw_labels):
 
 def main():
 
-    args = parse_args()
-    subset2task = {'French_clinical': 'clinical', 'French_temporal': 'temporal'}
-    args.task += '_' + subset2task[args.subset]
+    args = utils.parse_args()
+    run_name = utils.create_run_name(args)
+    run_path = utils.get_run_path(args)
+    model_path = utils.get_model_path(args)
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
@@ -157,10 +157,9 @@ def main():
         test_tokenized_datasets = test_tokenized_datasets.select(range(args.max_test_samples))
 
     os.makedirs(args.output_dir, exist_ok=True)
-    output_name = f"DrBenchmark-{args.task}-{uuid.uuid4().hex}"
 
     training_args = TrainingArguments(
-        f"{args.output_dir}/{output_name}",
+        model_path,
         evaluation_strategy="epoch",
         save_strategy="epoch",
         learning_rate=args.learning_rate,
@@ -177,7 +176,7 @@ def main():
     )
 
     logging.info('Load Metrics')
-    metric = evaluate.load("../../../metrics/seqeval.py", experiment_id=output_name)
+    metric = evaluate.load("../../../metrics/seqeval.py", experiment_id=run_name)
     data_collator = DataCollatorForTokenClassification(tokenizer)
 
     def compute_metrics(p):
@@ -210,8 +209,8 @@ def main():
     trainer.evaluate()
 
     logging.info("***** Save the best model *****")
-    trainer.save_model(f"{args.output_dir}/{output_name}_best_model")
-    shutil.rmtree(f"{args.output_dir}/{output_name}")
+    trainer.save_model(model_path + "_best_model")
+    shutil.rmtree(model_path)
 
     logging.info("***** Starting Evaluation *****")
 
@@ -235,9 +234,9 @@ def main():
         if isinstance(object, np.generic):
             return object.item()
 
-    with open(f"{args.run_dir}/{output_name}.json", 'w', encoding='utf-8') as f:
+    with open(run_path, 'w', encoding='utf-8') as f:
         json.dump({
-            "model_name": f"{args.output_dir}/{output_name}_best_model",
+            "model_name": model_path + "_best_model",
             "metrics": cr_metric,
             "hyperparameters": vars(args),
             "predictions": {
