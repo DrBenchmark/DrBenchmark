@@ -11,13 +11,17 @@ import logging
 import dataclasses
 
 from transformers import set_seed
+from packaging.version import parse as parse_version
 from datasets import load_dataset, load_from_disk
 from transformers import Trainer, TrainingArguments
-from transformers import TextClassificationPipeline
+from transformers import pipeline
+from transformers import __version__ as transformers_version
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
 import utils
+
+transformers_version = parse_version(transformers_version)
 
 
 def compute_metrics(pred):
@@ -99,7 +103,7 @@ def main():
 
     training_args = TrainingArguments(
         model_path,
-        evaluation_strategy="epoch",
+        **{'eval_strategy' if transformers_version >= parse_version('4.41') else 'evaluation_strategy': 'epoch'},
         save_strategy="epoch",
         learning_rate=args.learning_rate,
         per_device_train_batch_size=args.batch_size,
@@ -119,7 +123,7 @@ def main():
         training_args,
         train_dataset=dataset_train,
         eval_dataset=dataset_val,
-        tokenizer=tokenizer,
+        **{'processing_class' if transformers_version >= parse_version('4.46') else 'tokenizer': tokenizer},
         compute_metrics=compute_metrics,
     )
 

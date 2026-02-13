@@ -1,25 +1,22 @@
 name: DrBenchmark
 channels:
-  - defaults
+  - pytorch
+  - huggingface
   - conda-forge
+  - nodefaults
 dependencies:
-  - python>3.7,<3.13
+  - python>3.7
   - pip
-  - transformers>=4.0,<=4.49  # to prevent future version breakage (cf. warning tokenizer arg) 
-  - datasets>=2.21,<4.0  # >2.21 for HF_HUB_OFFLINE
+  - pytorch
+  # Older versions of transformers can be used but some package tweaking will be necessary
+  - transformers>=4.40 # >4.40 for compatibility
+  - datasets>=2.21  # >2.21 for HF_HUB_OFFLINE
   - evaluate>=0.4.1
-  - sentencepiece
-  - tensorboardX
-  - scikit-learn>1.4  # >1.4 for clister.root_mean_square_error
+  - scikit-learn>1.4  # >1.4 for root_mean_square_error
   - seqeval  # for metrics/seqeval.py
-  - beautifulsoup4  # for E3C
-  - lxml  # for E3C
-  - pillow  # for DiaMED
-  - filelock  # for MANTRAGSC
+  - accelerate>=0.26  # why ?
+  - tensorboardX
   - sacremoses  # for flaubert
-  - xmltodict
-  - pyyaml
-  - pip:
-    - syntok>=1.4.4  # for PXCorpus
-    - torch  # conda version does not support CUDA
-    - accelerate>=0.26
+  - sentencepiece  # for flaubert
+  - openpyxl  # for tools/*
+  - seaborn  # for tools/*

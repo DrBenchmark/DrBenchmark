@@ -14,12 +14,16 @@ import dataclasses
 import evaluate
 import numpy as np
 from transformers import set_seed
+from packaging.version import parse as parse_version
 from datasets import load_dataset, load_from_disk
 from transformers import Trainer, TrainingArguments
 from transformers import DataCollatorForTokenClassification
+from transformers import __version__ as transformers_version
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 
 import utils
+
+transformers_version = parse_version(transformers_version)
 
 
 def main():
@@ -44,7 +48,11 @@ def main():
             name=args.subset,
         )
 
-    label_list = dataset["train"].features["ner_tags"][0].names
+    try:
+        label_list = dataset["train"].features["ner_tags"].feature.names
+    except AttributeError:
+        # For datasets<4
+        label_list = dataset["train"].features["ner_tags"][0].names
 
     def getConfig(raw_labels):
 
@@ -162,7 +170,7 @@ def main():
 
     training_args = TrainingArguments(
         model_path,
-        evaluation_strategy="epoch",
+        **{'eval_strategy' if transformers_version >= parse_version('4.41') else 'evaluation_strategy': 'epoch'},
         save_strategy="epoch",
         learning_rate=args.learning_rate,
         per_device_train_batch_size=args.batch_size,
@@ -199,7 +207,7 @@ def main():
         train_dataset=train_tokenized_datasets,
         eval_dataset=validation_tokenized_datasets,
         data_collator=data_collator,
-        tokenizer=tokenizer,
+        **{'processing_class' if transformers_version >= parse_version('4.46') else 'tokenizer': tokenizer},
         compute_metrics=compute_metrics,
     )
 

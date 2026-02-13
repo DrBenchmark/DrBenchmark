@@ -13,12 +13,16 @@ import dataclasses
 
 from scipy import stats
 from transformers import set_seed
+from packaging.version import parse as parse_version
 from datasets import load_dataset, load_from_disk
 from sklearn.metrics import root_mean_squared_error
 from transformers import Trainer, TrainingArguments
+from transformers import __version__ as transformers_version
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 import utils
+
+transformers_version = parse_version(transformers_version)
 
 
 def compute_metrics(eval_pred):
@@ -129,7 +133,7 @@ def main():
 
     training_args = TrainingArguments(
         model_path,
-        evaluation_strategy="epoch",
+        **{'eval_strategy' if transformers_version >= parse_version('4.41') else 'evaluation_strategy': 'epoch'},
         save_strategy="epoch",
         learning_rate=args.learning_rate,
         per_device_train_batch_size=args.batch_size,
@@ -149,7 +153,7 @@ def main():
         training_args,
         train_dataset=dataset_train,
         eval_dataset=dataset_val,
-        tokenizer=tokenizer,
+        **{'processing_class' if transformers_version >= parse_version('4.46') else 'tokenizer': tokenizer},
         compute_metrics=compute_metrics,
     )
 
