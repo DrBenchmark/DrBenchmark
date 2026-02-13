@@ -54,7 +54,6 @@ def main():
         dataset = load_dataset(
             "../../../data_loaders_hf/DEFT2019.py",
             name=args.subset,
-            trust_remote_code=True,
             data_dir=args.data_dir,
         )
 
@@ -243,7 +242,7 @@ def main():
             "metrics": cr_metric,
             "hyperparameters": vars(args),
             "predictions": {
-                "identifiers": dataset["test"]["id"],
+                "identifiers": list(dataset["test"]["id"]),
                 "real_labels": _true_labels,
                 "system_predictions": _true_predictions,
             },

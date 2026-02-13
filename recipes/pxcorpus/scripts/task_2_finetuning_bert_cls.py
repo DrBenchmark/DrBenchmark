@@ -53,7 +53,6 @@ def main():
     else:
         dataset = load_dataset(
             "DrBenchmark/PxCorpus",
-            trust_remote_code=True,
         )
 
     labels_list = dataset["train"].features["label"].names
@@ -148,7 +147,7 @@ def main():
             "metrics": classification_report(labels, predictions, zero_division=.0, output_dict=True),
             "hyperparameters": vars(args),
             "predictions": {
-                "identifiers": dataset["test"]["id"],
+                "identifiers": list(dataset["test"]["id"]),
                 "real_labels": labels.tolist(),
                 "system_predictions": predictions.tolist(),
             },

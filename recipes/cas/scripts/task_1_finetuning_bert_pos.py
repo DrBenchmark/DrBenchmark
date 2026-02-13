@@ -42,7 +42,6 @@ def main():
         dataset = load_dataset(
             "DrBenchmark/CAS",
             name=args.subset,
-            trust_remote_code=True,
         )
 
     label_list = dataset["train"].features["pos_tags"][0].names
@@ -150,12 +149,10 @@ def main():
     # train_tokenized_datasets      = train_tokenized_datasets.remove_columns(["label"])
 
     validation_tokenized_datasets = dataset["validation"].map(tokenize_and_align_labels, batched=True)
-    # validation_tokenized_datasets = validation_tokenized_datasets.remove_columns(["label"])
     if args.max_val_samples:
         validation_tokenized_datasets = validation_tokenized_datasets.select(range(args.max_val_samples))
 
     test_tokenized_datasets = dataset["test"].map(tokenize_and_align_labels, batched=True)
-    # test_tokenized_datasets       = test_tokenized_datasets.remove_columns(["label"])
     if args.max_test_samples:
         test_tokenized_datasets = test_tokenized_datasets.select(range(args.max_test_samples))
 
@@ -178,6 +175,7 @@ def main():
         save_total_limit=1,
         report_to='none',
     )
+
     metric = evaluate.load("../../../metrics/seqeval.py", experiment_id=run_name)
     data_collator = DataCollatorForTokenClassification(tokenizer)
 
@@ -238,7 +236,7 @@ def main():
             "metrics": cr_metric,
             "hyperparameters": vars(args),
             "predictions": {
-                "identifiers": dataset["test"]["id"],
+                "identifiers": list(dataset["test"]["id"]),
                 "real_labels": _true_labels,
                 "system_predictions": _true_predictions,
             },

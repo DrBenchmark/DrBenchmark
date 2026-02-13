@@ -88,7 +88,6 @@ def main():
         dataset = load_dataset(
             "DrBenchmark/DEFT2020",
             name=args.subset,
-            trust_remote_code=True,
         )
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)

@@ -52,7 +52,6 @@ def main():
     else:
         dataset = load_dataset(
             "DrBenchmark/FrenchMedMCQA",
-            trust_remote_code=True,
         )
 
     labels_list = ["c", "a", "e", "d", "b", "be", "ae", "bc", "bd", "ab", "de", "cd", "ac", "ad", "ce", "bce", "abc", "cde", "bcd", "ace", "ade", "abe", "acd", "bde", "abd", "abde", "abcd", "bcde", "abce", "acde", "abcde"]
@@ -190,7 +189,7 @@ def main():
             },
             "hyperparameters": vars(args),
             "predictions": {
-                "identifiers": dataset["test"]["id"],
+                "identifiers": list(dataset["test"]["id"]),
                 "real_labels": y_true,
                 "system_predictions": y_pred,
             },
