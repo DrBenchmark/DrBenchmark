@@ -12,35 +12,35 @@ from datasets import load_dataset
 
 
 tasks = [
-    {"corpus": "DrBenchmark/QUAERO", "subset": "emea", "dataset": None, "data_path": "./recipes/quaero/data/", "task": None},
-    {"corpus": "DrBenchmark/QUAERO", "subset": "medline", "dataset": None, "data_path": "./recipes/quaero/data/", "task": None},
-    {"corpus": "DrBenchmark/MANTRAGSC", "subset": "fr_emea", "dataset": None, "data_path": "./recipes/mantragsc/data/", "task": None},
-    {"corpus": "DrBenchmark/MANTRAGSC", "subset": "fr_medline", "dataset": None, "data_path": "./recipes/mantragsc/data/", "task": None},
-    {"corpus": "DrBenchmark/MANTRAGSC", "subset": "fr_patents", "dataset": None, "data_path": "./recipes/mantragsc/data/", "task": None},
-    {"corpus": "DrBenchmark/FrenchMedMCQA", "subset": None, "dataset": None, "data_path": "./recipes/frenchmedmcqa/data/", "task": 1},
-    {"corpus": "DrBenchmark/FrenchMedMCQA", "subset": None, "dataset": None, "data_path": "./recipes/frenchmedmcqa/data/", "task": 2},
-    {"corpus": "DrBenchmark/MORFITT", "subset": None, "dataset": None, "data_path": "./recipes/morfitt/data/", "task": None},
-    {"corpus": "DrBenchmark/E3C", "subset": "French_clinical", "dataset": None, "data_path": "./recipes/e3c/data/", "task": None},
-    {"corpus": "DrBenchmark/E3C", "subset": "French_temporal", "dataset": None, "data_path": "./recipes/e3c/data/", "task": None},
-    {"corpus": "DrBenchmark/CLISTER", "subset": None, "dataset": None, "data_path": "./recipes/clister/data/", "task": None},
-    {"corpus": "DrBenchmark/DEFT2020", "subset": "task_1", "dataset": None, "data_path": "./recipes/deft2020/data/", "task": None},
-    {"corpus": "DrBenchmark/DEFT2020", "subset": "task_2", "dataset": None, "data_path": "./recipes/deft2020/data/", "task": None},
-    {"corpus": "DrBenchmark/PxCorpus", "subset": None, "dataset": None, "data_path": "./recipes/pxcorpus/data/", "task": 1},
-    {"corpus": "DrBenchmark/PxCorpus", "subset": None, "dataset": None, "data_path": "./recipes/pxcorpus/data/", "task": 2},
-    {"corpus": "DrBenchmark/DiaMED", "subset": None, "dataset": None, "data_path": "./recipes/diamed/data/", "task": None},
-    # {"corpus": "DrBenchmark/DEFT2019", "subset": None, "dataset": None, "data_path": "./recipes/deft2019/data/", "task": None},
-    {"corpus": "DrBenchmark/DEFT2021", "subset": "cls", "dataset": None, "data_path": "./recipes/deft2021/data/", "task": None},
-    {"corpus": "DrBenchmark/DEFT2021", "subset": "ner", "dataset": None, "data_path": "./recipes/deft2021/data/", "task": None},
+    {"corpus": "DrBenchmark/QUAERO", "subset": "emea", "task": None},
+    {"corpus": "DrBenchmark/QUAERO", "subset": "medline", "task": None},
+    {"corpus": "DrBenchmark/MANTRAGSC", "subset": "fr_emea", "task": None},
+    {"corpus": "DrBenchmark/MANTRAGSC", "subset": "fr_medline", "task": None},
+    {"corpus": "DrBenchmark/MANTRAGSC", "subset": "fr_patents", "task": None},
+    {"corpus": "DrBenchmark/FrenchMedMCQA", "subset": None, "task": 1},
+    {"corpus": "DrBenchmark/FrenchMedMCQA", "subset": None, "task": 2},
+    {"corpus": "DrBenchmark/MORFITT", "subset": None, "task": None},
+    {"corpus": "DrBenchmark/E3C", "subset": "French_clinical", "task": None},
+    {"corpus": "DrBenchmark/E3C", "subset": "French_temporal", "task": None},
+    {"corpus": "DrBenchmark/CLISTER", "subset": None, "task": None},
+    {"corpus": "DrBenchmark/DEFT2020", "subset": "task_1", "task": None},
+    {"corpus": "DrBenchmark/DEFT2020", "subset": "task_2", "task": None},
+    {"corpus": "DrBenchmark/PxCorpus", "subset": None, "task": 1},
+    {"corpus": "DrBenchmark/PxCorpus", "subset": None, "task": 2},
+    {"corpus": "DrBenchmark/DiaMED", "subset": None, "task": None},
+    # {"corpus": "DrBenchmark/DEFT2019", "subset": None, "task": None},
+    {"corpus": "DrBenchmark/DEFT2021", "subset": "cls", "task": None},
+    {"corpus": "DrBenchmark/DEFT2021", "subset": "ner", "task": None},
 
-    {"corpus": "DrBenchmark/CAS", "subset": "pos", "dataset": None, "data_path": "./recipes/cas/data/", "task": None},
-    {"corpus": "DrBenchmark/CAS", "subset": "cls", "dataset": None, "data_path": "./recipes/cas/data/", "task": None},
-    {"corpus": "DrBenchmark/CAS", "subset": "ner_neg", "dataset": None, "data_path": "./recipes/cas/data/", "task": None},
-    {"corpus": "DrBenchmark/CAS", "subset": "ner_spec", "dataset": None, "data_path": "./recipes/cas/data/", "task": None},
+    {"corpus": "DrBenchmark/CAS", "subset": "pos", "task": None},
+    {"corpus": "DrBenchmark/CAS", "subset": "cls", "task": None},
+    {"corpus": "DrBenchmark/CAS", "subset": "ner_neg", "task": None},
+    {"corpus": "DrBenchmark/CAS", "subset": "ner_spec", "task": None},
 
-    {"corpus": "DrBenchmark/ESSAI", "subset": "pos", "dataset": None, "data_path": "./recipes/essai/data/", "task": None},
-    {"corpus": "DrBenchmark/ESSAI", "subset": "cls", "dataset": None, "data_path": "./recipes/essai/data/", "task": None},
-    {"corpus": "DrBenchmark/ESSAI", "subset": "ner_neg", "dataset": None, "data_path": "./recipes/essai/data/", "task": None},
-    {"corpus": "DrBenchmark/ESSAI", "subset": "ner_spec", "dataset": None, "data_path": "./recipes/essai/data/", "task": None},
+    {"corpus": "DrBenchmark/ESSAI", "subset": "pos", "task": None},
+    {"corpus": "DrBenchmark/ESSAI", "subset": "cls", "task": None},
+    {"corpus": "DrBenchmark/ESSAI", "subset": "ner_neg", "task": None},
+    {"corpus": "DrBenchmark/ESSAI", "subset": "ner_spec", "task": None},
 ]
 
 tasks_classes = {f"{t['corpus']}-{t['subset']}-{t['task']}": {
@@ -53,7 +53,7 @@ for subset in ["train", "validation", "test"]:
 
     for task in tasks:
 
-        dataset = load_dataset(task['corpus'], task['subset'], data_dir=task['data_path'])[subset]
+        dataset = load_dataset(task['corpus'], task['subset'])[subset]
 
         t_key = f"{task['corpus']}-{task['subset']}-{task['task']}"
         print(f">> {t_key}")
