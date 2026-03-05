@@ -14,7 +14,7 @@ from transformers import set_seed
 from packaging.version import parse as parse_version
 from datasets import load_dataset, load_from_disk
 from transformers import Trainer, TrainingArguments
-from transformers import pipeline
+from transformers import TextClassificationPipeline
 from transformers import __version__ as transformers_version
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
