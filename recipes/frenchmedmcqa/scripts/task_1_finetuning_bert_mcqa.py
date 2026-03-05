@@ -14,7 +14,7 @@ from transformers import set_seed
 from packaging.version import parse as parse_version
 from datasets import load_dataset, load_from_disk
 from transformers import Trainer, TrainingArguments
-from transformers import TextClassificationPipeline
+from transformers import pipeline
 from transformers import __version__ as transformers_version
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
@@ -136,10 +136,7 @@ def main():
     shutil.rmtree(model_path)
 
     logging.info("***** Starting Evaluation *****")
-    tokenizer = AutoTokenizer.from_pretrained(f"{args.output_dir}/{output_name}_best_model", use_fast=True)
-    model = AutoModelForSequenceClassification.from_pretrained(f"{args.output_dir}/{output_name}_best_model", num_labels=len(labels_list))
-
-    pipeline = TextClassificationPipeline(model=model, tokenizer=tokenizer, return_all_scores=False, device=0)
+    pipe = pipeline(task="text-classification", model=model_path + "_best_model", top_k=None, device=training_args.device)
 
     def compute_accuracy_exact_match(preds, refs):
         exact_score = []
@@ -160,9 +157,9 @@ def main():
 
     for e in dataset_test:
 
-        res = pipeline(e["text"], truncation=True, max_length=model.config.max_position_embeddings)
+        res = pipe(e["text"], truncation=True, max_length=model.config.max_position_embeddings)
 
-        pred = int(res[0]["label"].split("_")[-1])
+        pred = int(res[0][0]["label"].split("_")[-1])
         pred = labels_list[pred]
         y_pred.append(pred)
         splitted_pred = sorted(list(pred))
