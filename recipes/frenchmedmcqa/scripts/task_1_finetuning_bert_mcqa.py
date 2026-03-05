@@ -136,8 +136,8 @@ def main():
     shutil.rmtree(model_path)
 
     logging.info("***** Starting Evaluation *****")
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
-    model = AutoModelForSequenceClassification.from_pretrained(args.model_name, num_labels=len(labels_list))
+    tokenizer = AutoTokenizer.from_pretrained(f"{args.output_dir}/{output_name}_best_model", use_fast=True)
+    model = AutoModelForSequenceClassification.from_pretrained(f"{args.output_dir}/{output_name}_best_model", num_labels=len(labels_list))
 
     pipeline = TextClassificationPipeline(model=model, tokenizer=tokenizer, return_all_scores=False, device=0)
 
