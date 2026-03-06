@@ -149,8 +149,9 @@ almanach/camembert-bio-base
 
 <details>
   <summary>
+
 ## Citing datasets
-  </summary>
+</summary>
 
 CAS:
 
