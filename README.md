@@ -14,6 +14,8 @@ The biomedical domain has sparked a significant interest in the field of Natural
 git clone https://github.com/DrBenchmark/DrBenchmark
 cd DrBenchmark
 conda env create -f environment.yml
+# or `environment-cpu.yml` if cpu only machine
+# if a GLIBC error occurs at run time try downgrading `safetensors<0.7`
 conda activate DrBenchmark
 
 # Run the benchmark for a specific task and model
