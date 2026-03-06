@@ -158,7 +158,7 @@ if __name__ == '__main__':
     df = df[nb_runs >= args.nb_run]
 
     logging.info(f"Randomly choosing only {args.nb_run} runs if more are available...")
-    df = df.groupby(['model', 'dataset', 'task', 'fewshot', 'metric'])['score'].apply(lambda x: x.sample(n=args.nb_run).mean())
+    df = df.groupby(['model', 'dataset', 'task', 'fewshot', 'metric'])['score'].apply(lambda x: x.sample(n=args.nb_run, random_state=42).mean())
 
     # Pretty table
     # Reorder lines and select metrics
