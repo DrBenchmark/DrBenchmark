@@ -1,8 +1,8 @@
 import json
 
-f = open("./stats/results.json","r")
-data = json.load(f)
-f.close()
+
+with open("./stats/results.json") as f:
+    data = json.load(f)
 
 for model in data:
 

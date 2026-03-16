@@ -1,11 +1,46 @@
 import os
-import argparse
-from argparse import Namespace
-
 import yaml
-import torch
+import json
+import random
+import hashlib
+import logging
+import argparse
 
+import torch
 from transformers import TrainingArguments
+
+
+subset2task_detail = {
+    'emea': 'emea', 'medline': 'medline',  # pxcorpus
+    'fr_emea': 'emea', 'fr_medline': 'medline', 'fr_patents': 'patents',  # mantragsc
+    'French_clinical': 'clinical', 'French_temporal': 'temporal'  # e3c
+}
+
+
+def create_run_name(args):
+    if isinstance(args, argparse.Namespace):
+        args = args.__dict__
+    # Creating the hash using the parameters (including the seed, dataset, model, ...)
+    hash_ = hashlib.shake_128(
+        json.dumps(args, sort_keys=True, ensure_ascii=True).encode()
+    ).hexdigest(8)
+    output_name = f'DrBenchmark-{args["task"]}-{hash_}'
+    return output_name
+
+
+def get_run_path(args):
+    if isinstance(args, argparse.Namespace):
+        args = args.__dict__
+    output_name = create_run_name(args)
+    return os.path.join(args['run_dir'], f'{output_name}.json')
+
+
+def get_model_path(args):
+    if isinstance(args, argparse.Namespace):
+        args = args.__dict__
+    output_name = create_run_name(args)
+    return os.path.join(args['output_dir'], f'{output_name}')
+
 
 class TrainingArgumentsWithMPSSupport(TrainingArguments):
 
@@ -18,43 +53,111 @@ class TrainingArgumentsWithMPSSupport(TrainingArguments):
         else:
             return torch.device("cpu")
 
+
 def parse_args():
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--config", type=str, required=True,
+                        help="Default YAML configuration file")
+    parser.add_argument("--model_name", type=str, required=False,
+                        help="HuggingFace Hub model name")
+    parser.add_argument("--output_dir", type=str, required=False,
+                        help="Path were the model will be saved")
+    parser.add_argument("--run_dir", type=str, required=False,
+                        help="Path were the run output will be saved")
+    parser.add_argument("--data_dir", type=str, required=False,
+                        help="Path where the data are stored")
+    parser.add_argument("--seed", type=int, required=False,
+                        help="Seed to be used (between 0 and 2**32-1) in `transformers.set_seed` for reproducibility.")
+    parser.add_argument("--epochs", type=int, required=False,
+                        help="Training epochs")
+    parser.add_argument("--batch_size", type=int, required=False,
+                        help="Training batch size")
+    parser.add_argument("--max_position_embeddings", type=int, required=False,
+                        help="Max position embeddings")
+    parser.add_argument("--weight_decay", type=float, required=False,
+                        help="Weight decay")
+    parser.add_argument("--learning_rate", type=float, required=False,
+                        help="Learning rate")
+    parser.add_argument("--subset", type=str, required=False,
+                        help="Corpus subset")
+    parser.add_argument("--fewshot", type=float, required=False,
+                        help="Percentage of the train subset used during training")
+    parser.add_argument("--offline", type=bool, required=False,
+                        help="Use local huggingface dataset")
+    parser.add_argument("--max_train_samples", type=int, required=False,
+                        help="For debugging purposes or quicker training, truncate the number of train examples to this value if set.")
+    parser.add_argument("--max_val_samples", type=int, required=False,
+                        help="For debugging purposes or quicker training, truncate the number of validation examples to this value if set.")
+    parser.add_argument("--max_test_samples", type=int, required=False,
+                        help="For debugging purposes or quicker evaluation, truncate the number of test examples to this value if set.")
 
-    parser = argparse.ArgumentParser(formatter_class = argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--config",                  type=str,   required=True,  help="Default YAML configuration file")
-    parser.add_argument("--model_name",              type=str,   required=False, help="HuggingFace Hub model name")
-    parser.add_argument("--output_dir",              type=str,   required=False, help="Path were the model will be saved")
-    parser.add_argument("--data_dir",                type=str,   required=False, help="Path where the data are stored")
-    parser.add_argument("--epochs",                  type=int,   required=False, help="Training epochs")
-    parser.add_argument("--batch_size",              type=int,   required=False, help="Training batch size")
-    parser.add_argument("--max_position_embeddings", type=int,   required=False, help="Max position embeddings")
-    parser.add_argument("--weight_decay",            type=float, required=False, help="Weight decay")
-    parser.add_argument("--learning_rate",           type=float, required=False, help="Learning rate")
-    parser.add_argument("--subset",                  type=str,   required=False, help="Corpus subset")
-    parser.add_argument("--fewshot",                 type=float, required=False, help="Percentage of the train subset used during training", default=1.0)
-    parser.add_argument("--offline",                 type=bool,  required=False, help="Use local huggingface dataset", default=False)
+    # Load command line arguments
+    args_cli = parser.parse_args()
+    args_cli = vars(args_cli)
 
-    args = parser.parse_args()
-    args = vars(args)
+    args = {}
+    # Load local config arguments is any
+    args_local = {}
+    if args_cli["config"]:
+        args_local = yaml.safe_load(open(args_cli["config"]))
+    # Load global config arguments
+    args_global = yaml.safe_load(open("../../../config.yaml"))
 
-    overall_args_yaml = yaml.load(open("../../../config.yaml"), Loader=yaml.FullLoader)
-    args["offline"] = overall_args_yaml["offline"]
+    # Update args with local arguments (which contains great default for each task)
+    args.update({k: v for k, v in args_local.items() if v is not None})
+    # Overwrite local args with global arguments (which allow changing params for all tasks)
+    args.update({k: v for k, v in args_global.items() if v is not None})
+    # Overwrite local and global with command line arguments (which allow precise param changing)
+    #  and fills missing arguments with default values
+    args.update({k: v for k, v in args_cli.items() if v is not None or k not in args})
 
-    args_yaml = yaml.load(open(args["config"]), Loader=yaml.FullLoader)
+    if args['max_train_samples'] is not None and (args['fewshot'] is not None and args['fewshot'] != 1.0):
+        raise ValueError('Cannot use `max_train_samples` and `fewshot` at the same time. Please check local and global config files.')
 
-    for k in args.keys():
-
-        if args[k] == None:
-            args[k] = args_yaml[k]
-    
     args["output_dir"] = args["output_dir"].rstrip('/')
-    
-    if args["offline"] == True:
-        os.environ["WANDB_DISABLED"] = "true"
-        os.environ['TRANSFORMERS_OFFLINE']='1'
-        model_name_clean = args['model_name'].lower().replace('/','_')
-        args["model_name"] = f"../../../models/{model_name_clean}"
 
-    print(f">> Model path: >>{args['model_name']}<<")
-    
-    return Namespace(**args)
+    # Resolve path to model, it can be either hub, full path, rel path
+    m = args["model_name"]
+    # If path exists, no problem
+    if not os.path.exists(m):
+        # If path not exist, it's either a model from the hub model or a
+        #  relative path that broke since we `cd` to `recipes/task/scripts`
+        # Try to fix the relative path
+        fixed_path = os.path.join('..', '..', '..', m)
+        if os.path.exists(fixed_path):
+            # Great it's a local path
+            m = fixed_path
+        else:
+            # Still do not exist, it must me a model from the hub
+            if args['offline']:
+                # If online
+                model_name_clean = m.lower().replace('/', '_')
+                m = os.path.join('..', '..', '..', 'models', model_name_clean)
+    args['model_name'] = m
+
+    if args['subset'] in subset2task_detail:
+        args['task'] += '_' + subset2task_detail[args['subset']]
+
+    if args["offline"]:
+        os.environ["WANDB_DISABLED"] = "true"
+        os.environ['TRANSFORMERS_OFFLINE'] = '1'  # transformers<4.42
+        os.environ['HF_HUB_OFFLINE'] = '1'  # datasets>=2.21, transformers>=4.42
+
+    if args['seed'] is None:
+        # If no seed was provided: Pick a seed
+        args['seed'] = random.randrange(2**32)
+        # Check if it already was computed
+        while os.path.exists(get_run_path(args)):
+            # If yes pick another seed
+            args['seed'] = (args['seed'] + 1) % (2**32)
+    else:
+        # If a seed was provided: checl whether it was already computed
+        if os.path.exists(get_run_path(args)):
+            # If yes do nothing
+            print(f"This configuration was already computed (seed: {args['seed']}, model: {args['model_name']}).")
+            print(json.dumps(args))
+            print("Exiting...")
+            exit(0)
+    # print(f">> Model path: >>{args['model_name']}<<")
+
+    return argparse.Namespace(**args)

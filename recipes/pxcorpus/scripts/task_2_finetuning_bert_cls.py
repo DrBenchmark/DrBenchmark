@@ -6,27 +6,29 @@
 # Apache 2.0
 
 import os
-import shutil
-
-import uuid
 import json
-import argparse
+import shutil
 import logging
+import dataclasses
 
-from utils import parse_args, TrainingArgumentsWithMPSSupport
-
-import torch
 import numpy as np
+from transformers import set_seed
+from packaging.version import parse as parse_version
 from datasets import load_dataset, load_from_disk
+from transformers import Trainer, TrainingArguments
+from transformers import __version__ as transformers_version
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score, classification_report
 
-from sklearn.metrics import precision_recall_fscore_support, accuracy_score, f1_score, roc_auc_score, accuracy_score, classification_report
+import utils
 
-from transformers import AutoTokenizer, EvalPrediction, AutoModelForSequenceClassification, Trainer, TrainingArguments, TextClassificationPipeline
+transformers_version = parse_version(transformers_version)
+
 
 def compute_metrics(pred):
     labels = pred.label_ids
     preds = pred.predictions.argmax(-1)
-    precision, recall, f1, _ = precision_recall_fscore_support(labels, preds, average='weighted')
+    precision, recall, f1, _ = precision_recall_fscore_support(labels, preds, average='weighted', zero_division=.0)
     acc = accuracy_score(labels, preds)
     return {
         'accuracy': acc,
@@ -35,22 +37,26 @@ def compute_metrics(pred):
         'recall': recall
     }
 
+
 def main():
 
-    args = parse_args()
+    args = utils.parse_args()
+    run_name = utils.create_run_name(args)
+    run_path = utils.get_run_path(args)
+    model_path = utils.get_model_path(args)
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-        datefmt="%m/%d/%Y %H:%M:%S"
+        datefmt="%m/%d/%Y %H:%M:%S",
+        level=logging.INFO
     )
-    #logger.setLevel(logging.INFO)
 
-    if args.offline == True:   
+    set_seed(args.seed)
+    if args.offline:
         dataset = load_from_disk(f"{args.data_dir.rstrip('/')}/local_hf_{args.subset}/")
-    else:            
+    else:
         dataset = load_dataset(
-            "Dr-BERT/PxCorpus",
-            data_dir=args.data_dir,
+            "DrBenchmark/PxCorpus",
         )
 
     labels_list = dataset["train"].features["label"].names
@@ -72,32 +78,40 @@ def main():
     dataset_train = dataset["train"].map(preprocess_function, batched=False).shuffle(seed=42).shuffle(seed=42).shuffle(seed=42)
     if args.fewshot != 1.0:
         dataset_train = dataset_train.select(range(int(len(dataset_train) * args.fewshot)))
+    if args.max_train_samples:
+        dataset_train = dataset_train.select(range(args.max_train_samples))
     dataset_train = dataset_train.remove_columns(["text"])
     dataset_train.set_format("torch")
 
     dataset_val = dataset["validation"].map(preprocess_function, batched=False)
+    if args.max_val_samples:
+        dataset_val = dataset_val.select(range(args.max_val_samples))
     dataset_val = dataset_val.remove_columns(["text"])
     dataset_val.set_format("torch")
 
     dataset_test = dataset["test"].map(preprocess_function, batched=False)
+    if args.max_test_samples:
+        dataset_test = dataset_test.select(range(args.max_test_samples))
     dataset_test = dataset_test.remove_columns(["text"])
     dataset_test.set_format("torch")
 
-    os.makedirs(args.output_dir, exist_ok=True)    
-    output_name = f"DrBenchmark-CAS-cls-{str(uuid.uuid4().hex)}"
+    os.makedirs(args.output_dir, exist_ok=True)
 
     training_args = TrainingArguments(
-        f"{args.output_dir}/{output_name}",
-        evaluation_strategy = "epoch",
-        save_strategy = "epoch",
-        learning_rate=float(args.learning_rate),
-        per_device_train_batch_size=int(args.batch_size),
-        per_device_eval_batch_size=int(args.batch_size),
-        num_train_epochs=int(args.epochs),
-        weight_decay=float(args.weight_decay),
+        model_path,
+        **{'eval_strategy' if transformers_version >= parse_version('4.41') else 'evaluation_strategy': 'epoch'},
+        save_strategy="epoch",
+        learning_rate=args.learning_rate,
+        per_device_train_batch_size=args.batch_size,
+        per_device_eval_batch_size=args.batch_size,
+        num_train_epochs=args.epochs,
+        weight_decay=args.weight_decay,
         load_best_model_at_end=True,
         metric_for_best_model="accuracy",
         push_to_hub=False,
+        save_only_model=True,
+        save_total_limit=1,
+        report_to='none',
     )
 
     trainer = Trainer(
@@ -105,7 +119,7 @@ def main():
         training_args,
         train_dataset=dataset_train,
         eval_dataset=dataset_val,
-        tokenizer=tokenizer,
+        **{'processing_class' if transformers_version >= parse_version('4.46') else 'tokenizer': tokenizer},
         compute_metrics=compute_metrics,
     )
 
@@ -114,32 +128,36 @@ def main():
     trainer.evaluate()
 
     logging.info("***** Save the best model *****")
-    trainer.save_model(f"{args.output_dir}/{output_name}_best_model")
-    shutil.rmtree(f"{args.output_dir}/{output_name}")
+    trainer.save_model(model_path + "_best_model")
+    shutil.rmtree(model_path)
 
     logging.info("***** Starting Evaluation *****")
     predictions, labels, _ = trainer.predict(dataset_test)
     predictions = np.argmax(predictions, axis=1)
 
-    f1_score = classification_report(
+    cr_metrics = classification_report(
         labels,
         predictions,
         digits=4,
+        labels=range(len(labels_list)),
         target_names=labels_list,
+        zero_division=.0
     )
-    print(f1_score)
-        
-    with open(f"../runs/{output_name}.json", 'w', encoding='utf-8') as f:
+    logging.info(cr_metrics)
+
+    with open(run_path, 'w', encoding='utf-8') as f:
         json.dump({
-            "model_name": f"{args.output_dir}/{output_name}_best_model",
-            "metrics": classification_report(labels, predictions, output_dict=True),
+            "model_name": model_path + "_best_model",
+            "metrics": classification_report(labels, predictions, zero_division=.0, output_dict=True),
             "hyperparameters": vars(args),
             "predictions": {
-                "identifiers": dataset["test"]["id"],
+                "identifiers": list(dataset["test"]["id"]),
                 "real_labels": labels.tolist(),
                 "system_predictions": predictions.tolist(),
             },
+            'trainer_state': dataclasses.asdict(trainer.state),
         }, f, ensure_ascii=False, indent=4)
+
 
 if __name__ == '__main__':
     main()

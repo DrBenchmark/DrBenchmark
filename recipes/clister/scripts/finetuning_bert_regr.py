@@ -6,28 +6,30 @@
 # Apache 2.0
 
 import os
-import shutil
-
-import uuid
 import json
-import argparse
+import shutil
 import logging
+import dataclasses
 
-from utils import parse_args, TrainingArgumentsWithMPSSupport
-
-import torch
-import numpy as np
 from scipy import stats
+from transformers import set_seed
+from packaging.version import parse as parse_version
 from datasets import load_dataset, load_from_disk
+from sklearn.metrics import root_mean_squared_error
+from transformers import Trainer, TrainingArguments
+from transformers import __version__ as transformers_version
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
-from sklearn.metrics import mean_squared_error
+import utils
 
-from transformers import AutoTokenizer, EvalPrediction, AutoModelForSequenceClassification, Trainer, TrainingArguments, TextClassificationPipeline
+transformers_version = parse_version(transformers_version)
+
 
 def compute_metrics(eval_pred):
     predictions, labels = eval_pred
-    rmse = mean_squared_error(labels, predictions, squared=False)
+    rmse = root_mean_squared_error(labels, predictions)
     return {"rmse": rmse}
+
 
 def EDRM(ref, systm, debug=False):
     maxVal = 5
@@ -37,54 +39,59 @@ def EDRM(ref, systm, debug=False):
         if id in systm and systm[id] >= 0 and systm[id] <= 5:
             d = abs(ref[id] - systm[id])
             if debug:
-                print("d: " , d)
+                logging.info(f"d: {d}")
             if abs(0 - systm[id]) > abs(maxVal - systm[id]):
                 dmax = abs(0 - systm[id])
             else:
                 dmax = abs(maxVal - systm[id])
         else:
-            print(id, " not in system answers!!!")
+            logging.info(f"{id} not in system answers!!!")
             d = maxVal
             dmax = maxVal
         if debug:
-            print("dmax: " , dmax)
-        dsum += 1 - d/dmax
+            logging.info(f"dmax: {dmax}")
+        dsum += 1 - d / dmax
         if debug:
-            print("dsum: ", dsum)
+            logging.info(f"dsum: {dsum}")
     edrm = dsum / len(ref)
     return(edrm)
+
 
 def SpMnCorr(ref, systm, alpha=0.05):
     r = [v for k, v in sorted(ref.items())]
     s = [v for k, v in sorted(systm.items())]
 
     if len(r) == len(s):
-        c,p = stats.spearmanr(r,s)
+        c, p = stats.spearmanr(r, s)
         if p > alpha:
-            print("Spearman Correlation: reference and system result are not correlated")
+            logging.info("Spearman Correlation: reference and system result are NOT correlated")
         else:
-            print("Spearman Correlation: reference and system result are correlated")
-        return([c,p])
+            logging.info("Spearman Correlation: reference and system result are correlated")
+        return([c, p])
     else:
-        return(["error","error"])
+        return(["error", "error"])
+
 
 def main():
 
-    args = parse_args()
+    args = utils.parse_args()
+    run_name = utils.create_run_name(args)
+    run_path = utils.get_run_path(args)
+    model_path = utils.get_model_path(args)
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-        datefmt="%m/%d/%Y %H:%M:%S"
+        datefmt="%m/%d/%Y %H:%M:%S",
+        level=logging.INFO
     )
-    #logger.setLevel(logging.INFO)
 
-    if args.offline == True:   
+    set_seed(args.seed)
+    if args.offline:
         dataset = load_from_disk(f"{args.data_dir.rstrip('/')}/local_hf_{args.subset}/")
-    else:            
+    else:
         dataset = load_dataset(
-            "Dr-BERT/CLISTER",
-            name="source",
-            data_dir=args.data_dir,
+            "DrBenchmark/CLISTER",
+            name=args.subset,
         )
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
@@ -104,33 +111,41 @@ def main():
     dataset_train = dataset["train"].map(preprocess_function, batched=False).shuffle(seed=42).shuffle(seed=42).shuffle(seed=42)
     if args.fewshot != 1.0:
         dataset_train = dataset_train.select(range(int(len(dataset_train) * args.fewshot)))
+    if args.max_train_samples:
+        dataset_train = dataset_train.select(range(args.max_train_samples))
     dataset_train = dataset_train.remove_columns(["text"])
     dataset_train.set_format("torch")
 
     dataset_val = dataset["validation"].map(preprocess_function, batched=False)
+    if args.max_val_samples:
+        dataset_val = dataset_val.select(range(args.max_val_samples))
     dataset_val = dataset_val.remove_columns(["text"])
     dataset_val.set_format("torch")
 
     dataset_test = dataset["test"].map(preprocess_function, batched=False)
+    if args.max_test_samples:
+        dataset_test = dataset_test.select(range(args.max_test_samples))
     dataset_test_ids = list(dataset["test"]["id"])
     dataset_test = dataset_test.remove_columns(["text"])
     dataset_test.set_format("torch")
-    
+
     os.makedirs(args.output_dir, exist_ok=True)
-    output_name = f"DrBenchmark-CLISTER-regression-{str(uuid.uuid4().hex)}"
 
     training_args = TrainingArguments(
-        f"{args.output_dir}/{output_name}",
-        evaluation_strategy = "epoch",
-        save_strategy = "epoch",
-        learning_rate=float(args.learning_rate),
-        per_device_train_batch_size=int(args.batch_size),
-        per_device_eval_batch_size=int(args.batch_size),
-        num_train_epochs=int(args.epochs),
-        weight_decay=float(args.weight_decay),
+        model_path,
+        **{'eval_strategy' if transformers_version >= parse_version('4.41') else 'evaluation_strategy': 'epoch'},
+        save_strategy="epoch",
+        learning_rate=args.learning_rate,
+        per_device_train_batch_size=args.batch_size,
+        per_device_eval_batch_size=args.batch_size,
+        num_train_epochs=args.epochs,
+        weight_decay=args.weight_decay,
         load_best_model_at_end=True,
         metric_for_best_model="rmse",
         push_to_hub=False,
+        save_only_model=True,
+        save_total_limit=1,
+        report_to='none',
     )
 
     trainer = Trainer(
@@ -138,7 +153,7 @@ def main():
         training_args,
         train_dataset=dataset_train,
         eval_dataset=dataset_val,
-        tokenizer=tokenizer,
+        **{'processing_class' if transformers_version >= parse_version('4.46') else 'tokenizer': tokenizer},
         compute_metrics=compute_metrics,
     )
 
@@ -147,23 +162,24 @@ def main():
     trainer.evaluate()
 
     logging.info("***** Save the best model *****")
-    trainer.save_model(f"{args.output_dir}/{output_name}_best_model")
-    shutil.rmtree(f"{args.output_dir}/{output_name}")
+    trainer.save_model(model_path + "_best_model")
+    shutil.rmtree(model_path)
 
     logging.info("***** Starting Evaluation *****")
     _predictions, _labels, _ = trainer.predict(dataset_test)
+    _predictions = _predictions.reshape(-1)
     predictions = {id: p for id, p in zip(dataset_test_ids, _predictions)}
-    labels      = {id: p for id, p in zip(dataset_test_ids, _labels)}
-    
+    labels = {id: p for id, p in zip(dataset_test_ids, _labels)}
+
     edrm = EDRM(labels, predictions)
-    print(">> EDRM: ", edrm)
+    logging.info(f">> EDRM: {edrm}")
 
     coeff, p = SpMnCorr(labels, predictions)
-    print(">> Spearman Correlation: ", coeff, "(",p,")")
+    logging.info(f">> Spearman Correlation: {coeff} ({p})")
 
-    with open(f"../runs/{output_name}.json", 'w', encoding='utf-8') as f:
+    with open(run_path, 'w', encoding='utf-8') as f:
         json.dump({
-            "model_name": f"{args.output_dir}/{output_name}_best_model",
+            "model_name": model_path + "_best_model",
             "metrics": {
                 "EDRM": float(edrm),
                 "spearman_correlation_coef": float(coeff),
@@ -175,7 +191,9 @@ def main():
                 "real_labels": _labels.tolist(),
                 "system_predictions": [p for p in _predictions.tolist()],
             },
+            'trainer_state': dataclasses.asdict(trainer.state),
         }, f, ensure_ascii=False, indent=4)
+
 
 if __name__ == '__main__':
     main()

@@ -6,22 +6,27 @@
 # Apache 2.0
 
 import os
-import shutil
-
-import uuid
 import json
+import shutil
 import logging
-
-import numpy as np
-from datasets import load_dataset, load_from_disk
-
-from utils import parse_args, TrainingArgumentsWithMPSSupport
+import dataclasses
 
 import torch
-from sklearn.metrics import precision_recall_fscore_support, accuracy_score, f1_score, roc_auc_score, accuracy_score, classification_report
-from transformers import AutoTokenizer, EvalPrediction, AutoModelForSequenceClassification, Trainer, TrainingArguments, TextClassificationPipeline
+import numpy as np
+from transformers import set_seed
+from packaging.version import parse as parse_version
+from datasets import load_dataset, load_from_disk
+from transformers import Trainer, TrainingArguments
+from transformers import __version__ as transformers_version
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from sklearn.metrics import f1_score, roc_auc_score, accuracy_score, classification_report
+
+import utils
+
+transformers_version = parse_version(transformers_version)
 
 THRESHOLD_VALUE = 0.70
+
 
 def toLogits(predictions, threshold=THRESHOLD_VALUE):
 
@@ -33,46 +38,52 @@ def toLogits(predictions, threshold=THRESHOLD_VALUE):
 
     return y_pred
 
+
 def multi_label_metrics(predictions, labels, threshold=THRESHOLD_VALUE):
 
     y_pred = toLogits(predictions, threshold)
     y_true = labels
 
-    f1_macro_average = f1_score(y_true=y_true, y_pred=y_pred, average='macro')
-    f1_micro_average = f1_score(y_true=y_true, y_pred=y_pred, average='micro')
-    f1_weighted_average = f1_score(y_true=y_true, y_pred=y_pred, average='weighted')
-    roc_auc = roc_auc_score(y_true, y_pred, average = 'micro')
+    f1_macro_average = f1_score(y_true=y_true, y_pred=y_pred, average='macro', zero_division=.0)
+    f1_micro_average = f1_score(y_true=y_true, y_pred=y_pred, average='micro', zero_division=.0)
+    f1_weighted_average = f1_score(y_true=y_true, y_pred=y_pred, average='weighted', zero_division=.0)
+    roc_auc = roc_auc_score(y_true, y_pred, average='micro')
     accuracy = accuracy_score(y_true, y_pred)
 
-    metrics = {'f1_macro': f1_macro_average, 'f1_micro': f1_micro_average,  'f1_weighted': f1_weighted_average, 'accuracy': accuracy, 'roc': roc_auc}
+    metrics = {'f1_macro': f1_macro_average, 'f1_micro': f1_micro_average, 'f1_weighted': f1_weighted_average, 'accuracy': accuracy, 'roc': roc_auc}
 
     return metrics
 
-def compute_metrics(p: EvalPrediction):
+
+def compute_metrics(p):
     preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
     result = multi_label_metrics(
-        predictions=preds, 
+        predictions=preds,
         labels=p.label_ids
     )
     return result
 
+
 def main():
 
-    args = parse_args()
+    args = utils.parse_args()
+    run_name = utils.create_run_name(args)
+    run_path = utils.get_run_path(args)
+    model_path = utils.get_model_path(args)
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-        datefmt="%m/%d/%Y %H:%M:%S"
+        datefmt="%m/%d/%Y %H:%M:%S",
+        level=logging.INFO
     )
-    #logger.setLevel(logging.INFO)
 
-    if args.offline == True:   
+    set_seed(args.seed)
+    if args.offline:
         dataset = load_from_disk(f"{args.data_dir.rstrip('/')}/local_hf_{args.subset}/")
-    else:            
+    else:
         dataset = load_dataset(
-            "Dr-BERT/DEFT2021",
+            "DrBenchmark/DEFT2021",
             name=args.subset,
-            data_dir=args.data_dir,
         )
 
     labels_list = dataset["train"].features["specialities"].feature.names
@@ -88,33 +99,41 @@ def main():
     dataset_train = dataset["train"].map(preprocess_function, batched=False).shuffle(seed=42).shuffle(seed=42).shuffle(seed=42)
     if args.fewshot != 1.0:
         dataset_train = dataset_train.select(range(int(len(dataset_train) * args.fewshot)))
-    dataset_train = dataset_train.remove_columns(["text","id","specialities"])
+    if args.max_train_samples:
+        dataset_train = dataset_train.select(range(args.max_train_samples))
+    dataset_train = dataset_train.remove_columns(["text", "id", "specialities"])
     dataset_train.set_format("torch")
 
     dataset_val = dataset["validation"].map(preprocess_function, batched=False)
-    dataset_val = dataset_val.remove_columns(["text","id","specialities"])
+    if args.max_val_samples:
+        dataset_val = dataset_val.select(range(args.max_val_samples))
+    dataset_val = dataset_val.remove_columns(["text", "id", "specialities"])
     dataset_val.set_format("torch")
 
     dataset_test = dataset["test"].map(preprocess_function, batched=False)
-    dataset_test = dataset_test.remove_columns(["text","id","specialities"])
+    if args.max_test_samples:
+        dataset_test = dataset_test.select(range(args.max_test_samples))
+    dataset_test = dataset_test.remove_columns(["text", "id", "specialities"])
     # true_labels = list(dataset_test["labels"])
     dataset_test.set_format("torch")
 
     os.makedirs(args.output_dir, exist_ok=True)
-    output_name = f"DrBenchmark-DEFT2021-{args.subset}-{str(uuid.uuid4().hex)}"
 
     training_args = TrainingArguments(
-        f"{args.output_dir}/{output_name}",
-        evaluation_strategy = "epoch",
-        save_strategy = "epoch",
-        learning_rate=float(args.learning_rate),
-        per_device_train_batch_size=int(args.batch_size),
-        per_device_eval_batch_size=int(args.batch_size),
-        num_train_epochs=int(args.epochs),
-        weight_decay=float(args.weight_decay),
+        model_path,
+        **{'eval_strategy' if transformers_version >= parse_version('4.41') else 'evaluation_strategy': 'epoch'},
+        save_strategy="epoch",
+        learning_rate=args.learning_rate,
+        per_device_train_batch_size=args.batch_size,
+        per_device_eval_batch_size=args.batch_size,
+        num_train_epochs=args.epochs,
+        weight_decay=args.weight_decay,
         load_best_model_at_end=True,
         metric_for_best_model="f1_weighted",
         push_to_hub=False,
+        save_only_model=True,
+        save_total_limit=1,
+        report_to='none',
     )
 
     trainer = Trainer(
@@ -122,7 +141,7 @@ def main():
         training_args,
         train_dataset=dataset_train,
         eval_dataset=dataset_val,
-        tokenizer=tokenizer,
+        **{'processing_class' if transformers_version >= parse_version('4.46') else 'tokenizer': tokenizer},
         compute_metrics=compute_metrics,
     )
 
@@ -131,8 +150,8 @@ def main():
     trainer.evaluate()
 
     logging.info("***** Save the best model *****")
-    trainer.save_model(f"{args.output_dir}/{output_name}_best_model")
-    shutil.rmtree(f"{args.output_dir}/{output_name}")
+    trainer.save_model(model_path + "_best_model")
+    shutil.rmtree(model_path)
 
     logging.info("***** Starting Evaluation *****")
 
@@ -141,22 +160,24 @@ def main():
     predictions = toLogits(predictions, THRESHOLD_VALUE)
 
     metrics = multi_label_metrics(predictions, labels, THRESHOLD_VALUE)
-    print(metrics)
+    logging.info(metrics)
 
-    cr = classification_report(labels, predictions, target_names=labels_list, digits=4)
-    print(cr)
+    cr = classification_report(labels, predictions, labels=range(len(labels_list)), target_names=labels_list, digits=4, zero_division=.0)
+    logging.info(cr)
 
-    with open(f"../runs/{output_name}.json", 'w', encoding='utf-8') as f:
+    with open(run_path, 'w', encoding='utf-8') as f:
         json.dump({
-            "model_name": f"{args.output_dir}/{output_name}_best_model",
-            "metrics": classification_report(labels, predictions, output_dict=True),
+            "model_name": model_path + "_best_model",
+            "metrics": classification_report(labels, predictions, zero_division=.0, output_dict=True),
             "hyperparameters": vars(args),
             "predictions": {
-                "identifiers": dataset["test"]["id"],
+                "identifiers": list(dataset["test"]["id"]),
                 "real_labels": labels.tolist(),
                 "system_predictions": predictions.tolist(),
             },
+            'trainer_state': dataclasses.asdict(trainer.state),
         }, f, ensure_ascii=False, indent=4)
+
 
 if __name__ == '__main__':
     main()

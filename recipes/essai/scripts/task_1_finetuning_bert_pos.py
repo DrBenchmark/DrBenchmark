@@ -6,44 +6,53 @@
 # Apache 2.0
 
 import os
-import shutil
-
-import sys
 import json
-import uuid
+import shutil
 import logging
-import itertools
-
-from utils import parse_args, TrainingArgumentsWithMPSSupport
-
-import torch
-import numpy as np
-from sklearn.metrics import classification_report
+import dataclasses
 
 import evaluate
-from datasets import load_metric, load_dataset, load_from_disk
-from transformers import EarlyStoppingCallback, AutoTokenizer, DataCollatorForTokenClassification, AutoModelForTokenClassification, TrainingArguments, Trainer
+import numpy as np
+from transformers import set_seed
+from packaging.version import parse as parse_version
+from datasets import load_dataset, load_from_disk
+from transformers import Trainer, TrainingArguments
+from transformers import DataCollatorForTokenClassification
+from transformers import __version__ as transformers_version
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+
+import utils
+
+transformers_version = parse_version(transformers_version)
+
 
 def main():
 
-    args = parse_args()
+    args = utils.parse_args()
+    run_name = utils.create_run_name(args)
+    run_path = utils.get_run_path(args)
+    model_path = utils.get_model_path(args)
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-        datefmt="%m/%d/%Y %H:%M:%S"
+        datefmt="%m/%d/%Y %H:%M:%S",
+        level=logging.INFO
     )
-    #logger.setLevel(logging.INFO)
 
-    if args.offline == True:   
+    set_seed(args.seed)
+    if args.offline:
         dataset = load_from_disk(f"{args.data_dir.rstrip('/')}/local_hf_{args.subset}/")
-    else:            
+    else:
         dataset = load_dataset(
-            "Dr-BERT/ESSAI",
-            name=str(args.subset),
-            data_dir=args.data_dir,
+            "DrBenchmark/ESSAI",
+            name=args.subset,
         )
 
-    label_list = dataset["train"].features["pos_tags"][0].names
+    try:
+        label_list = dataset["train"].features["pos_tags"].feature.names
+    except AttributeError:
+        # For datasets<4
+        label_list = dataset["train"].features["pos_tags"][0].names
 
     def getConfig(raw_labels):
 
@@ -84,34 +93,34 @@ def main():
                 for _i, (_t, _lb) in enumerate(zip(_e, _label)):
                     tokens_word = tokenizer(_t)["input_ids"][1:-1]
                     _local.extend(tokens_word)
-                    _local_labels.extend([_lb]*len(tokens_word))
-                
-                if len(_local) > 250:
-                    print(f">> {len(_local)}")
+                    _local_labels.extend([_lb] * len(tokens_word))
 
-                _local = _local[0:args.max_position_embeddings-1]
-                _local_labels = _local_labels[0:args.max_position_embeddings-1]
+                if len(_local) > 250:
+                    logging.info(f">> {len(_local)}")
+
+                _local = _local[0:args.max_position_embeddings - 1]
+                _local_labels = _local_labels[0:args.max_position_embeddings - 1]
 
                 _local.append(tokenizer("</s>")["input_ids"][1])
                 _local_labels.append(-100)
 
                 padding_left = args.max_position_embeddings - len(_local)
                 if padding_left > 0:
-                    _local.extend([tokenizer("<pad>")["input_ids"][1]]*padding_left)
-                    _local_labels.extend([-100]*padding_left)
+                    _local.extend([tokenizer("<pad>")["input_ids"][1]] * padding_left)
+                    _local_labels.extend([-100] * padding_left)
 
                 tokenized_inputs.append(_local)
                 _labels.append(_local_labels)
-            
+
             tokenized_inputs = {
                 "input_ids": tokenized_inputs,
                 "labels": _labels,
             }
 
         else:
-            
+
             tokenized_inputs = tokenizer(list(examples["tokens"]), truncation=True, max_length=args.max_position_embeddings, padding='max_length', is_split_into_words=True)
-        
+
             labels = []
 
             for i, label in enumerate(examples[f"pos_tags"]):
@@ -131,45 +140,51 @@ def main():
 
                     else:
                         label_ids.append(label[word_idx] if label_all_tokens else -100)
-                    
+
                     previous_word_idx = word_idx
 
                 labels.append(label_ids)
-            
+
             tokenized_inputs["labels"] = labels
 
         return tokenized_inputs
 
-    train_tokenized_datasets      = dataset["train"].map(tokenize_and_align_labels, batched=True).shuffle(seed=42).shuffle(seed=42).shuffle(seed=42)
+    train_tokenized_datasets = dataset["train"].map(tokenize_and_align_labels, batched=True).shuffle(seed=42).shuffle(seed=42).shuffle(seed=42)
     if args.fewshot != 1.0:
         train_tokenized_datasets = train_tokenized_datasets.select(range(int(len(train_tokenized_datasets) * args.fewshot)))
+    if args.max_train_samples:
+        train_tokenized_datasets = train_tokenized_datasets.select(range(args.max_train_samples))
     # train_tokenized_datasets      = train_tokenized_datasets.remove_columns(["label"])
 
     validation_tokenized_datasets = dataset["validation"].map(tokenize_and_align_labels, batched=True)
-    # validation_tokenized_datasets = validation_tokenized_datasets.remove_columns(["label"])
+    if args.max_val_samples:
+        validation_tokenized_datasets = validation_tokenized_datasets.select(range(args.max_val_samples))
 
-    test_tokenized_datasets       = dataset["test"].map(tokenize_and_align_labels, batched=True)
-    # test_tokenized_datasets       = test_tokenized_datasets.remove_columns(["label"])
+    test_tokenized_datasets = dataset["test"].map(tokenize_and_align_labels, batched=True)
+    if args.max_test_samples:
+        test_tokenized_datasets = test_tokenized_datasets.select(range(args.max_test_samples))
 
     os.makedirs(args.output_dir, exist_ok=True)
-    output_name = f"DrBenchmark-ESSAI-{str(args.subset)}-{uuid.uuid4()}"
 
     training_args = TrainingArguments(
-        f"{args.output_dir}/{output_name}",
-        evaluation_strategy = "epoch",
-        save_strategy = "epoch",
-        learning_rate=float(args.learning_rate),
-        per_device_train_batch_size=int(args.batch_size),
-        per_device_eval_batch_size=int(args.batch_size),
-        num_train_epochs=int(args.epochs),
-        weight_decay=float(args.weight_decay),
+        model_path,
+        **{'eval_strategy' if transformers_version >= parse_version('4.41') else 'evaluation_strategy': 'epoch'},
+        save_strategy="epoch",
+        learning_rate=args.learning_rate,
+        per_device_train_batch_size=args.batch_size,
+        per_device_eval_batch_size=args.batch_size,
+        num_train_epochs=args.epochs,
+        weight_decay=args.weight_decay,
         push_to_hub=False,
         metric_for_best_model="f1",
         load_best_model_at_end=True,
         greater_is_better=True,
+        save_only_model=True,
+        save_total_limit=1,
+        report_to='none',
     )
 
-    metric  = evaluate.load("../../../metrics/seqeval.py", experiment_id=output_name)
+    metric = evaluate.load("../../../metrics/seqeval.py", experiment_id=run_name)
     data_collator = DataCollatorForTokenClassification(tokenizer)
 
     def compute_metrics(p):
@@ -180,17 +195,17 @@ def main():
         true_predictions = [[label_list[p] for (p, l) in zip(prediction, label) if l != -100] for prediction, label in zip(predictions, labels)]
         true_labels = [[label_list[l] for (p, l) in zip(prediction, label) if l != -100] for prediction, label in zip(predictions, labels)]
 
-        results = metric.compute(predictions=true_predictions, references=true_labels)
+        results = metric.compute(predictions=true_predictions, references=true_labels, zero_division=.0)
 
         return {"precision": results["overall_precision"], "recall": results["overall_recall"], "f1": results["overall_f1"], "accuracy": results["overall_accuracy"]}
-        
+
     trainer = Trainer(
         model,
         training_args,
         train_dataset=train_tokenized_datasets,
         eval_dataset=validation_tokenized_datasets,
         data_collator=data_collator,
-        tokenizer=tokenizer,
+        **{'processing_class' if transformers_version >= parse_version('4.46') else 'tokenizer': tokenizer},
         compute_metrics=compute_metrics,
     )
 
@@ -198,8 +213,8 @@ def main():
     trainer.train()
 
     logging.info("***** Save the best model *****")
-    trainer.save_model(f"{args.output_dir}/{output_name}_best_model")
-    shutil.rmtree(f"{args.output_dir}/{output_name}")
+    trainer.save_model(model_path + "_best_model")
+    shutil.rmtree(model_path)
 
     logging.info("***** Starting Evaluation *****")
 
@@ -216,24 +231,26 @@ def main():
         for prediction, label in zip(predictions, labels)
     ]
 
-    cr_metric = metric.compute(predictions=_true_predictions, references=_true_labels)
-    print(cr_metric)
-        
+    cr_metric = metric.compute(predictions=_true_predictions, references=_true_labels, zero_division=.0)
+    logging.info(cr_metric)
+
     def np_encoder(object):
         if isinstance(object, np.generic):
             return object.item()
 
-    with open(f"../runs/{output_name}.json", 'w', encoding='utf-8') as f:
+    with open(run_path, 'w', encoding='utf-8') as f:
         json.dump({
-            "model_name": f"{args.output_dir}/{output_name}_best_model",
+            "model_name": model_path + "_best_model",
             "metrics": cr_metric,
             "hyperparameters": vars(args),
             "predictions": {
-                "identifiers": dataset["test"]["id"],
+                "identifiers": list(dataset["test"]["id"]),
                 "real_labels": _true_labels,
                 "system_predictions": _true_predictions,
             },
+            'trainer_state': dataclasses.asdict(trainer.state),
         }, f, ensure_ascii=False, indent=4, default=np_encoder)
+
 
 if __name__ == '__main__':
     main()
