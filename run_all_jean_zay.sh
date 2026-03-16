@@ -54,10 +54,10 @@ for MODEL_NAME in "${MODELS[@]}"; do
             "cd ./recipes/deft2020/scripts/ && srun bash run_task_1.sh '$MODEL_NAME'"
             "cd ./recipes/deft2020/scripts/ && srun bash run_task_2.sh '$MODEL_NAME'"
             
-            "cd ./recipes/deft2021/scripts/ && srun bash run_task_1.sh '$MODEL_NAME' 'ner' --batch_size 4 --gradient_accumulation_steps 4"
-            "cd ./recipes/deft2021/scripts/ && srun bash run_task_2.sh '$MODEL_NAME' --batch_size 1 --gradient_accumulation_steps 12"
+            "cd ./recipes/deft2021/scripts/ && srun bash run_task_1.sh '$MODEL_NAME' 'ner'"
+            "cd ./recipes/deft2021/scripts/ && srun bash run_task_2.sh '$MODEL_NAME'"
             
-            "cd ./recipes/diamed/scripts/ && srun bash run.sh '$MODEL_NAME' --batch_size 2 --gradient_accumulation_steps 8"
+            "cd ./recipes/diamed/scripts/ && srun bash run.sh '$MODEL_NAME'"
             
             "cd ./recipes/e3c/scripts/ && srun bash run.sh '$MODEL_NAME' 'French_clinical'"
             "cd ./recipes/e3c/scripts/ && srun bash run.sh '$MODEL_NAME' 'French_temporal'"
@@ -74,7 +74,7 @@ for MODEL_NAME in "${MODELS[@]}"; do
             "cd ./recipes/mantragsc/scripts/ && srun bash run.sh '$MODEL_NAME' 'fr_medline'"
             "cd ./recipes/mantragsc/scripts/ && srun bash run.sh '$MODEL_NAME' 'fr_patents'"
             
-            "cd ./recipes/morfitt/scripts/ && srun bash run.sh '$MODEL_NAME' --batch_size 1 --gradient_accumulation_steps 12"
+            "cd ./recipes/morfitt/scripts/ && srun bash run.sh '$MODEL_NAME'"
             
             "cd ./recipes/pxcorpus/scripts/ && srun bash run_task_1.sh '$MODEL_NAME'"
             "cd ./recipes/pxcorpus/scripts/ && srun bash run_task_2.sh '$MODEL_NAME'"
