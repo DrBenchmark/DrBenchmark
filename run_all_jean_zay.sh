@@ -54,7 +54,7 @@ for MODEL_NAME in "${MODELS[@]}"; do
             "cd ./recipes/deft2020/scripts/ && srun bash run_task_1.sh '$MODEL_NAME'"
             "cd ./recipes/deft2020/scripts/ && srun bash run_task_2.sh '$MODEL_NAME'"
             
-            "cd ./recipes/deft2021/scripts/ && srun bash run_task_1.sh '$MODEL_NAME' 'ner'"
+            "cd ./recipes/deft2021/scripts/ && srun bash run_task_1.sh '$MODEL_NAME'"
             "cd ./recipes/deft2021/scripts/ && srun bash run_task_2.sh '$MODEL_NAME'"
             
             "cd ./recipes/diamed/scripts/ && srun bash run.sh '$MODEL_NAME'"
