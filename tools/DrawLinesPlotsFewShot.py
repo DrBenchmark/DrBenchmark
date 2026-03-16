@@ -89,7 +89,6 @@ mapping = {
     "distilbert-base-uncased": "DistilBERT",
     "distilbert/distilbert-base-uncased": "DistilBERT",
 }
-mapping = {k.lower().replace('/', '_'): v for k, v in mapping.items()}
 
 mapping_line = {
     "CamemBERTa": "-",
@@ -112,9 +111,10 @@ for key in results_fewshot:
     max_val = 0
 
     for model in results_fewshot[key]:
-
+        if model not in mapping:
+            continue
         values = [float(v) for v in results_fewshot[key][model]]
-        model_name = mapping[model.replace("../../../models/", "")]
+        model_name = mapping[model]
         model_linestyle = mapping_line[model_name]
 
         if min(values) < min_val:

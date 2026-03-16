@@ -7,5 +7,7 @@ learning_rate: 1.0e-4
 output_dir: "../save_models/"
 run_dir: "../runs/"
 data_dir: "../data/"
-subset: "emea"
+subset: "fr_emea"
 fewshot: 1.0
+task: "mantragsc-ner"
+dataset: "DrBenchmark/MANTRAGSC"

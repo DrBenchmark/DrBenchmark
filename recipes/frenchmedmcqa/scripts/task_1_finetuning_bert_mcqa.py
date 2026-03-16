@@ -6,18 +6,22 @@
 
 import os
 import json
-import uuid
 import shutil
 import logging
 import dataclasses
 
+from transformers import set_seed
+from packaging.version import parse as parse_version
 from datasets import load_dataset, load_from_disk
 from transformers import Trainer, TrainingArguments
-from transformers import TextClassificationPipeline
+from transformers import pipeline
+from transformers import __version__ as transformers_version
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
-from utils import parse_args
+import utils
+
+transformers_version = parse_version(transformers_version)
 
 
 def compute_metrics(pred):
@@ -35,7 +39,10 @@ def compute_metrics(pred):
 
 def main():
 
-    args = parse_args()
+    args = utils.parse_args()
+    run_name = utils.create_run_name(args)
+    run_path = utils.get_run_path(args)
+    model_path = utils.get_model_path(args)
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
@@ -43,12 +50,12 @@ def main():
         level=logging.INFO
     )
 
+    set_seed(args.seed)
     if args.offline:
         dataset = load_from_disk(f"{args.data_dir.rstrip('/')}/local_hf_{args.subset}/")
     else:
         dataset = load_dataset(
             "DrBenchmark/FrenchMedMCQA",
-            trust_remote_code=True,
         )
 
     labels_list = ["c", "a", "e", "d", "b", "be", "ae", "bc", "bd", "ab", "de", "cd", "ac", "ad", "ce", "bce", "abc", "cde", "bcd", "ace", "ade", "abe", "acd", "bde", "abd", "abde", "abcd", "bcde", "abce", "acde", "abcde"]
@@ -93,11 +100,10 @@ def main():
         dataset_test = dataset_test.select(range(args.max_test_samples))
 
     os.makedirs(args.output_dir, exist_ok=True)
-    output_name = f"DrBenchmark-FrenchMedMCQA-mcqa-{uuid.uuid4().hex}"
 
     training_args = TrainingArguments(
-        f"{args.output_dir}/{output_name}",
-        evaluation_strategy="epoch",
+        model_path,
+        **{'eval_strategy' if transformers_version >= parse_version('4.41') else 'evaluation_strategy': 'epoch'},
         save_strategy="epoch",
         learning_rate=args.learning_rate,
         per_device_train_batch_size=args.batch_size,
@@ -117,7 +123,7 @@ def main():
         training_args,
         train_dataset=dataset_train,
         eval_dataset=dataset_val,
-        tokenizer=tokenizer,
+        **{'processing_class' if transformers_version >= parse_version('4.46') else 'tokenizer': tokenizer},
         compute_metrics=compute_metrics,
     )
 
@@ -126,14 +132,11 @@ def main():
     trainer.evaluate()
 
     logging.info("***** Save the best model *****")
-    trainer.save_model(f"{args.output_dir}/{output_name}_best_model")
-    shutil.rmtree(f"{args.output_dir}/{output_name}")
+    trainer.save_model(model_path + "_best_model")
+    shutil.rmtree(model_path)
 
     logging.info("***** Starting Evaluation *****")
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
-    model = AutoModelForSequenceClassification.from_pretrained(args.model_name, num_labels=len(labels_list))
-
-    pipeline = TextClassificationPipeline(model=model, tokenizer=tokenizer, return_all_scores=False, device=0)
+    pipe = pipeline(task="text-classification", model=model_path + "_best_model", top_k=None, device=training_args.device)
 
     def compute_accuracy_exact_match(preds, refs):
         exact_score = []
@@ -154,9 +157,9 @@ def main():
 
     for e in dataset_test:
 
-        res = pipeline(e["text"], truncation=True, max_length=model.config.max_position_embeddings)
+        res = pipe(e["text"], truncation=True, max_length=model.config.max_position_embeddings)
 
-        pred = int(res[0]["label"].split("_")[-1])
+        pred = int(res[0][0]["label"].split("_")[-1])
         pred = labels_list[pred]
         y_pred.append(pred)
         splitted_pred = sorted(list(pred))
@@ -178,16 +181,16 @@ def main():
     exact_match = compute_accuracy_exact_match(y_true, y_pred)
     logging.info(exact_match)
 
-    with open(f"{args.run_dir}/{output_name}.json", 'w', encoding='utf-8') as f:
+    with open(run_path, 'w', encoding='utf-8') as f:
         json.dump({
-            "model_name": f"{args.output_dir}/{output_name}_best_model",
+            "model_name": model_path + "_best_model",
             "metrics": {
                 "hamming_score": float(hamming_score),
                 "exact_match": float(exact_match),
             },
             "hyperparameters": vars(args),
             "predictions": {
-                "identifiers": dataset["test"]["id"],
+                "identifiers": list(dataset["test"]["id"]),
                 "real_labels": y_true,
                 "system_predictions": y_pred,
             },

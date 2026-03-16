@@ -9,41 +9,6 @@ except ModuleNotFoundError:
     def tqdm(x, *args, **kwargs):
         return x
 
-# TASK
-fp2task = {
-    "-cls-": "cls",
-    "-French_clinical-": "ner_clinical",
-    "-French_temporal-": "ner_temporal",
-    "-fr_emea-": "ner_emea",
-    "-fr_medline-": "ner_medline",
-    "-fr_patents-": "ner_patents",
-    "-emea-": "ner_emea",
-    "-medline-": "ner_medline",
-    "-pos-": "pos",
-    "-regression-": "regr",
-    "-mcqa-": "mcqa",
-    "-ner-": "ner",
-    "-ner_neg-": "ner_neg",
-    "-ner_spec-": "ner_spec"
-}
-
-# CORPUS
-fp2corpus = {
-    "/cas/": "cas",
-    "/clister/": "clister",
-    "/deft2020/": "deft2020",
-    "/e3c/": "e3c",
-    "/essai/": "essai",
-    "/frenchmedmcqa/": "frenchmedmcqa",
-    "/mantragsc/": "mantragsc",
-    "/morfitt/": "morfitt",
-    "/quaero/": "quaero",
-    "/pxcorpus/": "pxcorpus",
-    "/diamed/": "diamed",
-    "/deft2019/": "deft2019",
-    "/deft2021/": "deft2021",
-}
-
 if __name__ == '__main__':
     path = "recipes"
 
@@ -57,15 +22,12 @@ if __name__ == '__main__':
         with open(file_path) as f_json:
             data = json.load(f_json)
 
-        task = [v for k, v in fp2task.items() if k in file_path]
-        assert len(task) != 0
-        task = task[0]
-
-        corpus = [v for k, v in fp2corpus.items() if k in file_path]
-        assert len(corpus) != 0
-        corpus = corpus[0]
+        corpus, task = data['hyperparameters']['task'].split('-')
 
         model_name = data["hyperparameters"]["model_name"]
+        if model_name.startswith('../../../models/'):
+            model_name = model_name.replace('../../../models/', '')
+            model_name = '/'.join(model_name.split('_', 1))
 
         fewshot = data["hyperparameters"]["fewshot"]
         key = f"{corpus}|{task}|{fewshot}"

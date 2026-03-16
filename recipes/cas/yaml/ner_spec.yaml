@@ -9,3 +9,5 @@ run_dir: "../runs/"
 data_dir: "../data/"
 subset: "ner_spec"
 fewshot: 1.0
+task: "cas-ner_spec"
+dataset: "DrBenchmark/CAS"

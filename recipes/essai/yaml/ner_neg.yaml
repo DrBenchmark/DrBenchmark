@@ -9,3 +9,5 @@ run_dir: "../runs/"
 data_dir: "../data/"
 subset: "ner_neg"
 fewshot: 1.0
+task: "essai-ner_neg"
+dataset: "DrBenchmark/ESSAI"

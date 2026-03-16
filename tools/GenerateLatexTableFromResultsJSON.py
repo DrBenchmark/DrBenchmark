@@ -6,7 +6,6 @@ with open("./stats/overall_averaged_metrics.json") as f:
 
 with open('models.txt') as f_in:
     models = [l.strip() for l in f_in if l.strip()]
-    models = ["../../../models/" + m.lower().replace("/", "_") for m in models]
 
 print(models)
 
@@ -28,7 +27,6 @@ mapping = {
     "microsoft/Biomednlp-PubmedBERT-base-uncased-abstract": "OLD-PubMedBERT",
     "Dr-BERT/DrBERT-7GB": "DrBERT-FS",
     "Dr-BERT/DrBERT-4GB-CP-PubMedBERT": "DrBERT-CP",
-    "camembert-base": "CamemBERT",
     "almanach/camembert-base": "CamemBERT",
     "almanach/camemberta-base": "CamemBERTa",
     "almanach/camembert-bio-base": "CamemBERT-BIO",
@@ -39,9 +37,8 @@ mapping = {
     "distilbert-base-uncased": "DistilBERT",
     "distilbert/distilbert-base-uncased": "DistilBERT",
 }
-mapping = {k.lower().replace('/', '_'): v for k, v in mapping.items()}
 
-output.append("\\textbf{Dataset} & \\textbf{Task} & " + " & ".join(["\\textbf{" + mapping[m.replace("../../../models/", "")] + "}" for m in models]) + " \\\\ ")
+output.append("\\textbf{Dataset} & \\textbf{Task} & " + " & ".join(["\\textbf{" + mapping[m] + "}" for m in models]) + " \\\\ ")
 
 latest_corpus = None
 # latest_corpus = tasks[0].split("|")[0]
@@ -53,8 +50,7 @@ for t in tasks:
     runs_metrics = []
 
     for m in models:
-
-        if m not in data:
+        if m not in data or t not in data[m]:
             metric = "-"
         elif t.find("deft2020|regr") != -1 or t.find("clister|regr") != -1:
             metric = f"{round(data[m][t]['edrm'], 2)}" + " / " + f"{round(data[m][t]['spearman_correlation_coef'], 2)}"

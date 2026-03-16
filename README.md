@@ -14,15 +14,17 @@ The biomedical domain has sparked a significant interest in the field of Natural
 git clone https://github.com/DrBenchmark/DrBenchmark
 cd DrBenchmark
 conda env create -f environment.yml
+# or `environment-cpu.yml` if cpu only machine
+# if a GLIBC error occurs at run time try downgrading `safetensors<0.7`
 conda activate DrBenchmark
 
 # Run the benchmark for a specific task and model
-python run.py --tasks frenchmedmcqa-mcqa --model Dr-BERT/DrBERT-7GB --nb-run 4
+python run.py --tasks frenchmedmcqa-mcqa --model Dr-BERT/DrBERT-7GB --nb-run 1
 # or to run all tasks for all models in ./models.txt
 python run.py --tasks all --nb-run 4
 ```
 
-**Note**: The access to **DEFT-2019** data is restricted. Once data is acquired, add the files to `./recipes/deft2019/data/`.
+**Note**: The access to **DEFT-2019** data is restricted. Once data is acquired, add files to `./recipes/deft2019/data/`.
 
 **Note**: In case you are running the benchmark on an **offline machine / cluster**, execute `python ./download_datasets_locally.py` and `python ./download_models_locally.py` to locally build and save datasets and models. Then, set `offline` to `True` in `./config.yaml`.
 
@@ -36,7 +38,7 @@ More information on managing environments with Anaconda can be found in [the con
 
 1. Find your account identifier with `idr_compuse` command
 2. Edit `run_jean_zay.sh` to replace `<ACCOUNT>` by your account identifier
-3. `sbatch run_jean_zay.sh`
+3. Run `sbatch run_jean_zay.sh`
 
 ## Evaluate other models
 
@@ -145,7 +147,11 @@ almanach/camembert-bio-base
 }
 ```
 
+<details>
+  <summary>
+
 ## Citing datasets
+</summary>
 
 CAS:
 
@@ -352,6 +358,8 @@ PxCorpus:
   location = "Marseille, France"
 }
 ```
+
+</details>
 
 ## Acknowledgments
 

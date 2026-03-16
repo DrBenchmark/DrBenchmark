@@ -1,10 +1,45 @@
 import os
 import yaml
+import json
+import random
+import hashlib
 import logging
 import argparse
 
 import torch
 from transformers import TrainingArguments
+
+
+subset2task_detail = {
+    'emea': 'emea', 'medline': 'medline',  # pxcorpus
+    'fr_emea': 'emea', 'fr_medline': 'medline', 'fr_patents': 'patents',  # mantragsc
+    'French_clinical': 'clinical', 'French_temporal': 'temporal'  # e3c
+}
+
+
+def create_run_name(args):
+    if isinstance(args, argparse.Namespace):
+        args = args.__dict__
+    # Creating the hash using the parameters (including the seed, dataset, model, ...)
+    hash_ = hashlib.shake_128(
+        json.dumps(args, sort_keys=True, ensure_ascii=True).encode()
+    ).hexdigest(8)
+    output_name = f'DrBenchmark-{args["task"]}-{hash_}'
+    return output_name
+
+
+def get_run_path(args):
+    if isinstance(args, argparse.Namespace):
+        args = args.__dict__
+    output_name = create_run_name(args)
+    return os.path.join(args['run_dir'], f'{output_name}.json')
+
+
+def get_model_path(args):
+    if isinstance(args, argparse.Namespace):
+        args = args.__dict__
+    output_name = create_run_name(args)
+    return os.path.join(args['output_dir'], f'{output_name}')
 
 
 class TrainingArgumentsWithMPSSupport(TrainingArguments):
@@ -31,6 +66,8 @@ def parse_args():
                         help="Path were the run output will be saved")
     parser.add_argument("--data_dir", type=str, required=False,
                         help="Path where the data are stored")
+    parser.add_argument("--seed", type=int, required=False,
+                        help="Seed to be used (between 0 and 2**32-1) in `transformers.set_seed` for reproducibility.")
     parser.add_argument("--epochs", type=int, required=False,
                         help="Training epochs")
     parser.add_argument("--batch_size", type=int, required=False,
@@ -100,11 +137,29 @@ def parse_args():
                 m = os.path.join('..', '..', '..', 'models', model_name_clean)
     args['model_name'] = m
 
+    if args['subset'] in subset2task_detail:
+        args['task'] += '_' + subset2task_detail[args['subset']]
+
     if args["offline"]:
         os.environ["WANDB_DISABLED"] = "true"
         os.environ['TRANSFORMERS_OFFLINE'] = '1'  # transformers<4.42
         os.environ['HF_HUB_OFFLINE'] = '1'  # datasets>=2.21, transformers>=4.42
 
+    if args['seed'] is None:
+        # If no seed was provided: Pick a seed
+        args['seed'] = random.randrange(2**32)
+        # Check if it already was computed
+        while os.path.exists(get_run_path(args)):
+            # If yes pick another seed
+            args['seed'] = (args['seed'] + 1) % (2**32)
+    else:
+        # If a seed was provided: checl whether it was already computed
+        if os.path.exists(get_run_path(args)):
+            # If yes do nothing
+            print(f"This configuration was already computed (seed: {args['seed']}, model: {args['model_name']}).")
+            print(json.dumps(args))
+            print("Exiting...")
+            exit(0)
     # print(f">> Model path: >>{args['model_name']}<<")
 
     return argparse.Namespace(**args)

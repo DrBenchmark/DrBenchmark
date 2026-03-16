@@ -7,19 +7,23 @@
 
 import os
 import json
-import uuid
 import shutil
 import logging
 import dataclasses
 
 import evaluate
 import numpy as np
+from transformers import set_seed
+from packaging.version import parse as parse_version
 from datasets import load_dataset, load_from_disk
 from transformers import Trainer, TrainingArguments
 from transformers import DataCollatorForTokenClassification
+from transformers import __version__ as transformers_version
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 
-from utils import parse_args
+import utils
+
+transformers_version = parse_version(transformers_version)
 
 
 def getConfig(raw_labels):
@@ -36,7 +40,10 @@ def getConfig(raw_labels):
 
 def main():
 
-    args = parse_args()
+    args = utils.parse_args()
+    run_name = utils.create_run_name(args)
+    run_path = utils.get_run_path(args)
+    model_path = utils.get_model_path(args)
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
@@ -44,13 +51,13 @@ def main():
         level=logging.INFO
     )
 
+    set_seed(args.seed)
     if args.offline:
         dataset = load_from_disk(f"{args.data_dir.rstrip('/')}/local_hf_{args.subset}/")
     else:
         dataset = load_dataset(
             "../../../data_loaders_hf/DEFT2019.py",
             name=args.subset,
-            trust_remote_code=True,
             data_dir=args.data_dir,
         )
 
@@ -58,7 +65,11 @@ def main():
     dev_dataset = dataset["validation"]
     test_dataset = dataset["test"]
 
-    label_list = train_dataset.features[f"ner_tags"].feature.names
+    try:
+        label_list = train_dataset.features["ner_tags"].feature.names
+    except AttributeError:
+        # For datasets<4
+        label_list = train_dataset.features["ner_tags"][0].names
 
     label2id, id2label = getConfig(label_list)
 
@@ -152,11 +163,10 @@ def main():
         test_tokenized_datasets = test_tokenized_datasets.select(range(args.max_test_samples))
 
     os.makedirs(args.output_dir, exist_ok=True)
-    output_name = f"DrBenchmark-DEFT2019-ner-{args.subset}-{uuid.uuid4().hex}"
 
     training_args = TrainingArguments(
-        f"{args.output_dir}/{output_name}",
-        evaluation_strategy="epoch",
+        model_path,
+        **{'eval_strategy' if transformers_version >= parse_version('4.41') else 'evaluation_strategy': 'epoch'},
         save_strategy="epoch",
         learning_rate=args.learning_rate,
         per_device_train_batch_size=args.batch_size,
@@ -172,7 +182,7 @@ def main():
     )
 
     logging.info('Load Metrics')
-    metric = evaluate.load("../../../metrics/seqeval.py", experiment_id=output_name)
+    metric = evaluate.load("../../../metrics/seqeval.py", experiment_id=run_name)
     data_collator = DataCollatorForTokenClassification(tokenizer)
 
     def compute_metrics(p):
@@ -198,7 +208,7 @@ def main():
         train_dataset=train_tokenized_datasets,
         eval_dataset=dev_tokenized_datasets,
         data_collator=data_collator,
-        tokenizer=tokenizer,
+        **{'processing_class' if transformers_version >= parse_version('4.46') else 'tokenizer': tokenizer},
         compute_metrics=compute_metrics,
     )
 
@@ -207,8 +217,8 @@ def main():
     trainer.evaluate()
 
     logging.info("***** Save the best model *****")
-    trainer.save_model(f"{args.output_dir}/{output_name}_best_model")
-    shutil.rmtree(f"{args.output_dir}/{output_name}")
+    trainer.save_model(model_path + "_best_model")
+    shutil.rmtree(model_path)
 
     logging.info("***** Starting Evaluation *****")
 
@@ -234,13 +244,13 @@ def main():
         if isinstance(object, np.generic):
             return object.item()
 
-    with open(f"{args.run_dir}/{output_name}.json", 'w', encoding='utf-8') as f:
+    with open(run_path, 'w', encoding='utf-8') as f:
         json.dump({
-            "model_name": f"{args.output_dir}/{output_name}_best_model",
+            "model_name": model_path + "_best_model",
             "metrics": cr_metric,
             "hyperparameters": vars(args),
             "predictions": {
-                "identifiers": dataset["test"]["id"],
+                "identifiers": list(dataset["test"]["id"]),
                 "real_labels": _true_labels,
                 "system_predictions": _true_predictions,
             },

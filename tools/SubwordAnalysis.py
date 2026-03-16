@@ -10,34 +10,34 @@ with open('models.txt') as f_in:
     models = [l.strip() for l in f_in if l.strip()]
 
 tasks = [
-    # {"model": "DrBenchmark/DEFT2019", "subset": None, "dataset": None, "data_path": "./recipes/deft2019/data/"},
-    {"model": "DrBenchmark/DEFT2021", "subset": "cls", "dataset": None, "data_path": "./recipes/deft2021/data/"},
-    {"model": "DrBenchmark/DEFT2021", "subset": "ner", "dataset": None, "data_path": "./recipes/deft2021/data/"},
+    # {"model": "DrBenchmark/DEFT2019", "subset": None},
+    {"model": "DrBenchmark/DEFT2021", "subset": "cls"},
+    {"model": "DrBenchmark/DEFT2021", "subset": "ner"},
 
-    {"model": "DrBenchmark/QUAERO", "subset": "emea", "dataset": None, "data_path": "./recipes/quaero/data/"},
-    {"model": "DrBenchmark/QUAERO", "subset": "medline", "dataset": None, "data_path": "./recipes/quaero/data/"},
-    {"model": "DrBenchmark/MANTRAGSC", "subset": "fr_emea", "dataset": None, "data_path": "./recipes/mantragsc/data/"},
-    {"model": "DrBenchmark/MANTRAGSC", "subset": "fr_medline", "dataset": None, "data_path": "./recipes/mantragsc/data/"},
-    {"model": "DrBenchmark/MANTRAGSC", "subset": "fr_patents", "dataset": None, "data_path": "./recipes/mantragsc/data/"},
-    {"model": "DrBenchmark/FrenchMedMCQA", "subset": None, "dataset": None, "data_path": "./recipes/frenchmedmcqa/data/"},
-    {"model": "DrBenchmark/MORFITT", "subset": None, "dataset": None, "data_path": "./recipes/morfitt/data/"},
-    {"model": "DrBenchmark/E3C", "subset": "French_clinical", "dataset": None, "data_path": "./recipes/e3c/data/"},
-    {"model": "DrBenchmark/E3C", "subset": "French_temporal", "dataset": None, "data_path": "./recipes/e3c/data/"},
-    {"model": "DrBenchmark/CLISTER", "subset": None, "dataset": None, "data_path": "./recipes/clister/data/"},
-    {"model": "DrBenchmark/DEFT2020", "subset": "task_1", "dataset": None, "data_path": "./recipes/deft2020/data/"},
-    {"model": "DrBenchmark/DEFT2020", "subset": "task_2", "dataset": None, "data_path": "./recipes/deft2020/data/"},
-    {"model": "DrBenchmark/DiaMED", "subset": None, "dataset": None, "data_path": "./recipes/diamed/data/"},
-    {"model": "DrBenchmark/PxCorpus", "subset": None, "dataset": None, "data_path": "./recipes/pxcorpus/data/"},
+    {"model": "DrBenchmark/QUAERO", "subset": "emea"},
+    {"model": "DrBenchmark/QUAERO", "subset": "medline"},
+    {"model": "DrBenchmark/MANTRAGSC", "subset": "fr_emea"},
+    {"model": "DrBenchmark/MANTRAGSC", "subset": "fr_medline"},
+    {"model": "DrBenchmark/MANTRAGSC", "subset": "fr_patents"},
+    {"model": "DrBenchmark/FrenchMedMCQA", "subset": None},
+    {"model": "DrBenchmark/MORFITT", "subset": None},
+    {"model": "DrBenchmark/E3C", "subset": "French_clinical"},
+    {"model": "DrBenchmark/E3C", "subset": "French_temporal"},
+    {"model": "DrBenchmark/CLISTER", "subset": None},
+    {"model": "DrBenchmark/DEFT2020", "subset": "task_1"},
+    {"model": "DrBenchmark/DEFT2020", "subset": "task_2"},
+    {"model": "DrBenchmark/DiaMED", "subset": None},
+    {"model": "DrBenchmark/PxCorpus", "subset": None},
 
-    {"model": "DrBenchmark/ESSAI", "subset": "pos", "dataset": None, "data_path": "./recipes/essai/data/"},
-    {"model": "DrBenchmark/ESSAI", "subset": "ner_neg", "dataset": None, "data_path": "./recipes/essai/data/"},
-    {"model": "DrBenchmark/ESSAI", "subset": "ner_spec", "dataset": None, "data_path": "./recipes/essai/data/"},
-    {"model": "DrBenchmark/ESSAI", "subset": "cls", "dataset": None, "data_path": "./recipes/essai/data/"},
+    {"model": "DrBenchmark/ESSAI", "subset": "pos"},
+    {"model": "DrBenchmark/ESSAI", "subset": "ner_neg"},
+    {"model": "DrBenchmark/ESSAI", "subset": "ner_spec"},
+    {"model": "DrBenchmark/ESSAI", "subset": "cls"},
 
-    {"model": "DrBenchmark/CAS", "subset": "pos", "dataset": None, "data_path": "./recipes/cas/data/"},
-    {"model": "DrBenchmark/CAS", "subset": "ner_neg", "dataset": None, "data_path": "./recipes/cas/data/"},
-    {"model": "DrBenchmark/CAS", "subset": "ner_spec", "dataset": None, "data_path": "./recipes/cas/data/"},
-    {"model": "DrBenchmark/CAS", "subset": "cls", "dataset": None, "data_path": "./recipes/cas/data/"},
+    {"model": "DrBenchmark/CAS", "subset": "pos"},
+    {"model": "DrBenchmark/CAS", "subset": "ner_neg"},
+    {"model": "DrBenchmark/CAS", "subset": "ner_spec"},
+    {"model": "DrBenchmark/CAS", "subset": "cls"},
 ]
 
 mapping = {
@@ -66,7 +66,7 @@ for m in models:
 
     for task in tasks:
 
-        if task['dataset'] is None:
+        if 'dataset' not in task:
             task['dataset'] = load_dataset(task['model'], task['subset'], trust_remote_code=True)["test"]
 
         t_key = f"{task['model']}-{task['subset']}"
