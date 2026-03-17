@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
 # Apache 2.0
 
-python finetuning_bert_cls.py --config="../yaml/cls.yaml" --model="$1"
+model="$1"
+shift
+python finetuning_bert_cls.py --config="../yaml/cls.yaml" --model="$model" "$@"

@@ -1,1 +1,6 @@
 offline: True
+# max_position_embeddings is set to 512 for comptability with original paper
+# To use the full potentional of models, increase max_position_embeddings but
+#  beware of OutOfMemoryErrors, use larger GPUs or increase
+#  gradient_accumulation_steps and decrease batch size in yaml files.
+max_position_embeddings: 512

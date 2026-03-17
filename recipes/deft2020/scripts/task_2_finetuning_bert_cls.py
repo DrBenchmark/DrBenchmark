@@ -69,7 +69,7 @@ def main():
 
         text = f"{tokenizer.cls_token} {e['source']} {tokenizer.sep_token} (1) {e['cible_1']} {tokenizer.sep_token} (2) {e['cible_2']} {tokenizer.sep_token} (3) {e['cible_3']} {tokenizer.eos_token}"
 
-        res = tokenizer(text, truncation=True, max_length=args.max_position_embeddings, padding="max_length")
+        res = tokenizer(text, truncation=True, max_length=args.max_position_embeddings, padding="do_not_pad")
         res["text"] = text
 
         res["label"] = e["correct_cible"]

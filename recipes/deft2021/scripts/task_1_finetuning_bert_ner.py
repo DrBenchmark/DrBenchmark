@@ -83,7 +83,8 @@ def main():
         # label_all_tokens = True
 
         if args.model_name.lower().find("flaubert") != -1:
-
+            if not args.max_position_embeddings:
+                args.max_position_embeddings = tokenizer.model_max_length
             tokenized_inputs = []
             _labels = []
 
@@ -108,11 +109,6 @@ def main():
                 _local.append(tokenizer("</s>")["input_ids"][1])
                 _local_labels.append(-100)
 
-                padding_left = args.max_position_embeddings - len(_local)
-                if padding_left > 0:
-                    _local.extend([tokenizer("<pad>")["input_ids"][1]] * padding_left)
-                    _local_labels.extend([-100] * padding_left)
-
                 tokenized_inputs.append(_local)
                 _labels.append(_local_labels)
 
@@ -122,8 +118,7 @@ def main():
             }
 
         else:
-
-            tokenized_inputs = tokenizer(list(examples["tokens"]), truncation=True, max_length=args.max_position_embeddings, padding='max_length', is_split_into_words=True)
+            tokenized_inputs = tokenizer(list(examples["tokens"]), truncation=True, max_length=args.max_position_embeddings, padding="do_not_pad", is_split_into_words=True)
 
             labels = []
 
@@ -189,6 +184,8 @@ def main():
     data_collator = DataCollatorForTokenClassification(tokenizer)
 
     def compute_metrics(p):
+        # Beware : The labels here might be truncated according to `model_max_length`
+        # These are the training metrics, not the final metrics.
 
         predictions, labels = p
         predictions = np.argmax(predictions, axis=2)
@@ -226,15 +223,17 @@ def main():
     predictions, labels, _ = trainer.predict(test_tokenized_datasets)
     predictions = np.argmax(predictions, axis=2)
 
+    # Convert predictions at the subtoken level to token level
     _true_predictions = [
         [label_list[p] for (p, l) in zip(prediction, label) if l != -100]
         for prediction, label in zip(predictions, labels)
     ]
 
-    _true_labels = [
-        [label_list[l] for (p, l) in zip(prediction, label) if l != -100]
-        for prediction, label in zip(predictions, labels)
-    ]
+    # We might have truncated the labels in `tokenize_and_align_labels`
+    # We retrieve the untruncated labels
+    _true_labels = [[label_list[l] for l in doc] for doc in test_tokenized_datasets['ner_tags']]
+    # We pad the predictions with 'O' to match untruncated labels
+    _true_predictions = [p + ['O'] * (len(l) - len(p)) for p, l in zip(_true_predictions, _true_labels)]
 
     cr_metric = metric.compute(predictions=_true_predictions, references=_true_labels, zero_division=.0)
     logging.info(cr_metric)

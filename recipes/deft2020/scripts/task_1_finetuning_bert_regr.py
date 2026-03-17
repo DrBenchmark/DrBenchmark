@@ -101,7 +101,7 @@ def main():
 
         text = f"{tokenizer.cls_token} {e['source']} {tokenizer.sep_token}  {e['cible']} {tokenizer.eos_token}"
 
-        res = tokenizer(text, truncation=True, max_length=args.max_position_embeddings, padding="max_length")
+        res = tokenizer(text, truncation=True, max_length=args.max_position_embeddings, padding="do_not_pad")
         res["text"] = text
 
         res["label"] = float(e["moy"])

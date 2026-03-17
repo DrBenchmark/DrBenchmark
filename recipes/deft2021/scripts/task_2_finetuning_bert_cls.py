@@ -92,7 +92,7 @@ def main():
     model = AutoModelForSequenceClassification.from_pretrained(args.model_name, num_labels=len(labels_list), problem_type="multi_label_classification")
 
     def preprocess_function(e):
-        res = tokenizer(e['text'], truncation=True, max_length=args.max_position_embeddings, padding="max_length")
+        res = tokenizer(e['text'], truncation=True, max_length=args.max_position_embeddings, padding="do_not_pad")
         res["labels"] = e["specialities_one_hot"]
         return res
 

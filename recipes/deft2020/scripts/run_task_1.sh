@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
 # Apache 2.0
 
-python task_1_finetuning_bert_regr.py --config="../yaml/regr.yaml" --model="$1"
+model="$1"
+shift
+python task_1_finetuning_bert_regr.py --config="../yaml/regr.yaml" --model="$model" "$@"

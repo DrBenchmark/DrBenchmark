@@ -1,7 +1,8 @@
 epochs: 35
 model_name: Dr-BERT/DrBERT-7GB
-batch_size: 12
-max_position_embeddings: 512
+# for an effective batch_size of 12
+gradient_accumulation_steps: 12
+batch_size: 1
 weight_decay: 0.01
 learning_rate: 2.0e-5
 output_dir: "../save_models/"

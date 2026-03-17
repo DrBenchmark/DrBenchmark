@@ -78,7 +78,7 @@ def main():
 
         text = ' '.join([t for t in e['clinical_case'].lower().split(" ") if t not in stopwords])
 
-        res = tokenizer(text, truncation=True, max_length=args.max_position_embeddings, padding="max_length")
+        res = tokenizer(text, truncation=True, max_length=args.max_position_embeddings, padding="do_not_pad")
         res["text"] = text
 
         res["label"] = e["icd-10"]
