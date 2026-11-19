@@ -122,6 +122,21 @@ The tasks 2, 3 and 4 of CAS and ESSAI, and DEFT-2019, are additional tasks: they
 
 [PxCorpus](https://zenodo.org/record/6524162) is the first open-sourced corpus of spoken language understanding on medical drug prescriptions. It contains 4 hours of transcribed and annotated dialogues of drug prescriptions in French acquired through an experiment with 55 experts and non-experts participants. In total, the dataset includes 1,981 recordings of 55 participants (38% non-experts, 25% doctors, 36% medical practitioners), manually transcribed and semantically annotated. The first task is a named entity recognition task where each word of a sequence is classified into one of the 38 classes and formatted at the IOB2 format. The second one consists of classifying the textual utterances into one of 4 intent classes (medical prescription, replace, negate or none).
 
+## Tests
+
+```bash
+pip install pytest
+# Everything: a few minutes on a laptop
+pytest
+# Only the fast checks, without any training: a few seconds
+pytest -m "not e2e"
+```
+
+The tests need neither the data nor a network access: each task of `run.py` is run end to end with a tiny randomly initialised model on synthetic datasets that have the schema of the real ones (see [tests/](./tests/)). The scores they produce are meaningless: the tests check that every recipe runs and writes the results expected by the tools.
+
+The known bugs are kept as expected failures (`xfail`): they are listed at the end of the output of `pytest`, and the corresponding test has to be unmarked once a bug is fixed.
+
+The tests are run by GitHub Actions on every push to `master` and on every pull request (see [.github/workflows/tests.yml](./.github/workflows/tests.yml)).
 
 ## Citing DrBenchmark
 

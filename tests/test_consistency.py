@@ -1,0 +1,139 @@
+"""Consistency between `run.py`, the recipes, the scripts for SLURM and the documentation.
+
+These tests do not train anything: they check that the files that describe the tasks
+agree with each other.
+"""
+
+import os
+import re
+import subprocess
+import sys
+
+import pytest
+
+from helpers import ALL_TASKS, RECIPE_NAMES, RECIPES, REPO, TASKS, load_module
+
+
+def task_ids(task):
+    return task.name
+
+
+def test_every_recipe_has_a_task():
+    assert sorted({task.recipe for task in ALL_TASKS}) == RECIPE_NAMES
+
+
+@pytest.mark.parametrize("task", ALL_TASKS, ids=task_ids)
+def test_launcher(task):
+    assert task.launcher_path.is_file()
+    assert os.access(task.launcher_path, os.X_OK), f"{task.launcher_path} is not executable"
+    assert (task.scripts_dir / task.script).is_file()
+    assert task.config_path.is_file()
+
+
+@pytest.mark.parametrize("recipe", RECIPE_NAMES)
+def test_no_unused_file(recipe):
+    """Every launcher, training script and YAML file of a recipe belongs to a task of `run.py`."""
+    tasks = [task for task in ALL_TASKS if task.recipe == recipe]
+    scripts_dir = RECIPES / recipe / "scripts"
+
+    assert sorted(path.name for path in scripts_dir.glob("run*.sh")) == sorted({task.launcher for task in tasks})
+    training_scripts = sorted(path.name for path in scripts_dir.glob("*.py") if path.name != "utils.py")
+    assert training_scripts == sorted({task.script for task in tasks})
+    assert sorted((RECIPES / recipe / "yaml").glob("*.yaml")) == sorted({task.config_path for task in tasks})
+
+
+@pytest.mark.parametrize("recipe", RECIPE_NAMES)
+def test_utils_is_shared(recipe):
+    """Every recipe uses `recipes/utils.py`, through a symbolic link."""
+    assert (RECIPES / recipe / "scripts" / "utils.py").resolve() == (RECIPES / "utils.py").resolve()
+
+
+@pytest.mark.parametrize("task", ALL_TASKS, ids=task_ids)
+def test_yaml_file(task):
+    config = task.config
+    required = {
+        "epochs", "model_name", "batch_size", "weight_decay", "learning_rate",
+        "output_dir", "run_dir", "data_dir", "subset", "fewshot", "task", "dataset",
+    }
+    assert required <= set(config), required - set(config)
+
+    assert config["task"].split("-")[0] == task.recipe
+    # `utils.parse_args` appends the subset to the name: e3c-ner -> e3c-ner_clinical
+    assert task.name.startswith(config["task"])
+    assert config["dataset"].startswith("DrBenchmark/")
+    assert config["dataset"].split("/")[1].lower() == task.recipe
+    assert config["fewshot"] == 1.0
+    assert (config["output_dir"], config["run_dir"], config["data_dir"]) == ("../save_models/", "../runs/", "../data/")
+
+
+def test_datasets_saved_for_the_offline_mode():
+    """`download_datasets_locally.py` saves every dataset the recipes read in offline mode.
+
+    DEFT-2019 is the exception: its access is restricted and it is not on the Hub.
+    """
+    module = load_module("download_datasets_locally", REPO / "download_datasets_locally.py")
+    saved = {(corpus.lower(), subset) for corpus, subset in module.ds}
+    read = {(task.recipe, task.subset) for task in ALL_TASKS}
+    assert read - saved == {("deft2019", None)}
+    assert saved <= read
+
+    datasets = {task.recipe: task.config["dataset"] for task in ALL_TASKS}
+    for corpus, _ in module.ds:
+        assert f"DrBenchmark/{corpus}" == datasets[corpus.lower()]
+
+
+@pytest.mark.parametrize("script", ["run_all_slurm.sh", "run_all_jean_zay.sh"])
+def test_slurm_script_runs_every_task(script):
+    jobs = re.findall(
+        r"""^\s*"cd \./recipes/(\w+)/scripts/ && srun bash (\S+) '\$MODEL_NAME'(?: '(\w+)')?"$""",
+        (REPO / script).read_text(),
+        re.M,
+    )
+    commands = sorted(
+        (recipe, f"./{launcher} {{model_name}}" + (f" {subset}" if subset else ""))
+        for recipe, launcher, subset in jobs
+    )
+    assert commands == sorted((task.recipe, TASKS[task.name]) for task in ALL_TASKS)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="Known bug: run_one_jean_zay.sh uses old task names (e.g. FrenchMedMCQA_MCQA) that run.py rejects.",
+)
+def test_run_one_jean_zay_uses_valid_task_names():
+    names = re.findall(r"^#? ?TASK='([^']+)'$", (REPO / "run_one_jean_zay.sh").read_text(), re.M)
+    if not names:
+        pytest.fail("No task found in run_one_jean_zay.sh", pytrace=False)
+    assert set(names) <= set(TASKS)
+
+
+def test_run_py_command_line():
+    """`run.py` lists the tasks in its help and refuses the names it does not know."""
+    def run_py(*arguments):
+        return subprocess.run([sys.executable, "run.py", *arguments], cwd=REPO, capture_output=True, text=True)
+
+    usage = run_py("--help")
+    assert usage.returncode == 0
+    assert all(name in usage.stdout.replace("\n", "").replace(" ", "") for name in TASKS)
+
+    unknown = run_py("--tasks", "unknown-task", "--models", "some/model")
+    assert unknown.returncode == 2
+    assert "invalid choice" in unknown.stderr
+
+
+def test_recipes_readme_lists_every_task():
+    """The table of `recipes/README.md` gives the name and the command of each task."""
+    rows = re.findall(r"\| `([a-z0-9]+-[a-z_]+)`\s*\| `(\./run[^`]*)`\s*\|$", (RECIPES / "README.md").read_text(), re.M)
+    documented = {name: command.replace("<model>", "{model_name}") for name, command in rows}
+    assert documented == TASKS
+
+
+@pytest.mark.parametrize("task", ALL_TASKS, ids=task_ids)
+def test_recipe_readme_documents_the_task(task):
+    readme = (RECIPES / task.recipe / "README.md").read_text()
+    assert task.name in readme
+    assert f"`{task.launcher}`" in readme
+    assert f"`yaml/{task.config_path.name}`" in readme
+    if task.subset:
+        assert f"`{task.subset}`" in readme

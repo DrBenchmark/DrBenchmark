@@ -1,0 +1,118 @@
+"""End-to-end tests: each task of `run.py` is trained and evaluated on synthetic data.
+
+The launchers are called exactly as `run.py` calls them, with a tiny model and one
+epoch. The scores are meaningless: the tests only check that every recipe runs and
+writes the results the tools of `tools/` expect.
+"""
+
+import math
+from pathlib import Path
+
+import pytest
+
+import synthetic
+from helpers import ALL_TASKS
+
+pytestmark = pytest.mark.e2e
+
+N_TEST = synthetic.SPLIT_SIZES["test"]
+
+
+def task_ids(task):
+    return task.name
+
+
+def assert_score(value):
+    assert isinstance(value, float) and 0.0 <= value <= 1.0, value
+
+
+@pytest.mark.parametrize("task", ALL_TASKS, ids=task_ids)
+def test_recipe(task, run_recipe, tiny_bert):
+    run = run_recipe(task.name, tiny_bert)
+    result = run.result
+
+    assert run.run_files[0].name.startswith(f"DrBenchmark-{task.name}-")
+    assert result["hyperparameters"]["task"] == task.name
+    assert result["hyperparameters"]["subset"] == task.subset
+    assert result["trainer_state"]["epoch"] == 1
+
+    # The best model is saved next to the results
+    assert (Path(result["model_name"]) / "config.json").is_file()
+
+    # One prediction per example of the test set
+    predictions = result["predictions"]
+    assert len(predictions["identifiers"]) == N_TEST
+    assert len(predictions["real_labels"]) == N_TEST
+    assert len(predictions["system_predictions"]) == N_TEST
+
+    # The metrics read by `tools/ComputeMetrics.py`
+    metrics = result["metrics"]
+    if task.kind in ("pos", "ner"):
+        for name in ("overall_precision", "overall_recall", "overall_f1", "overall_accuracy"):
+            assert_score(metrics[name])
+        # One predicted label per word
+        for reference, prediction in zip(predictions["real_labels"], predictions["system_predictions"]):
+            assert len(reference) == len(prediction)
+    elif task.kind == "cls":
+        assert_score(metrics["weighted avg"]["f1-score"])
+        assert_score(metrics["macro avg"]["f1-score"])
+    elif task.kind == "mcqa":
+        assert_score(metrics["hamming_score"])
+        assert_score(metrics["exact_match"])
+    elif task.kind == "regr":
+        assert_score(metrics["EDRM"])
+        # The correlation is undefined (NaN) when the tiny model predicts a constant
+        assert isinstance(metrics["spearman_correlation_coef"], float)
+    else:
+        pytest.fail(f"Unknown kind of task: {task.kind}")
+
+
+def test_flaubert_sequence_classification(run_recipe, tiny_flaubert):
+    """The tokenizer of FlauBERT is a slow one: check that the recipes accept it."""
+    assert_score(run_recipe("cas-cls", tiny_flaubert).result["metrics"]["weighted avg"]["f1-score"])
+
+
+@pytest.mark.parametrize("task_name", ["cas-pos", "quaero-ner_emea"])
+def test_flaubert_token_classification(task_name, run_recipe, tiny_flaubert):
+    run = run_recipe(task_name, tiny_flaubert)
+    if run.returncode != 0 and "inconsistent numbers of samples" in run.log:
+        pytest.xfail(
+            "Known bug: with FlauBERT, the scripts predict one label per sub-token but "
+            "compare them with one reference label per word, which seqeval rejects."
+        )
+    assert_score(run.result["metrics"]["overall_f1"])
+
+
+GRADIENT_ACCUMULATION_TASKS = [task for task in ALL_TASKS if "gradient_accumulation_steps" in task.config]
+
+
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="Known bug: no training script gives `gradient_accumulation_steps` to the Trainer, "
+           "so the batch size is the one of the YAML file instead of the effective one.",
+)
+@pytest.mark.parametrize("task", GRADIENT_ACCUMULATION_TASKS, ids=task_ids)
+def test_gradient_accumulation_is_applied(task, run_recipe, tiny_bert):
+    config = task.config
+    examples_per_update = config["batch_size"] * config["gradient_accumulation_steps"]
+    expected_updates = math.ceil(synthetic.SPLIT_SIZES["train"] / examples_per_update)
+
+    state = run_recipe(task.name, tiny_bert).result["trainer_state"]
+    assert state["global_step"] == expected_updates
+
+
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="Known bug: `metric_for_best_model='rmse'` is used without `greater_is_better=False`, "
+           "so the checkpoint with the highest validation RMSE is kept.",
+)
+@pytest.mark.parametrize("task", [task for task in ALL_TASKS if task.kind == "regr"], ids=task_ids)
+def test_regression_keeps_the_checkpoint_with_the_lowest_rmse(task, run_recipe, tiny_bert):
+    # A high learning rate makes the RMSE clearly different from one epoch to the next
+    run = run_recipe(task.name, tiny_bert, "--epochs", "3", "--learning_rate", "0.01")
+    state = run.result["trainer_state"]
+    rmse = [log["eval_rmse"] for log in state["log_history"] if "eval_rmse" in log]
+    assert len(rmse) >= 3
+    assert state["best_metric"] == pytest.approx(min(rmse))
