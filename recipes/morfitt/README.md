@@ -2,11 +2,37 @@
 
 This article presents MORFITT, the first multi-label corpus in French annotated in specialties in the medical field. MORFITT is composed of 3,624 abstracts of scientific articles from PubMed, annotated in 12 specialties for a total of 5,116 annotations. We detail the corpus, the experiments and the preliminary results obtained using a classifier based on the pre-trained language model CamemBERT. These preliminary results demonstrate the difficulty of the task, with a weighted average F-score of 61.78%.
 
+## Data
+
+The corpus is hosted on the HuggingFace Hub: [DrBenchmark/MORFITT](https://huggingface.co/datasets/DrBenchmark/MORFITT) (subset `source`).
+
+| Subset   | Train | Validation |  Test |
+|:---------|------:|-----------:|------:|
+| `source` | 1,514 |      1,022 | 1,088 |
+
+The subset is downloaded automatically when `offline` is set to `False` in `config.yaml`. When it is set to `True`, which is the default value of the repository, it is read from `./data/local_hf_source/`: this directory is created by `python download_datasets_locally.py`, run from the root of the repository.
+
 ## Run Training
 
+The launcher uses relative paths: it has to be run from the `scripts/` directory.
+
 ```bash
-bash ./scripts/run.sh "Dr-BERT/DrBERT-7GB"
+cd scripts/
+bash run.sh "Dr-BERT/DrBERT-7GB"
 ```
+
+Or, from the root of the repository:
+
+```bash
+python run.py --tasks morfitt-cls --models "Dr-BERT/DrBERT-7GB"
+```
+
+## Multi-label Classification
+
+Each abstract is annotated with one or several of the 12 following specialties: `microbiology`, `etiology`, `virology`, `physiology`, `immunology`, `parasitology`, `genetics`, `chemistry`, `veterinary`, `surgery`, `pharmacology` and `psychology`.
+
+- **Launcher**: `run.sh` (configuration: `yaml/cls.yaml`)
+- **Metric**: weighted F1
 
 ## DrBERT
 
@@ -35,5 +61,10 @@ weighted avg     0.7785    0.6147    0.6805      1560
 ## Citing the dataset
 
 ```bibtex
-TODO
+@inproceedings{labrak2023morfitt,
+  title={MORFITT: A multi-label corpus of French scientific articles in the biomedical domain},
+  author={Labrak, Yanis and Rouvier, Micka{\"e}l and Dufour, Richard},
+  booktitle={30e Conf{\'e}rence sur le Traitement Automatique des Langues Naturelles (TALN) Atelier sur l'Analyse et la Recherche de Textes Scientifiques},
+  year={2023}
+}
 ```

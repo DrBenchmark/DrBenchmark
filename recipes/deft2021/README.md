@@ -2,17 +2,16 @@
 
 The DEFT corpus consists of clinical cases written in French from the CAS corpus. The clinical cases are related to medical specialties (cardiology, urology, oncology, obstetrics, pneumology, gastroenterology, etc.). They have been published in various French-speaking countries (France, Belgium, Switzerland, Canada, African countries, tropical countries, etc.).
 
-A sub-corpus of 275 files has been taken from the 717 files of the 2019 edition of DEFT and has been annotated for two task: named-entity recognition and multi-label classification, corresponding to the 2020 and 2021 editions of DEFT. and 167 files compose the training set and 108 files for the test set. 
+A sub-corpus of 275 files has been taken from the 717 files of the 2019 edition of DEFT and has been annotated for two tasks: named-entity recognition and multi-label classification, corresponding to the 2020 and 2021 editions of DEFT. 167 files compose the training set and 108 files the test set.
 
-
-The first task is a fine-grained information extraction task based on ten categories. Although thirteen categories were annotated, only ten were used for the evaluation campaign. The annotations on the thirteen categories were, however, distributed and are included in this archive. 
+The first task is a fine-grained information extraction task based on ten categories. Although thirteen categories were annotated, only ten were used for the evaluation campaign. The annotations on the thirteen categories were, however, distributed and are the ones used in this recipe.
 Four areas are covered:
 - around patients: (1) anatomy
 - clinical practice: (2) examination, (3) pathology, (4) sign or symptom
 - drug and surgical treatments: (5) substance, (6) dose, (7) duration, (8) frequency, (9) mode of administration, (10) treatment (surgical or medical), (11) value
 - temporality: (12) date, (13) time
 
-The annotation guide used can be consulted at: https://deft.limsi.fr/2020/guide-deft.html
+The annotation guide used can be consulted at: https://web.archive.org/web/20220629170600/https://deft.limsi.fr/2020/guide-deft.html
 
 For some types, attributes have been used, providing additional information that has not been used for the DEFT 2020 campaign.
 
@@ -41,37 +40,52 @@ The second task is the identification of patient's clinical profile based on the
 - C25 Troubles dus à des produits chimiques
 - C26 Plaies et blessures
 
-The same mention may refer to one or several axes (e.g., for example, "myeloma" refers to C04 Neoplasms, C15 Hematological and lymphatic and C20 Diseases of the immune system).
+The same mention may refer to one or several axes (e.g., "myeloma" refers to C04 Neoplasms, C15 Hematological and lymphatic and C20 Diseases of the immune system).
 
 ## Data
 
-```plain
-> ./data/
-    > DEFT2021-cas-cliniques
-        > DEFT-cas-cliniques
-            > *.txt
-            > *.ann
-        > evaluations
-            > ref-train-deft2021.txt
-            > ref-test-deft2021.txt
-        > README-2021.txt
-        > distribution-corpus.txt
-```
+The corpus is hosted on the HuggingFace Hub: [DrBenchmark/DEFT2021](https://huggingface.co/datasets/DrBenchmark/DEFT2021). It provides one subset per task. The validation sets are randomly taken from the 167 training files. For `ner`, the files are split into sentences; for `cls`, each example is a whole clinical case:
+
+| Subset | Task                                | Train | Validation |  Test |
+|:-------|:------------------------------------|------:|-----------:|------:|
+| `ner`  | Task 1 - Named-Entity Recognition   | 2,153 |        793 | 1,766 |
+| `cls`  | Task 2 - Multi-label Classification |   118 |         49 |   108 |
+
+The subsets are downloaded automatically when `offline` is set to `False` in `config.yaml`. When it is set to `True`, which is the default value of the repository, they are read from `./data/local_hf_<subset>/`: these directories are created by `python download_datasets_locally.py`, run from the root of the repository.
 
 ## Run Training
 
+The launchers use relative paths: they have to be run from the `scripts/` directory.
+
 ```bash
-bash ./scripts/run_task_1.sh "Dr-BERT/DrBERT-7GB"
-bash ./scripts/run_task_2.sh "Dr-BERT/DrBERT-7GB"
+cd scripts/
+bash run_task_1.sh "Dr-BERT/DrBERT-7GB"
+bash run_task_2.sh "Dr-BERT/DrBERT-7GB"
+```
+
+Or, from the root of the repository:
+
+```bash
+python run.py --tasks deft2021-ner deft2021-cls --models "Dr-BERT/DrBERT-7GB"
 ```
 
 ## Task 1 - Named-Entity Recognition
 
-TODO
+The thirteen categories are annotated in the IOB2 format, which gives 27 labels.
+
+**Entities** : `O`, and `B-` / `I-` for `anatomie`, `date`, `dose`, `duree`, `examen`, `frequence`, `mode`, `moment`, `pathologie`, `sosy`, `substance`, `traitement` and `valeur`
+
+- **Launcher**: `run_task_1.sh` (configuration: `yaml/ner.yaml`)
+- **Metric**: SeqEval F1
+- **Reference result**: 60.44 for `Dr-BERT/DrBERT-7GB` (average of 4 runs, reported in Table 6 of the [DrBenchmark paper](https://hal.science/hal-04470938))
 
 ## Task 2 - Multi-label Classification
 
-TODO
+Each clinical case is annotated with one or several of the 23 axes, which are named as follows in the dataset: `immunitaire`, `endocriniennes`, `blessures`, `chimiques`, `etatsosy`, `nutritionnelles`, `infections`, `virales`, `parasitaires`, `tumeur`, `osteomusculaires`, `stomatognathique`, `digestif`, `respiratoire`, `ORL`, `nerveux`, `oeil`, `homme`, `femme`, `cardiovasculaires`, `hemopathies`, `genetique` and `peau`.
+
+- **Launcher**: `run_task_2.sh` (configuration: `yaml/cls.yaml`)
+- **Metric**: weighted F1
+- **Reference result**: 34.15 for `Dr-BERT/DrBERT-7GB` (average of 4 runs, reported in Table 6 of the [DrBenchmark paper](https://hal.science/hal-04470938))
 
 ## Citing the dataset
 

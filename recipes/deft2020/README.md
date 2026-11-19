@@ -4,21 +4,35 @@ L’édition 2020 du défi fouille de texte (DEFT) a proposé deux tâches autou
 
 ## Data
 
-```plain
-t1-test.xml
-t1-train.xml
-t2-test.xml
-t2-train.xml
-```
+The corpus is hosted on the HuggingFace Hub: [DrBenchmark/DEFT2020](https://huggingface.co/datasets/DrBenchmark/DEFT2020). It provides one subset per task. The validation sets are randomly taken from the original training sets:
+
+| Subset   | Task   | Train | Validation | Test |
+|:---------|:-------|------:|-----------:|-----:|
+| `task_1` | Task 1 |   498 |        102 |  410 |
+| `task_2` | Task 2 |   460 |        112 |  530 |
+
+The subsets are downloaded automatically when `offline` is set to `False` in `config.yaml`. When it is set to `True`, which is the default value of the repository, they are read from `./data/local_hf_<subset>/`: these directories are created by `python download_datasets_locally.py`, run from the root of the repository.
 
 ## Run Training
 
+The launchers use relative paths: they have to be run from the `scripts/` directory.
+
 ```bash
-bash ./scripts/run_task_1.sh "Dr-BERT/DrBERT-7GB"
-bash ./scripts/run_task_2.sh "Dr-BERT/DrBERT-7GB"
+cd scripts/
+bash run_task_1.sh "Dr-BERT/DrBERT-7GB"
+bash run_task_2.sh "Dr-BERT/DrBERT-7GB"
+```
+
+Or, from the root of the repository:
+
+```bash
+python run.py --tasks deft2020-regr deft2020-cls --models "Dr-BERT/DrBERT-7GB"
 ```
 
 ## Task 1 - identify the degree of similarity between pairs of parallel and non-parallel sentences across multiple domains
+
+- **Launcher**: `run_task_1.sh` (configuration: `yaml/regr.yaml`)
+- **Metrics**: EDRM and Spearman correlation
 
 ```plain
 EDRM:  0.7766715
@@ -27,6 +41,9 @@ Spearman Correlation:  0.8396319104009418 ( 3.3188400671693685e-110 )
 ```
 
 ## Task 2 - identify possible parallel sentences for a source sentence
+
+- **Launcher**: `run_task_2.sh` (configuration: `yaml/cls.yaml`)
+- **Metric**: weighted F1
 
 ```plain
               precision    recall  f1-score   support

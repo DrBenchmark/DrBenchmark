@@ -6,30 +6,49 @@ A sub-corpus of 717 files has been compiled for the 2019 edition of the DEFT (DÃ
 
 ## Data
 
+The access to the DEFT 2019 data is restricted: the corpus is not available on the HuggingFace Hub and has to be acquired first (see the [main README](../../README.md)). Once acquired, put the content of the `DEFT2021-cas-cliniques` archive directly in `./data/`:
+
 ```plain
 > ./data/
-    > DEFT2021-cas-cliniques
-        > DEFT-cas-cliniques
-            > *.txt
-            > *.ann
-        > evaluations
-            > ref-train-deft2021.txt
-            > ref-test-deft2021.txt
-        > README-2021.txt
-        > distribution-corpus.txt
+    > DEFT-cas-cliniques
+        > *.txt
+        > *.ann
+    > evaluations
+        > ref-train-deft2021.txt
+        > ref-test-deft2021.txt
+    > README-2021.txt
+    > distribution-corpus.txt
 ```
+
+When `offline` is set to `False` in `config.yaml`, the corpus is read from these files by the local loading script `data_loaders_hf/DEFT2019.py`. This script only uses `distribution-corpus.txt` (assignment of each file to the training or test set of DEFT 2019) and the BRAT files of `DEFT-cas-cliniques/`. The documents are split into sentences, and the validation set is randomly taken from the training documents.
+
+When `offline` is set to `True`, which is the default value of the repository, the recipe reads instead a dataset saved beforehand (with `save_to_disk`) in `./data/local_hf_None/`. Unlike for the other datasets, this directory is not created by `download_datasets_locally.py`, in which DEFT 2019 is commented out.
 
 ## Run Training
 
+The launcher uses relative paths: it has to be run from the `scripts/` directory.
+
 ```bash
-bash ./scripts/run.sh "Dr-BERT/DrBERT-7GB"
+cd scripts/
+bash run.sh "Dr-BERT/DrBERT-7GB"
 ```
 
-## 
+Or, from the root of the repository:
+
+```bash
+python run.py --tasks deft2019-ner --models "Dr-BERT/DrBERT-7GB"
+```
 
 ## Task 1 - Named-Entity Recognition
 
-TODO
+The entities are annotated in the IOB2 format.
+
+**Entities** : `O`, `B-age`, `I-age`, `B-genre`, `I-genre`, `B-issue`, `I-issue`, `B-origine` and `I-origine`
+
+- **Launcher**: `run.sh` (configuration: `yaml/ner.yaml`)
+- **Metric**: SeqEval F1
+
+This task is not part of the 20 tasks evaluated in the DrBenchmark paper: no reference result is available for it.
 
 ## Citing the dataset
 

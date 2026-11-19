@@ -1,90 +1,82 @@
-# CAS
+# DiaMED
 
-We manually annotated two corpora from the biomedical field. The ESSAI corpus contains clinical trial protocols in French. They were mainly obtained from the National Cancer Institute The typical protocol consists of two parts: the summary of the trial, which indicates the purpose of the trial and the methods applied; and a detailed description of the trial with the inclusion and exclusion criteria. The CAS corpus contains clinical cases published in scientific literature and training material. They are published in different journals from French-speaking countries (France, Belgium, Switzerland, Canada, African countries, tropical countries) and are related to various medical specialties (cardiology, urology, oncology, obstetrics, pulmonology, gastro-enterology). The purpose of clinical cases is to describe clinical situations of patients. Hence, their content is close to the content of clinical narratives (description of diagnoses, treatments or procedures, evolution, family history, expected audience, etc.). In clinical cases, the negation is frequently used for describing the patient signs, symptoms, and diagnosis. Speculation is present as well but less frequently. This version only contain the annotated CAS corpus.
+DiaMED is a corpus of 739 clinical cases written in French, which has been created for DrBenchmark. The clinical cases were collected from an open-access journal, The Pan African Medical Journal. Each of them was manually assigned by several annotators, including a medical expert, to one of the 22 chapters of the International Classification of Diseases, 10th Revision (ICD-10). A chapter gives a general description of the type of disease or injury.
 
 ## Data
 
-```plain
-./data/
-    ./CAS_neg.txt/
-    ./CAS_spec.txt/
-```
+The corpus is hosted on the HuggingFace Hub: [DrBenchmark/DiaMED](https://huggingface.co/datasets/DrBenchmark/DiaMED).
+
+| Train | Validation | Test |
+|------:|-----------:|-----:|
+|   509 |         76 |  154 |
+
+The dataset also contains the figures of the clinical cases, which are not used by this recipe: about 730 MB have to be downloaded.
+
+The corpus is downloaded automatically when `offline` is set to `False` in `config.yaml`. When it is set to `True`, which is the default value of the repository, it is read from `./data/local_hf_None/`: this directory is created by `python download_datasets_locally.py`, run from the root of the repository.
 
 ## Run Training
 
+The launcher uses relative paths: it has to be run from the `scripts/` directory.
+
 ```bash
-bash ./scripts/run_task_1.sh "Dr-BERT/DrBERT-7GB"
-bash ./scripts/run_task_2.sh "Dr-BERT/DrBERT-7GB"
+cd scripts/
+bash run.sh "Dr-BERT/DrBERT-7GB"
 ```
 
-## Task 1 - POS Tagging
+Or, from the root of the repository:
 
-```plain
-              precision    recall  f1-score   support
-
-         ABR     0.8692    0.8306    0.8495       248
-         ADJ     0.9790    0.9767    0.9779      5540
-         ADV     0.9933    0.9777    0.9854      1211
-     DET:ART     0.9984    0.9993    0.9988      4298
-     DET:POS     1.0000    0.9939    0.9969       164
-         INT     1.0000    1.0000    1.0000         5
-         KON     0.9875    0.9923    0.9899      1036
-         NAM     0.9253    0.9400    0.9326      1133
-         NOM     0.9848    0.9837    0.9843     10459
-         NUM     0.9950    0.9950    0.9950      1797
-     PRO:DEM     1.0000    1.0000    1.0000       164
-     PRO:IND     0.9915    1.0000    0.9957       116
-     PRO:PER     0.9916    0.9916    0.9916       713
-     PRO:REL     0.9799    0.9932    0.9865       147
-         PRP     0.9976    0.9986    0.9981      5021
-     PRP:det     0.9965    1.0000    0.9982       845
-         PUN     0.9997    0.9997    0.9997      3026
-     PUN:cit     1.0000    0.9009    0.9479       111
-        SENT     1.0000    1.0000    1.0000      1585
-         SYM     0.8475    0.9709    0.9050       103
-    VER:cond     0.8571    0.7500    0.8000         8
-    VER:futu     0.9333    0.8485    0.8889        33
-    VER:impf     0.9888    1.0000    0.9944      1061
-    VER:infi     0.9709    0.9816    0.9762       272
-    VER:pper     0.9791    0.9872    0.9832      1567
-    VER:ppre     0.9872    0.9788    0.9830       236
-    VER:pres     0.9916    0.9898    0.9907      1077
-    VER:simp     0.9219    0.8939    0.9077        66
-    VER:subi     1.0000    0.4286    0.6000         7
-    VER:subp     1.0000    0.8571    0.9231         7
-
-    accuracy                         0.9870     42056
-   macro avg     0.9722    0.9420    0.9527     42056
-weighted avg     0.9871    0.9870    0.9870     42056
+```bash
+python run.py --tasks diamed-cls --models "Dr-BERT/DrBERT-7GB"
 ```
 
-## Task 2 - Negation / Speculation classification
+## Multi-class Classification
 
-```plain
-              precision    recall  f1-score   support
+Each clinical case (field `clinical_case`) is classified into one of the 22 following ICD-10 chapters (field `icd-10`):
 
-    negation     0.4974    1.0000    0.6643       754
- speculation     0.0000    0.0000    0.0000       762
+- A00-B99 Certain infectious and parasitic diseases
+- C00-D49 Neoplasms
+- D50-D89 Diseases of the blood and blood-forming organs and certain disorders involving the immune mechanism
+- E00-E89 Endocrine, nutritional and metabolic diseases
+- F01-F99 Mental, Behavioral and Neurodevelopmental disorders
+- G00-G99 Diseases of the nervous system
+- H00-H59 Diseases of the eye and adnexa
+- H60-H95 Diseases of the ear and mastoid process
+- I00-I99 Diseases of the circulatory system
+- J00-J99 Diseases of the respiratory system
+- K00-K95 Diseases of the digestive system
+- L00-L99 Diseases of the skin and subcutaneous tissue
+- M00-M99 Diseases of the musculoskeletal system and connective tissue
+- N00-N99 Diseases of the genitourinary system
+- O00-O9A Pregnancy, childbirth and the puerperium
+- P00-P96 Certain conditions originating in the perinatal period
+- Q00-Q99 Congenital malformations, deformations and chromosomal abnormalities
+- R00-R99 Symptoms, signs and abnormal clinical and laboratory findings, not elsewhere classified
+- S00-T88 Injury, poisoning and certain other consequences of external causes
+- U00-U85 Codes for special purposes
+- V00-Y99 External causes of morbidity
+- Z00-Z99 Factors influencing health status and contact with health services
 
-    accuracy                         0.4974      1516
-   macro avg     0.2487    0.5000    0.3322      1516
-weighted avg     0.2474    0.4974    0.3304      1516
-```
+The text of the clinical case is lowercased and its stop words are removed before being given to the model.
+
+- **Launcher**: `run.sh` (configuration: `yaml/cls.yaml`)
+- **Metric**: weighted F1
+- **Reference result**: 60.45 for `Dr-BERT/DrBERT-7GB` (average of 4 runs, reported in Table 6 of the [DrBenchmark paper](https://hal.science/hal-04470938))
 
 ## Citing the dataset
 
 ```bibtex
-@inproceedings{grabar:hal-01937096,
-  TITLE = "{{CAS: French Corpus with Clinical Cases}}",
-  AUTHOR = {Grabar, Natalia and Claveau, Vincent and Dalloux, Cl{\'e}ment},
-  URL = {https://hal.archives-ouvertes.fr/hal-01937096},
-  BOOKTITLE = {{Proceedings of the 9th International Workshop on Health Text Mining and Information Analysis (LOUHI)}},
-  ADDRESS = {Brussels, Belgium},
-  PAGES = {1--7},
-  YEAR = {2018},
-  MONTH = Oct,
-  PDF = {https://hal.archives-ouvertes.fr/hal-01937096/file/corpus_Louhi_2018.pdf},
-  HAL_ID = {hal-01937096},
-  HAL_VERSION = {v1},
+@inproceedings{labrak:hal-04470938,
+  title = {{DrBenchmark: A Large Language Understanding Evaluation Benchmark for French Biomedical Domain}},
+  author = {Labrak, Yanis and Bazoge, Adrien and El Khettari, Oumaima and Rouvier, Micka{\"e}l and Constant Dit Beaufils, Pac{\^o}me and Grabar, Natalia and Daille, B{\'e}atrice and Quiniou, Solen and Morin, Emmanuel and Gourraud, Pierre-antoine and Dufour, Richard},
+  url = {https://hal.science/hal-04470938},
+  booktitle = {{Fourteenth Language Resources and Evaluation Conference (LREC-COLING 2024)}},
+  address = {Torino, Italy},
+  organization = {{Nicoletta Calzolari and Min-Yen Kan}},
+  year = {2024},
+  month = May,
+  keywords = {NLP evaluation ; Benchmarking ; Medical domain ; French language ; Transformers},
+  pdf = {https://hal.science/hal-04470938/file/DrBenchmark.pdf},
+  hal_id = {hal-04470938},
+  hal_version = {v1},
 }
 ```

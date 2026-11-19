@@ -1,75 +1,72 @@
 # CAS
 
-We manually annotated two corpora from the biomedical field. The ESSAI corpus contains clinical trial protocols in French. They were mainly obtained from the National Cancer Institute The typical protocol consists of two parts: the summary of the trial, which indicates the purpose of the trial and the methods applied; and a detailed description of the trial with the inclusion and exclusion criteria. The CAS corpus contains clinical cases published in scientific literature and training material. They are published in different journals from French-speaking countries (France, Belgium, Switzerland, Canada, African countries, tropical countries) and are related to various medical specialties (cardiology, urology, oncology, obstetrics, pulmonology, gastro-enterology). The purpose of clinical cases is to describe clinical situations of patients. Hence, their content is close to the content of clinical narratives (description of diagnoses, treatments or procedures, evolution, family history, expected audience, etc.). In clinical cases, the negation is frequently used for describing the patient signs, symptoms, and diagnosis. Speculation is present as well but less frequently. This version only contain the annotated CAS corpus.
+We manually annotated two corpora from the biomedical field. The ESSAI corpus contains clinical trial protocols in French. They were mainly obtained from the National Cancer Institute. The typical protocol consists of two parts: the summary of the trial, which indicates the purpose of the trial and the methods applied; and a detailed description of the trial with the inclusion and exclusion criteria. The CAS corpus contains clinical cases published in scientific literature and training material. They are published in different journals from French-speaking countries (France, Belgium, Switzerland, Canada, African countries, tropical countries) and are related to various medical specialties (cardiology, urology, oncology, obstetrics, pulmonology, gastro-enterology). The purpose of clinical cases is to describe clinical situations of patients. Hence, their content is close to the content of clinical narratives (description of diagnoses, treatments or procedures, evolution, family history, expected audience, etc.). In clinical cases, the negation is frequently used for describing the patient signs, symptoms, and diagnosis. Speculation is present as well but less frequently. This version only contains the annotated CAS corpus.
 
 ## Data
 
-```plain
-./data/
-    ./CAS_neg.txt/
-    ./CAS_spec.txt/
-```
+The corpus is hosted on the HuggingFace Hub: [DrBenchmark/CAS](https://huggingface.co/datasets/DrBenchmark/CAS). It provides one subset per task. Each example is a sentence, and the sentences are randomly split into 70% for training, 10% for validation and 20% for test:
+
+| Subset     | Task                                           | Train | Validation | Test |
+|:-----------|:-----------------------------------------------|------:|-----------:|-----:|
+| `pos`      | Task 1 - POS Tagging                           | 2,653 |        379 |  758 |
+| `cls`      | Task 2 - Negation / Speculation classification | 2,653 |        379 |  758 |
+| `ner_neg`  | Task 3 - Negation scope detection              | 2,653 |        379 |  758 |
+| `ner_spec` | Task 4 - Speculation scope detection           | 2,653 |        379 |  758 |
+
+The subsets are downloaded automatically when `offline` is set to `False` in `config.yaml`. When it is set to `True`, which is the default value of the repository, they are read from `./data/local_hf_<subset>/`: these directories are created by `python download_datasets_locally.py`, run from the root of the repository.
 
 ## Run Training
 
+The launchers use relative paths: they have to be run from the `scripts/` directory.
+
 ```bash
-bash ./scripts/run_task_1.sh "Dr-BERT/DrBERT-7GB"
-bash ./scripts/run_task_2.sh "Dr-BERT/DrBERT-7GB"
+cd scripts/
+bash run_task_1.sh "Dr-BERT/DrBERT-7GB"
+bash run_task_2.sh "Dr-BERT/DrBERT-7GB"
+bash run_task_3.sh "Dr-BERT/DrBERT-7GB"
+bash run_task_4.sh "Dr-BERT/DrBERT-7GB"
+```
+
+Or, from the root of the repository:
+
+```bash
+python run.py --tasks cas-pos cas-cls cas-ner_neg cas-ner_spec --models "Dr-BERT/DrBERT-7GB"
 ```
 
 ## Task 1 - POS Tagging
 
-```plain
-              precision    recall  f1-score   support
+Each token is annotated with one of the 31 following part-of-speech tags: `ABR`, `ADJ`, `ADV`, `DET:ART`, `DET:POS`, `INT`, `KON`, `NAM`, `NOM`, `NUM`, `PRO:DEM`, `PRO:IND`, `PRO:PER`, `PRO:REL`, `PRP`, `PRP:det`, `PUN`, `PUN:cit`, `SENT`, `SYM`, `VER:con`, `VER:cond`, `VER:futu`, `VER:impf`, `VER:infi`, `VER:pper`, `VER:ppre`, `VER:pres`, `VER:simp`, `VER:subi` and `VER:subp`. In the dataset, the tags are stored in the IOB2 format, i.e. prefixed with `B-` (e.g. `B-NOM`).
 
-         ABR     0.8692    0.8306    0.8495       248
-         ADJ     0.9790    0.9767    0.9779      5540
-         ADV     0.9933    0.9777    0.9854      1211
-     DET:ART     0.9984    0.9993    0.9988      4298
-     DET:POS     1.0000    0.9939    0.9969       164
-         INT     1.0000    1.0000    1.0000         5
-         KON     0.9875    0.9923    0.9899      1036
-         NAM     0.9253    0.9400    0.9326      1133
-         NOM     0.9848    0.9837    0.9843     10459
-         NUM     0.9950    0.9950    0.9950      1797
-     PRO:DEM     1.0000    1.0000    1.0000       164
-     PRO:IND     0.9915    1.0000    0.9957       116
-     PRO:PER     0.9916    0.9916    0.9916       713
-     PRO:REL     0.9799    0.9932    0.9865       147
-         PRP     0.9976    0.9986    0.9981      5021
-     PRP:det     0.9965    1.0000    0.9982       845
-         PUN     0.9997    0.9997    0.9997      3026
-     PUN:cit     1.0000    0.9009    0.9479       111
-        SENT     1.0000    1.0000    1.0000      1585
-         SYM     0.8475    0.9709    0.9050       103
-    VER:cond     0.8571    0.7500    0.8000         8
-    VER:futu     0.9333    0.8485    0.8889        33
-    VER:impf     0.9888    1.0000    0.9944      1061
-    VER:infi     0.9709    0.9816    0.9762       272
-    VER:pper     0.9791    0.9872    0.9832      1567
-    VER:ppre     0.9872    0.9788    0.9830       236
-    VER:pres     0.9916    0.9898    0.9907      1077
-    VER:simp     0.9219    0.8939    0.9077        66
-    VER:subi     1.0000    0.4286    0.6000         7
-    VER:subp     1.0000    0.8571    0.9231         7
-
-    accuracy                         0.9870     42056
-   macro avg     0.9722    0.9420    0.9527     42056
-weighted avg     0.9871    0.9870    0.9870     42056
-```
+- **Launcher**: `run_task_1.sh` (configuration: `yaml/pos.yaml`)
+- **Metric**: SeqEval F1
+- **Reference result**: 96.93 for `Dr-BERT/DrBERT-7GB` (average of 4 runs, reported in Table 6 of the [DrBenchmark paper](https://hal.science/hal-04470938))
 
 ## Task 2 - Negation / Speculation classification
 
-```plain
-              precision    recall  f1-score   support
+Each sentence is classified into one of 4 classes, according to the phenomena it contains: `negation`, `speculation`, `negation_speculation` (both) or `neutral` (none).
 
-    negation     0.4974    1.0000    0.6643       754
- speculation     0.0000    0.0000    0.0000       762
+- **Launcher**: `run_task_2.sh` (configuration: `yaml/cls.yaml`)
+- **Metric**: weighted F1
 
-    accuracy                         0.4974      1516
-   macro avg     0.2487    0.5000    0.3322      1516
-weighted avg     0.2474    0.4974    0.3304      1516
-```
+## Task 3 - Negation scope detection
+
+Token classification task, which consists in finding the tokens that are in the scope of a negation.
+
+**Entities** : `O`, `B_scope_neg` and `I_scope_neg`
+
+- **Launcher**: `run_task_3.sh` (configuration: `yaml/ner_neg.yaml`)
+- **Metric**: SeqEval F1
+
+## Task 4 - Speculation scope detection
+
+Token classification task, which consists in finding the tokens that are in the scope of a speculation.
+
+**Entities** : `O`, `B_xcope_inc` and `I_xcope_inc`
+
+- **Launcher**: `run_task_4.sh` (configuration: `yaml/ner_spec.yaml`, same Python script as Task 3)
+- **Metric**: SeqEval F1
+
+The tasks 2, 3 and 4 are not part of the 20 tasks evaluated in the DrBenchmark paper: no reference result is available for them.
 
 ## Citing the dataset
 

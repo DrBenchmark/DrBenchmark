@@ -2,49 +2,60 @@
 
 E3C is a freely available multilingual corpus (English, French, Italian, Spanish, and Basque) of semantically annotated clinical narratives to allow for the linguistic analysis, benchmarking, and training of information extraction systems. It consists of two types of annotations: (i) clinical entities (e.g., pathologies), (ii) temporal information and factuality (e.g., events). Researchers can use the benchmark training and test splits of our corpus to develop and test their own models.
 
+Only the French part of the corpus is used in DrBenchmark.
+
+## Data
+
+The corpus is hosted on the HuggingFace Hub: [DrBenchmark/E3C](https://huggingface.co/datasets/DrBenchmark/E3C). The recipe uses the two French subsets, one per type of annotation. Each example is a sentence:
+
+| Subset            | Task                                         | Train | Validation |  Test |
+|:------------------|:---------------------------------------------|------:|-----------:|------:|
+| `French_clinical` | Task 1 - Clinical entities                   | 2,087 |        302 | 1,109 |
+| `French_temporal` | Task 2 - Temporal information and factuality |   776 |        111 |   222 |
+
+The original corpus does not come with predefined subsets. For `French_clinical`, the training and validation sets are taken from the layer 2 of the corpus and the test set is the whole layer 1. For `French_temporal`, the layer 1 is randomly split into 70% for training, 10% for validation and 20% for test.
+
+The subsets are downloaded automatically when `offline` is set to `False` in `config.yaml`. When it is set to `True`, which is the default value of the repository, they are read from `./data/local_hf_<subset>/`: these directories are created by `python download_datasets_locally.py`, run from the root of the repository.
+
 ## Run Training
 
+The launcher uses relative paths: it has to be run from the `scripts/` directory. Its second argument is the subset.
+
 ```bash
-bash ./scripts/run_task_1.sh "Dr-BERT/DrBERT-7GB" "emea"
-bash ./scripts/run_task_2.sh "Dr-BERT/DrBERT-7GB" "emea"
+cd scripts/
+bash run.sh "Dr-BERT/DrBERT-7GB" "French_clinical"
+bash run.sh "Dr-BERT/DrBERT-7GB" "French_temporal"
+```
+
+Or, from the root of the repository:
+
+```bash
+python run.py --tasks e3c-ner_clinical e3c-ner_temporal --models "Dr-BERT/DrBERT-7GB"
 ```
 
 ## Task 1 - Clinical entities
 
 **Entities** : `O`, `B-CLINENTITY` and `I-CLINENTITY`
 
-```plain
-              precision    recall  f1-score   support
-
-B-CLINENTITY     0.7438    0.8275    0.7834       400
-I-CLINENTITY     0.5517    0.5794    0.5652       359
-           O     0.9742    0.9657    0.9699      7195
-
-    accuracy                         0.9413      7954
-   macro avg     0.7566    0.7909    0.7729      7954
-weighted avg     0.9435    0.9413    0.9423      7954
-```
+- **Launcher**: `run.sh` with the subset `French_clinical` (configuration: `yaml/ner.yaml`)
+- **Metric**: SeqEval F1
+- **Reference result**: 54.45 for `Dr-BERT/DrBERT-7GB` (average of 4 runs, reported in Table 6 of the [DrBenchmark paper](https://hal.science/hal-04470938))
 
 ## Task 2 - Temporal information and factuality
 
 **Entities** : `O`, `B-EVENT`, `B-ACTOR`, `B-BODYPART`, `B-TIMEX3`, `B-RML`, `I-EVENT`, `I-ACTOR`, `I-BODYPART`, `I-TIMEX3` and `I-RML`
 
-```plain
-              precision    recall  f1-score   support
+- **Launcher**: `run.sh` with the subset `French_temporal` (configuration: `yaml/ner.yaml`)
+- **Metric**: SeqEval F1
+- **Reference result**: 81.48 for `Dr-BERT/DrBERT-7GB` (average of 4 runs, reported in Table 6 of the [DrBenchmark paper](https://hal.science/hal-04470938))
 
-     B-ACTOR     0.0000    0.0000    0.0000         0
-  B-BODYPART     0.0000    0.0000    0.0000         0
-     B-EVENT     0.0000    0.0000    0.0000         0
-       B-RML     0.0000    0.0000    0.0000         0
-    B-TIMEX3     0.0000    0.0000    0.0000         0
-     I-ACTOR     0.0000    0.0000    0.0000         0
-  I-BODYPART     0.0000    0.0000    0.0000         0
-     I-EVENT     0.0000    0.0000    0.0000         0
-       I-RML     0.0000    0.0000    0.0000         0
-    I-TIMEX3     0.0000    0.0000    0.0000         0
-           O     1.0000    0.6780    0.8081      7954
+## Citing the dataset
 
-    accuracy                         0.6780      7954
-   macro avg     0.0909    0.0616    0.0735      7954
-weighted avg     1.0000    0.6780    0.8081      7954
+```bibtex
+@article{Magnini2020TheEP,
+  title={The E3C Project: Collection and Annotation of a Multilingual Corpus of Clinical Cases},
+  author={Bernardo Magnini and Bego{\~n}a Altuna and Alberto Lavelli and Manuela Speranza and Roberto Zanoli},
+  journal={Proceedings of the Seventh Italian Conference on Computational Linguistics CLiC-it 2020},
+  year={2020}
+}
 ```

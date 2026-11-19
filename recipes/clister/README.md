@@ -4,20 +4,33 @@ Le TAL repose sur la disponibilité de corpus annotés pour l’entraînement et
 
 ## Data
 
-```plain
-id_to_sentence_test.json
-id_to_sentence_train.json
-test.csv
-train.csv
-```
+The corpus is hosted on the HuggingFace Hub: [DrBenchmark/CLISTER](https://huggingface.co/datasets/DrBenchmark/CLISTER) (subset `source`). Each example is a pair of sentences (`text_1` and `text_2`) with its similarity score (`label`, between 0 and 5). The validation set is randomly taken from the original training set:
+
+| Subset   | Train | Validation | Test |
+|:---------|------:|-----------:|-----:|
+| `source` |   499 |        101 |  400 |
+
+The subset is downloaded automatically when `offline` is set to `False` in `config.yaml`. When it is set to `True`, which is the default value of the repository, it is read from `./data/local_hf_source/`: this directory is created by `python download_datasets_locally.py`, run from the root of the repository.
 
 ## Run Training
 
+The launcher uses relative paths: it has to be run from the `scripts/` directory.
+
 ```bash
-bash ./scripts/run.sh "Dr-BERT/DrBERT-7GB"
+cd scripts/
+bash run.sh "Dr-BERT/DrBERT-7GB"
+```
+
+Or, from the root of the repository:
+
+```bash
+python run.py --tasks clister-regr --models "Dr-BERT/DrBERT-7GB"
 ```
 
 ## Result
+
+- **Launcher**: `run.sh` (configuration: `yaml/regr.yaml`)
+- **Metrics**: EDRM and Spearman correlation
 
 ```plain
 EDRM:  0.6228134

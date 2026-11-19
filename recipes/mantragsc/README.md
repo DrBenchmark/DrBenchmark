@@ -2,87 +2,52 @@
 
 We selected text units from different parallel corpora (Medline abstract titles, drug labels, biomedical patent claims) in English, French, German, Spanish, and Dutch. Three annotators per language independently annotated the biomedical concepts, based on a subset of the Unified Medical Language System and covering a wide range of semantic groups.
 
+Only the French part of the corpus is used in DrBenchmark.
+
+## Data
+
+The corpus is hosted on the HuggingFace Hub: [DrBenchmark/MANTRAGSC](https://huggingface.co/datasets/DrBenchmark/MANTRAGSC). The recipe uses the three French subsets, one per source. Each subset is randomly split into 70% for training, 10% for validation and 20% for test:
+
+| Subset       | Source                    | Train | Validation | Test |
+|:-------------|:--------------------------|------:|-----------:|-----:|
+| `fr_emea`    | Drug labels (EMEA)        |    70 |         10 |   20 |
+| `fr_medline` | Medline abstract titles   |    70 |         10 |   20 |
+| `fr_patents` | Biomedical patent claims  |    35 |          5 |   10 |
+
+The subsets are downloaded automatically when `offline` is set to `False` in `config.yaml`. When it is set to `True`, which is the default value of the repository, they are read from `./data/local_hf_<subset>/`: these directories are created by `python download_datasets_locally.py`, run from the root of the repository.
+
 ## Run Training
 
+The launcher uses relative paths: it has to be run from the `scripts/` directory. Its second argument is the subset.
+
 ```bash
-bash ./scripts/run.sh "Dr-BERT/DrBERT-7GB" "fr_patents"
+cd scripts/
+bash run.sh "Dr-BERT/DrBERT-7GB" "fr_emea"
+bash run.sh "Dr-BERT/DrBERT-7GB" "fr_medline"
+bash run.sh "Dr-BERT/DrBERT-7GB" "fr_patents"
 ```
 
-## Results EMEA
+Or, from the root of the repository:
 
-```plain
-              precision    recall  f1-score   support
-
-      B-ANAT     0.4000    1.0000    0.5714         2
-      B-CHEM     0.7500    0.8462    0.7952        39
-      B-DISO     0.4242    0.8750    0.5714        16
-      B-LIVB     1.0000    0.6471    0.7857        17
-      B-OBJC     1.0000    0.3333    0.5000         3
-      B-PHYS     0.8000    0.5000    0.6154         8
-      B-PROC     0.7857    0.6875    0.7333        16
-      I-CHEM     1.0000    0.6667    0.8000         3
-      I-DISO     0.2727    0.3333    0.3000         9
-      I-LIVB     0.0000    0.0000    0.0000         5
-      I-PHYS     0.0000    0.0000    0.0000         1
-      I-PROC     0.0000    0.0000    0.0000        10
-           O     0.9450    0.9500    0.9475       380
-
-    accuracy                         0.8684       509
-   macro avg     0.5675    0.5261    0.5092       509
-weighted avg     0.8652    0.8684    0.8604       509
+```bash
+python run.py --tasks mantragsc-ner_emea mantragsc-ner_medline mantragsc-ner_patents --models "Dr-BERT/DrBERT-7GB"
 ```
 
-## Results MEDLINE
+## Named-Entity Recognition
 
-```plain
-              precision    recall  f1-score   support
+The entities are annotated in the IOB2 format with UMLS Semantic Groups.
 
-      B-ANAT     0.0000    0.0000    0.0000        14
-      B-CHEM     0.0000    0.0000    0.0000         2
-      B-DEVI     0.0000    0.0000    0.0000         1
-      B-DISO     0.4474    0.4474    0.4474        38
-      B-GEOG     0.0000    0.0000    0.0000         4
-      B-LIVB     1.0000    0.1887    0.3175        53
-      B-OBJC     0.0000    0.0000    0.0000         5
-      B-PHYS     0.0000    0.0000    0.0000        12
-      B-PROC     0.5455    0.6207    0.5806        29
-      I-ANAT     0.0000    0.0000    0.0000         2
-      I-CHEM     0.0000    0.0000    0.0000         4
-      I-DEVI     0.0000    0.0000    0.0000         1
-      I-DISO     0.2941    0.4545    0.3571        11
-      I-LIVB     0.0000    0.0000    0.0000         6
-      I-PHYS     0.0000    0.0000    0.0000         2
-           O     0.6618    0.9579    0.7828       190
+**Entities** : `O`, and `B-` / `I-` for `ANAT`, `CHEM`, `DEVI`, `DISO`, `LIVB`, `OBJC`, `PHEN`, `PHYS` and `PROC`. The subset `fr_medline` also contains `GEOG`.
 
-    accuracy                         0.6203       374
-   macro avg     0.1843    0.1668    0.1553       374
-weighted avg     0.5743    0.6203    0.5436       374
-```
+- **Launcher**: `run.sh` (configuration: `yaml/ner.yaml`)
+- **Metric**: SeqEval F1
+- **Reference results** for `Dr-BERT/DrBERT-7GB` (average of 4 runs, reported in Table 6 of the [DrBenchmark paper](https://hal.science/hal-04470938)):
 
-## Results PATENTS
-
-```plain
-              precision    recall  f1-score   support
-
-      B-ANAT     0.5000    0.5000    0.5000         2
-      B-CHEM     0.5333    0.4103    0.4638        39
-      B-DEVI     0.0000    0.0000    0.0000         7
-      B-DISO     0.5870    0.8438    0.6923        32
-      B-LIVB     0.0000    0.0000    0.0000         2
-      B-OBJC     0.0000    0.0000    0.0000         2
-      B-PHYS     0.0000    0.0000    0.0000         2
-      B-PROC     0.0000    0.0000    0.0000         7
-      I-CHEM     0.1111    0.2500    0.1538         4
-      I-DEVI     0.0000    0.0000    0.0000         4
-      I-DISO     0.6316    0.5714    0.6000        42
-      I-PHYS     0.0000    0.0000    0.0000         2
-      I-PROC     0.0000    0.0000    0.0000         5
-           O     0.9326    0.9706    0.9512       613
-
-    accuracy                         0.8702       763
-   macro avg     0.2354    0.2533    0.2401       763
-weighted avg     0.8378    0.8702    0.8521       763
-```
+| Subset       | SeqEval F1 |
+|:-------------|-----------:|
+| `fr_emea`    |      66.23 |
+| `fr_medline` |      42.38 |
+| `fr_patents` |      57.34 |
 
 ## Citing the dataset
 

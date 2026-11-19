@@ -13,32 +13,34 @@ The biomedical domain has sparked a significant interest in the field of Natural
 ```bash
 git clone https://github.com/DrBenchmark/DrBenchmark
 cd DrBenchmark
-conda env create -n DrBenchmark python pip
+conda create -n DrBenchmark python pip
+conda activate DrBenchmark
 pip install -r requirements.txt
 # if a GLIBC/CMake error occurs try `pip install -r requirements.txt "pyarrow<20" "safetensors<0.7"`
-conda activate DrBenchmark
 
 # Run the benchmark for a specific task and model
-python run.py --tasks frenchmedmcqa-mcqa --model Dr-BERT/DrBERT-7GB --nb-run 1
+python run.py --tasks frenchmedmcqa-mcqa --models Dr-BERT/DrBERT-7GB --nb-run 1
 # or to run all tasks for all models in ./models.txt
 python run.py --tasks all --nb-run 4
 ```
 
-**Note**: The access to **DEFT-2019** data is restricted. Once data is acquired, add files to `./recipes/deft2019/data/`.
+**Note**: The access to **DEFT-2019** data is restricted. Once data is acquired, add files to `./recipes/deft2019/data/` (see [its README](./recipes/deft2019/README.md) for the expected layout).
 
-**Note**: In case you are running the benchmark on an **offline machine / cluster**, execute `python ./download_datasets_locally.py` and `python ./download_models_locally.py` to locally build and save datasets and models. Then, set `offline` to `True` in `./config.yaml`.
+**Note**: `offline` is set to `True` by default in `./config.yaml`: the datasets and the models are read from local copies, which have to be built first with `python ./download_datasets_locally.py` and `python ./download_models_locally.py`. This is the mode to use on an **offline machine / cluster**. To download the datasets and the models directly from the HuggingFace Hub instead, set `offline` to `False` in `./config.yaml`.
+
+The tasks, their names for `run.py` and the way to run each of them separately are described in [recipes/README.md](./recipes/README.md).
 
 More information on managing environments with Anaconda can be found in [the conda cheat sheet](https://docs.conda.io/projects/conda/en/4.6.0/_downloads/52a95608c49671267e40c689e0bc00ca/conda-cheatsheet.pdf).
 
 ### Running with SLURM
 
-1. `sbatch run_slurm.sh`
+1. `sbatch run_all_slurm.sh`
 
 ### Running with SLURM on Jean-Zay
 
 1. Find your account identifier with `idr_compuse` command
-2. Edit `run_jean_zay.sh` to replace `<ACCOUNT>` by your account identifier
-3. Run `sbatch run_jean_zay.sh`
+2. Edit `run_all_jean_zay.sh` to replace `<ACCOUNT>` by your account identifier
+3. Run `sbatch run_all_jean_zay.sh`
 
 ## Evaluate other models
 
@@ -62,57 +64,63 @@ almanach/camembert-bio-base
 
 |  **Dataset**           | Train | Validation | Test | Task                                       | Metrics             | HuggingFace                                                       |
 |:----------------------:| -----:| ----------:| -----:|:------------------------------------------:|:------------------:|:-----------------------------------------------------------------:|
-| CAS - Task 1           |  5306 |        758 | 1516 | Part-Of-Speech Tagging (POS)               | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/CAS)           |
-| CAS - Task 2           |  5306 |        758 | 1516 | Multi-class Classification (CLS)           | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/CAS)           |
-| ESSAI - Task 1         |  9693 |       1385 | 2770 | Part-Of-Speech Tagging (POS)               | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/ESSAI)         |
-| ESSAI - Task 2         |  9693 |       1385 | 2770 | Multi-class Classification(CLS)            | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/ESSAI)         |
-| QUAERO - EMEA          |   429 |        389 |  348 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/QUAERO)        |
+| CAS - Task 1           |  2653 |        379 |  758 | Part-Of-Speech Tagging (POS)               | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/CAS)           |
+| CAS - Task 2           |  2653 |        379 |  758 | Multi-class Classification (CLS)           | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/CAS)           |
+| CAS - Task 3           |  2653 |        379 |  758 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/CAS)           |
+| CAS - Task 4           |  2653 |        379 |  758 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/CAS)           |
+| ESSAI - Task 1         |  5072 |        725 | 1450 | Part-Of-Speech Tagging (POS)               | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/ESSAI)         |
+| ESSAI - Task 2         |  5073 |        725 | 1450 | Multi-class Classification (CLS)           | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/ESSAI)         |
+| ESSAI - Task 3         |  5072 |        725 | 1450 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/ESSAI)         |
+| ESSAI - Task 4         |  4620 |        660 | 1321 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/ESSAI)         |
+| QUAERO - EMEA          |   482 |        437 |  427 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/QUAERO)        |
 | QUAERO - MEDLINE       |   833 |        832 |  833 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/QUAERO)        |
-| E3C Task 1             |   969 |        140 |  293 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/E3C)           |
-| E3C Task 2             |   969 |        140 |  293 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/E3C)           |
+| E3C - Task 1           |  2087 |        302 | 1109 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/E3C)           |
+| E3C - Task 2           |   776 |        111 |  222 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/E3C)           |
 | MorFITT                |  1514 |       1022 | 1088 | Multi-label Classification (CLS)           | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/MORFITT)       |
 | FrenchMedMCQA - Task 1 |  2171 |        312 |  622 | Multiple-Choice Question Answering (MCQA)  | Hamming Score / EMR | [LINK](https://huggingface.co/datasets/DrBenchmark/FrenchMedMCQA) |
 | FrenchMedMCQA - Task 2 |  2171 |        312 |  622 | Multi-class Classification (CLS)           | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/FrenchMedMCQA) |
-| Mantra-GSC - EMEA      |    70 |         10 |   20 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/Mantra-GSC)    |
-| Mantra-GSC - MEDLINE   |    70 |         10 |   20 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/Mantra-GSC)    |
-| Mantra-GSC - PATENT    |    35 |          5 |   10 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/Mantra-GSC)    |
+| Mantra-GSC - EMEA      |    70 |         10 |   20 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/MANTRAGSC)     |
+| Mantra-GSC - MEDLINE   |    70 |         10 |   20 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/MANTRAGSC)     |
+| Mantra-GSC - PATENT    |    35 |          5 |   10 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/MANTRAGSC)     |
 | CLISTER                |   499 |        101 |  400 | Semantic textual similarity (STS)          | EDRM / Spearman     | [LINK](https://huggingface.co/datasets/DrBenchmark/CLISTER)       |
 | DEFT-2019 (restricted) |  3543 |       1340 | 7202 | Named Entity Recognition (NER)             | F1                  | [LINK](https://web.archive.org/web/20221203123027/https://deft.lisn.upsaclay.fr/2019/) |
 | DEFT-2020 - Task 1     |   498 |        102 |  410 | Semantic textual similarity (STS)          | EDRM / Spearman     | [LINK](https://huggingface.co/datasets/DrBenchmark/DEFT2020)      |
 | DEFT-2020 - Task 2     |   460 |        112 |  530 | Multi-class Classification (CLS)           | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/DEFT2020)      |
-| DEFT-2021 - Task 1     |   118 |         49 |  108 | Multi-label Classification (CLS)           | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/DEFT2021)      |
 | DEFT-2021 - Task 1     |  2153 |        793 | 1766 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/DEFT2021)      |
-| DiaMED                 |   509 |         76 |  154 | Multi-class Classification (CLS)           | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/DiaMed)        |
-| PxCorpus               |  1386 |        198 |  397 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/PxCorpus)      |
-| PxCorpus               |  1386 |        198 |  397 | Multi-class Classification (CLS)           | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/PxCorpus)      |
+| DEFT-2021 - Task 2     |   118 |         49 |  108 | Multi-label Classification (CLS)           | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/DEFT2021)      |
+| DiaMED                 |   509 |         76 |  154 | Multi-class Classification (CLS)           | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/DiaMED)        |
+| PxCorpus - Task 1      |  1386 |        198 |  397 | Named Entity Recognition (NER)             | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/PxCorpus)      |
+| PxCorpus - Task 2      |  1386 |        198 |  397 | Multi-class Classification (CLS)           | F1                  | [LINK](https://huggingface.co/datasets/DrBenchmark/PxCorpus)      |
+
+The tasks 2, 3 and 4 of CAS and ESSAI, and DEFT-2019, are additional tasks: they are not part of the 20 tasks evaluated in the DrBenchmark paper.
 
 ## Datasets
 
-[CAS](http://natalia.grabar.free.fr/resources.php) is a corpus of 717 clinical cases annotated in both part-of-speech tagging and multi-class classification. 
+[CAS](http://natalia.grabar.free.fr/resources.php) is a corpus of 717 clinical cases, split into 3,790 sentences, annotated for four tasks: (i) part-of-speech tagging (31 tags), (ii) multi-class classification of the sentences according to whether they contain a negation, a speculation, both or none, and the detection of the scope of (iii) negations and (iv) speculations, both handled as named-entity recognition tasks.
 
-[ESSAI](https://clementdalloux.fr/?page_id=28) is a corpus of 13,848 clinical cases annotated in both 41 part-of-speech tags and the same classes as CAS for the classification (NEGATION or SPECULATION). 
+[ESSAI](https://web.archive.org/web/20240506123112/http://clementdalloux.fr/?page_id=28) is a corpus of clinical trial protocols, split into 7,247 sentences, annotated for the same four tasks as CAS, with 35 part-of-speech tags.
 
-[QUAERO](https://quaerofrenchmed.limsi.fr/) The QUAERO French Medical Corpus introduces an extensive corpus of biomedical documents annotated at the entity and concept levels to provide NER and classification tasks. Three text genres are covered, comprising a total of 103,056 words obtained either from EMEA or MEDLINE. Ten entity categories corresponding to UMLS Semantic Groups were annotated, using automatic pre-annotations validated by trained human annotators. Overall, a total of 26,409 entity annotations were mapped to 5,797 unique UMLS concepts. To simplify the evaluation process, we sort the nested labels by alphabetical order and concatenate them together into a single one to transform the task to a usable format for token classification with BERT based architectures.
+[QUAERO](https://web.archive.org/web/20240624042319/https://quaerofrenchmed.limsi.fr/) The QUAERO French Medical Corpus introduces an extensive corpus of biomedical documents annotated at the entity and concept levels to provide NER and classification tasks. Three text genres are covered in the original corpus, comprising a total of 103,056 words; DrBenchmark uses two of them: drug leaflets from EMEA and titles from MEDLINE. Ten entity categories corresponding to UMLS Semantic Groups were annotated, using automatic pre-annotations validated by trained human annotators. Overall, a total of 26,409 entity annotations were mapped to 5,797 unique UMLS concepts. To simplify the evaluation process, nested entities are not kept: when several annotations overlap, only the longest one is used. The EMEA documents are also split into sentences, as some of them exceed the maximum input length of the models.
 
 [E3C](https://github.com/hltfbk/E3C-Corpus) is a multilingual corpus of clinical narratives annotated for the named-entity recognition task.  It consists of two types of annotations: (i) clinical entities (e.g., pathologies), (ii) temporal information and factuality (e.g., events). It handles 5 languages (French, English, Italian, Spanish and Basque) but in our case, we are only interested by French.
 
-[MorFITT](ddd) is the first multi-label corpus in French annotated in specialties in the medical field. It is composed of 3,624 abstracts of scientific articles from PubMed, annotated in 12 specialties for a total of 5,116 annotations.
+[MorFITT](https://hal.science/hal-04125879) is the first multi-label corpus in French annotated in specialties in the medical field. It is composed of 3,624 abstracts of scientific articles from PubMed, annotated in 12 specialties for a total of 5,116 annotations.
 
 [FrenchMedMCQA](https://aclanthology.org/2022.louhi-1.5.pdf) is a publicly available Multiple-Choice Question Answering (MCQA) dataset in French for medical domain. It contains 3,105 questions coming from real exams of the French medical specialization diploma in pharmacy, integrating single and multiple answers.
 
-[Mantra-GSC](ddd) is a multilingual corpus annotated for biomedical named-entity recognition. It handles 5 languages (Spanish, French, German, Dutch and English) but in our case we are focusing only on the French subset. The corpus is obtained from three sources which as been partitioned to be evaluated separately since two annotation schemas are used: Medline (11 classes), EMEA and Patents (10 classes).
+[Mantra-GSC](https://doi.org/10.1093/jamia/ocv037) is a multilingual corpus annotated for biomedical named-entity recognition. It handles 5 languages (Spanish, French, German, Dutch and English) but in our case we are focusing only on the French subset. The corpus is obtained from three sources which have been partitioned to be evaluated separately since two annotation schemas are used: Medline (11 classes), EMEA and Patents (10 classes).
 
 [CLISTER](https://aclanthology.org/2022.jeptalnrecital-taln.28.pdf) is a French clinical Semantic Textual Similarity (STS) corpus of 1,000 sentence pairs manually annotated by multiple annotators according to their similarity scores ranging from 0 to 5 and averaged together, giving a floating point number.
 
-[DEFT-2019](https://aclanthology.org/2019.jeptalnrecital-deft.1/) is a corpus annotated for named-entity recognition proposed in the 2019 edition of the French Text Mining Challenge. This corpus is made of 717 clinical cases taken from the CAS corpus. The corpus is annotated with 4 entities: age, genre, issus and origine.
+[DEFT-2019](https://aclanthology.org/2019.jeptalnrecital-deft.1/) is a corpus annotated for named-entity recognition proposed in the 2019 edition of the French Text Mining Challenge. This corpus is made of 717 clinical cases taken from the CAS corpus. The corpus is annotated with 4 entities: age, genre, issue and origine.
 
 [DEFT-2020](https://aclanthology.org/2020.jeptalnrecital-deft.1.pdf) The 2020 edition of the French Text Mining Challenge proposed two tasks about textual similarity and one information extraction task. The first task aims at identifying the degree of similarity between pairs of sentences, from 0 (the less similar) to 5 (the most similar). The second task consists in identifying the closest sentence from a source sentence among three given sentences. Both tasks rely on a corpus from the general and health domains.
 
-[DEFT-2021](https://aclanthology.org/2021.jeptalnrecital-deft.1/) is a corpus annotated on two tasks: (i) multi-label classification and (ii) named-entity recognition. This task aims at identifying patient's clinical profile on the basis of the diseases, signs or symptoms mentioned in a subset of 275 clinical cases taken from DEFT-2019. The corpus is annotated with 23 axes derived from Chapter C of Medical Subject Headings (MeSH)
+[DEFT-2021](https://aclanthology.org/2021.jeptalnrecital-deft.1/) is a subset of 275 clinical cases taken from DEFT-2019, annotated on two tasks: (i) named-entity recognition and (ii) multi-label classification. The first task is a fine-grained information extraction task over 13 types of entities. The second task aims at identifying patient's clinical profile on the basis of the diseases, signs or symptoms mentioned in the clinical cases: the corpus is annotated with 23 axes derived from Chapter C of Medical Subject Headings (MeSH).
 
-[DiaMED]() is a corpus of 739 clinical cases manually annotated in major diagnostic categories (CMD). These CMD classes are a clinical classification composed of 28 classes, most often corresponding to a functional system (nervous system, eyes, ...) and allowing the assignment of patients to a particular hospital service.
+[DiaMED](https://huggingface.co/datasets/DrBenchmark/DiaMED) is a corpus of 739 clinical cases collected from an open-access journal (The Pan African Medical Journal) and manually annotated into the 22 chapters of the International Classification of Diseases, 10th Revision (ICD-10). These chapters give a general description of the type of disease or injury (infectious diseases, neoplasms, diseases of the nervous system, ...).
 
-[PxCorpus](https://zenodo.org/record/6524162) is the first open-sourced corpus of spoken language understanding on medical drug prescriptions. It contains 4 hours of transcribed and annotated dialogues of drug prescriptions in French acquired through an experiment with 55 experts and non-experts participants. In total, the dataset includes 1,981 recordings of 55 participants (38\% non-experts, 25\% doctors, 36\% medical practitioners), manually transcribed and semantically annotated. The first task consist of classifying the textual utterances into one of 4 intent classes (Appendix~\ref{sec:classes-pxcorpus}). The second one consist of a named entity recognition task where each word of a sequence is classified into one of the 38 classes and formatted at the IOB2 format.
+[PxCorpus](https://zenodo.org/record/6524162) is the first open-sourced corpus of spoken language understanding on medical drug prescriptions. It contains 4 hours of transcribed and annotated dialogues of drug prescriptions in French acquired through an experiment with 55 experts and non-experts participants. In total, the dataset includes 1,981 recordings of 55 participants (38% non-experts, 25% doctors, 36% medical practitioners), manually transcribed and semantically annotated. The first task is a named entity recognition task where each word of a sequence is classified into one of the 38 classes and formatted at the IOB2 format. The second one consists of classifying the textual utterances into one of 4 intent classes (medical prescription, replace, negate or none).
 
 
 ## Citing DrBenchmark
