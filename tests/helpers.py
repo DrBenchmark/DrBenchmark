@@ -23,7 +23,8 @@ def load_module(name, path):
 # {"e3c-ner_clinical": "./run.sh {model_name} French_clinical"}
 TASKS = load_module("drbenchmark_run", REPO / "run.py").task2script
 
-RECIPE_NAMES = sorted(path.name for path in RECIPES.iterdir() if path.is_dir())
+# The directories of `recipes/` with scripts: every one but `common/`, the code they share
+RECIPE_NAMES = sorted(path.name for path in RECIPES.iterdir() if (path / "scripts").is_dir())
 
 
 class Task:

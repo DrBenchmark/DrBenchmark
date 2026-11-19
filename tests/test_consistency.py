@@ -35,15 +35,26 @@ def test_no_unused_file(recipe):
     scripts_dir = RECIPES / recipe / "scripts"
 
     assert sorted(path.name for path in scripts_dir.glob("run*.sh")) == sorted({task.launcher for task in tasks})
-    training_scripts = sorted(path.name for path in scripts_dir.glob("*.py") if path.name != "utils.py")
+    training_scripts = sorted(path.name for path in scripts_dir.glob("*.py"))
     assert training_scripts == sorted({task.script for task in tasks})
     assert sorted((RECIPES / recipe / "yaml").glob("*.yaml")) == sorted({task.config_path for task in tasks})
 
 
 @pytest.mark.parametrize("recipe", RECIPE_NAMES)
-def test_utils_is_shared(recipe):
-    """Every recipe uses `recipes/utils.py`, through a symbolic link."""
-    assert (RECIPES / recipe / "scripts" / "utils.py").resolve() == (RECIPES / "utils.py").resolve()
+def test_common_package_is_shared(recipe):
+    """Every recipe uses the code of `recipes/common/`, through a symbolic link."""
+    link = RECIPES / recipe / "scripts" / "common"
+    assert link.is_symlink()
+    assert link.resolve() == (RECIPES / "common").resolve()
+
+
+@pytest.mark.parametrize("task", ALL_TASKS, ids=task_ids)
+def test_training_script_uses_the_shared_code(task):
+    """A training script only states what is specific to its task: the rest is in `recipes/common/`."""
+    script = (task.scripts_dir / task.script).read_text()
+    assert re.search(r"^from common import ", script, re.M)
+    for duplicated in ("TrainingArguments(", "Trainer(", "load_dataset(", "parse_args("):
+        assert duplicated not in script, f"{duplicated} should be called by recipes/common/"
 
 
 @pytest.mark.parametrize("task", ALL_TASKS, ids=task_ids)

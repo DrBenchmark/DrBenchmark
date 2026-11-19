@@ -1,4 +1,4 @@
-"""Tests of `recipes/utils.py`: command line parsing and naming of the runs."""
+"""Tests of `recipes/common/utils.py`: command line parsing and naming of the runs."""
 
 import os
 import re

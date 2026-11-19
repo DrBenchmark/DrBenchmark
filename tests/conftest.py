@@ -18,8 +18,8 @@ from helpers import RECIPES, TASKS, Task, load_module, read_json
 
 @pytest.fixture(scope="session")
 def utils():
-    """The module `recipes/utils.py`, which every training script imports."""
-    return load_module("drbenchmark_utils", RECIPES / "utils.py")
+    """The module `recipes/common/utils.py`, which parses the command line of every training script."""
+    return load_module("drbenchmark_utils", RECIPES / "common" / "utils.py")
 
 
 @pytest.fixture(autouse=True)
