@@ -15,12 +15,19 @@ concurrency:
 
 jobs:
   tests:
+    name: tests (Python ${{ matrix.python-version }}, ${{ matrix.dependencies }} dependencies)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.12", "3.15"]
+        # latest: the newest versions allowed by requirements.txt, as a new user gets them
+        dependencies: [latest]
+        include:
+          # tested: the exact versions of constraints.txt
+          - python-version: "3.12"
+            dependencies: tested
     steps:
       - uses: actions/checkout@v7
 
@@ -28,12 +35,16 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            constraints.txt
 
       - name: Install the dependencies
         run: |
-          # CPU build of PyTorch: the default one bundles CUDA and is much bigger
-          pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install -r requirements.txt pytest
+          # The extra index provides the CPU build of PyTorch: the default one bundles CUDA and is much bigger
+          pip install -r requirements.txt pytest --extra-index-url https://download.pytorch.org/whl/cpu ${{ matrix.dependencies == 'tested' && '-c constraints.txt' || '' }}
+          # The versions are printed to know with which ones the tests passed, or failed
+          pip freeze
 
       - name: Run the tests
         run: pytest

@@ -28,6 +28,8 @@ python run.py --tasks all --nb-run 4
 
 **Note**: `offline` is set to `True` by default in `./config.yaml`: the datasets and the models are read from local copies, which have to be built first with `python ./download_datasets_locally.py` and `python ./download_models_locally.py`. This is the mode to use on an **offline machine / cluster**. To download the datasets and the models directly from the HuggingFace Hub instead, set `offline` to `False` in `./config.yaml`.
 
+**Note**: `requirements.txt` bounds each dependency below the next major release after the one the tests were run with. To install exactly the versions of a tested environment, which are listed in `constraints.txt`, use `pip install -r requirements.txt -c constraints.txt` (Python >= 3.12 is needed).
+
 The tasks, their names for `run.py` and the way to run each of them separately are described in [recipes/README.md](./recipes/README.md).
 
 More information on managing environments with Anaconda can be found in [the conda cheat sheet](https://docs.conda.io/projects/conda/en/4.6.0/_downloads/52a95608c49671267e40c689e0bc00ca/conda-cheatsheet.pdf).
@@ -136,7 +138,9 @@ The tests need neither the data nor a network access: each task of `run.py` is r
 
 The known bugs are kept as expected failures (`xfail`): they are listed at the end of the output of `pytest`, and the corresponding test has to be unmarked once a bug is fixed.
 
-The tests are run by GitHub Actions on every push to `master` and on every pull request (see [.github/workflows/tests.yml](./.github/workflows/tests.yml)).
+The tests are run by GitHub Actions on every push to `master` and on every pull request (see [.github/workflows/tests.yml](./.github/workflows/tests.yml)), with the latest versions of the dependencies allowed by `requirements.txt` and with the versions of `constraints.txt`.
+
+To support a new major release of a dependency, raise its bound in `requirements.txt`, check that the tests pass, then update `constraints.txt` (the command is given at the top of that file).
 
 ## Citing DrBenchmark
 
