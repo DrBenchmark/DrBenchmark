@@ -15,7 +15,7 @@
 
 # 1. Edit source ~/.profile for your environment file
 # 2. Edit --account for your JZ account
-# 3. Edit MODEL_NAME and 
+# 3. Edit MODEL_NAME, NBR_RUNS and TASK (the task names are the ones of `python run.py --help`)
 
 module purge
 module load pytorch-gpu/py3/1.12.1
@@ -26,32 +26,32 @@ conda activate DrBenchmark
 MODEL_NAME="Dr-BERT/DrBERT-7GB"
 NBR_RUNS=1
 
-# TASK='CAS_POS'
-# TASK='CAS_CLS'
-# TASK='CAS_NER NEG'
-# TASK='CAS_NER SPEC'
-# TASK='CLISTER'
-# TASK='Diamed'
-# TASK='E3C_French_clinical'
-# TASK='E3C_French_temporal'
-# TASK='ESSAI_POS'
-# TASK='ESSAI_CLS'
-# TASK='ESSAI_NER NEG'
-# TASK='ESSAI_NER SPEC'
-TASK='FrenchMedMCQA_MCQA'
-# TASK='FrenchMedMCQA_CLS'
-# TASK='MantraGSC_fr_emea'
-# TASK='MantraGSC_fr_medline'
-# TASK='MantraGSC_fr_patents'
-# TASK='Morfitt'
-# TASK='DEFT2019'
-# TASK='DEFT2020_REG'
-# TASK='DEFT2020_CLS'
-# TASK='DEFT2021_NER'
-# TASK='DEFT2021_CLS'
-# TASK='PXCorpus_NER'
-# TASK='PXCorpus_CLS'
-# TASK='QUAERO_EMEA'
-# TASK='QUAERO_MEDLINE'
+# TASK='cas-pos'
+# TASK='cas-cls'
+# TASK='cas-ner_neg'
+# TASK='cas-ner_spec'
+# TASK='clister-regr'
+# TASK='diamed-cls'
+# TASK='e3c-ner_clinical'
+# TASK='e3c-ner_temporal'
+# TASK='essai-pos'
+# TASK='essai-cls'
+# TASK='essai-ner_neg'
+# TASK='essai-ner_spec'
+TASK='frenchmedmcqa-mcqa'
+# TASK='frenchmedmcqa-cls'
+# TASK='mantragsc-ner_emea'
+# TASK='mantragsc-ner_medline'
+# TASK='mantragsc-ner_patents'
+# TASK='morfitt-cls'
+# TASK='deft2019-ner'
+# TASK='deft2020-regr'
+# TASK='deft2020-cls'
+# TASK='deft2021-ner'
+# TASK='deft2021-cls'
+# TASK='pxcorpus-ner'
+# TASK='pxcorpus-cls'
+# TASK='quaero-ner_emea'
+# TASK='quaero-ner_medline'
 
 python run.py --tasks "$TASK" --models "$MODEL_NAME" --nb-run "$NBR_RUNS"

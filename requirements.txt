@@ -12,3 +12,4 @@ sacremoses  # for flaubert
 sentencepiece  # for flaubert
 openpyxl  # for tools/*
 seaborn  # for tools/*
+python-liquid>=2  # for tools/SlurmFromMissingRuns.py

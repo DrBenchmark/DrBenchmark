@@ -54,6 +54,18 @@ class TrainingArgumentsWithMPSSupport(TrainingArguments):
             return torch.device("cpu")
 
 
+def str2bool(value):
+    """Parse a boolean given on the command line, e.g. `--offline False`.
+
+    `type=bool` cannot be used for that: it turns any non-empty string, even "False", into True.
+    """
+    if value.lower() in ("true", "yes", "1"):
+        return True
+    if value.lower() in ("false", "no", "0"):
+        return False
+    raise argparse.ArgumentTypeError(f"expected true or false, got '{value}'")
+
+
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--config", type=str, required=True,
@@ -84,8 +96,8 @@ def parse_args():
                         help="Corpus subset")
     parser.add_argument("--fewshot", type=float, required=False,
                         help="Percentage of the train subset used during training")
-    parser.add_argument("--offline", type=bool, required=False,
-                        help="Use local huggingface dataset")
+    parser.add_argument("--offline", type=str2bool, required=False, metavar="{true,false}",
+                        help="Use the datasets and models saved locally instead of the HuggingFace Hub")
     parser.add_argument("--max_train_samples", type=int, required=False,
                         help="For debugging purposes or quicker training, truncate the number of train examples to this value if set.")
     parser.add_argument("--max_val_samples", type=int, required=False,

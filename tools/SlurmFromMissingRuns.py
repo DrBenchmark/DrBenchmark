@@ -3,7 +3,7 @@ import sys
 import json
 
 import pandas as pd
-from liquid import render
+from liquid import parse
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from run import task2script
@@ -18,7 +18,7 @@ slurm_template = """#!/bin/bash
 #SBATCH --time=02:00:00
 #SBATCH --output=./logs/%x_%A_%a.err
 #SBATCH --error=./logs/%x_%A_%a.err
-#SBATCH --array=0-{{ JOBS | size }}%10      # 27tasks*8models*4runs = 864 jobs overall but 100 jobs max in the queue
+#SBATCH --array=0-{{ JOBS | size | minus: 1 }}%10      # one job per missing run, 10 jobs max running at the same time
 {% if JEANZAY -%}
 #SBATCH --account=<ACCOUNT>@v100
 {% else -%}
@@ -105,4 +105,9 @@ if __name__ == '__main__':
             continue
         JOBS += [comm] * r[0]
 
-    print(render(slurm_template, **{'JOBS': JOBS, 'JEANZAY': args.jeanzay}))
+    if not JOBS:
+        # An empty job array is not valid for SLURM (--array=0--1)
+        sys.exit('No missing run: there is no SLURM script to generate.')
+
+    # `parse(...).render(mapping)` works with python-liquid 2 and 3, unlike `render(..., **variables)`
+    print(parse(slurm_template).render({'JOBS': JOBS, 'JEANZAY': args.jeanzay}))

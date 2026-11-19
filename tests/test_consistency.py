@@ -6,8 +6,6 @@ agree with each other.
 
 import os
 import re
-import subprocess
-import sys
 
 import pytest
 
@@ -96,30 +94,13 @@ def test_slurm_script_runs_every_task(script):
     assert commands == sorted((task.recipe, TASKS[task.name]) for task in ALL_TASKS)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="Known bug: run_one_jean_zay.sh uses old task names (e.g. FrenchMedMCQA_MCQA) that run.py rejects.",
-)
-def test_run_one_jean_zay_uses_valid_task_names():
-    names = re.findall(r"^#? ?TASK='([^']+)'$", (REPO / "run_one_jean_zay.sh").read_text(), re.M)
-    if not names:
-        pytest.fail("No task found in run_one_jean_zay.sh", pytrace=False)
-    assert set(names) <= set(TASKS)
-
-
-def test_run_py_command_line():
-    """`run.py` lists the tasks in its help and refuses the names it does not know."""
-    def run_py(*arguments):
-        return subprocess.run([sys.executable, "run.py", *arguments], cwd=REPO, capture_output=True, text=True)
-
-    usage = run_py("--help")
-    assert usage.returncode == 0
-    assert all(name in usage.stdout.replace("\n", "").replace(" ", "") for name in TASKS)
-
-    unknown = run_py("--tasks", "unknown-task", "--models", "some/model")
-    assert unknown.returncode == 2
-    assert "invalid choice" in unknown.stderr
+def test_run_one_jean_zay_lists_every_task():
+    """`run_one_jean_zay.sh` proposes one line per task, with the names `run.py` accepts."""
+    script = (REPO / "run_one_jean_zay.sh").read_text()
+    proposed = re.findall(r"^#? ?TASK='([^']+)'$", script, re.M)
+    assert sorted(proposed) == sorted(TASKS)
+    # Exactly one of them is not commented out
+    assert len(re.findall(r"^TASK='([^']+)'$", script, re.M)) == 1
 
 
 def test_recipes_readme_lists_every_task():

@@ -136,10 +136,23 @@ def test_gradient_accumulation_of_the_yaml_file_is_kept(task, parse):
     assert parse(task).gradient_accumulation_steps == task.config["gradient_accumulation_steps"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="Known bug: --offline is declared with type=bool, so any value, even 'False', is true.",
-)
-def test_offline_mode_can_be_disabled_on_the_command_line(parse):
-    assert parse("cas-pos", "--offline", "False").offline is False
+@pytest.mark.parametrize("value, expected", [
+    ("True", True), ("true", True), ("yes", True), ("1", True),
+    ("False", False), ("false", False), ("no", False), ("0", False),
+])
+def test_offline_mode_on_the_command_line(value, expected, parse, monkeypatch):
+    """`--offline` overrides `config.yaml`, in both directions."""
+    monkeypatch.delenv("HF_HUB_OFFLINE", raising=False)
+    args = parse("cas-pos", "--offline", value)
+    assert args.offline is expected
+    assert ("HF_HUB_OFFLINE" in os.environ) is expected
+    if not expected:
+        # The model is downloaded from the Hub: its name is kept as it is
+        assert args.model_name == MODEL
+
+
+def test_offline_mode_needs_a_boolean(parse, capsys):
+    with pytest.raises(SystemExit) as exit_info:
+        parse("cas-pos", "--offline", "maybe")
+    assert exit_info.value.code == 2
+    assert "expected true or false" in capsys.readouterr().err

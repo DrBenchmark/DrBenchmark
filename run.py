@@ -1,5 +1,7 @@
 import logging
+import shlex
 import subprocess
+import sys
 
 task2script = {
     'cas-pos': './run_task_1.sh {model_name}',
@@ -80,6 +82,9 @@ if __name__ == '__main__':
     if args.tasks == ['all']:
         args.tasks = sorted(list(task2script.keys()))
 
+    # Runs that did not end properly: (task, model, iteration, exit code)
+    failures = []
+
     for task in args.tasks:
         corpus, subset = task.split('-')
 
@@ -90,9 +95,20 @@ if __name__ == '__main__':
                 logging.info('=============================')
                 logging.info('')
 
-                command = f'cd recipes/{corpus.lower()}/scripts/ ; {task2script[task].format(model_name=model)}'
+                command = task2script[task].format(model_name=shlex.quote(model))
                 try:
-                    subprocess.call(command, shell=True)
+                    returncode = subprocess.call(command, shell=True, cwd=f'recipes/{corpus.lower()}/scripts/')
                 except KeyboardInterrupt:
                     logging.info('KeyboardInterrupt Exiting...')
-                    exit()
+                    sys.exit(130)
+
+                if returncode != 0:
+                    logging.error(f'Evaluation of {model} on {corpus}-{subset} (run {iteration}) failed with exit code {returncode}')
+                    failures.append((task, model, iteration, returncode))
+
+    # A failed run does not stop the other ones, but it must not go unnoticed
+    if failures:
+        logging.error(f'{len(failures)} run(s) failed:')
+        for task, model, iteration, returncode in failures:
+            logging.error(f'  {task} | {model} | run {iteration} | exit code {returncode}')
+        sys.exit(1)

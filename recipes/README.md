@@ -68,3 +68,5 @@ Except for DEFT 2019, whose access is restricted (see [its README](./deft2019/))
 
 - `offline: False`: the datasets and the models are downloaded automatically from the HuggingFace Hub.
 - `offline: True`, which is the default value of the repository: the datasets are read from the `data/local_hf_<subset>/` directory of each recipe and the models from the `models/` directory of the repository. They have to be created beforehand with `python download_datasets_locally.py` and `python download_models_locally.py`, run from the root of the repository.
+
+The value of `config.yaml` can be overridden for one run by giving `--offline true` or `--offline false` to a launcher.
