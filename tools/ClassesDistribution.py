@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 
 from datasets import load_dataset
 
+from paths import STATS_DIR
+
 
 tasks = [
     {"corpus": "DrBenchmark/QUAERO", "subset": "emea", "task": None},
@@ -146,7 +148,7 @@ for subset in ["train", "validation", "test"]:
             tasks_classes[t_key][subset].extend(current_classes)
             del current_classes
 
-os.makedirs("./stats/distributions", exist_ok=True)
+os.makedirs(os.path.join(STATS_DIR, "distributions"), exist_ok=True)
 
 for subset in ["train", "validation", "test"]:
 
@@ -162,7 +164,7 @@ for subset in ["train", "validation", "test"]:
             plt.title('Distribution of the values', fontsize=16)
             plt.xlabel('Frequencies')
             plt.ylabel('Classes')
-            plt.savefig(f"./stats/distributions/{t_key.replace('/','_')}.png", bbox_inches='tight', dpi=200)
+            plt.savefig(os.path.join(STATS_DIR, "distributions", f"{t_key.replace('/','_')}.png"), bbox_inches='tight', dpi=200)
             plt.cla()
             plt.clf()
 
@@ -178,12 +180,12 @@ for subset in ["train", "validation", "test"]:
             plt.title('Distribution of classes', fontsize=16)
             plt.xlabel('Frequencies')
             plt.ylabel('Classes')
-            plt.savefig(f"./stats/distributions/{t_key.replace('/','_')}.png", bbox_inches='tight', dpi=200)
+            plt.savefig(os.path.join(STATS_DIR, "distributions", f"{t_key.replace('/','_')}.png"), bbox_inches='tight', dpi=200)
             plt.cla()
             plt.clf()
 
         print(tasks_classes[t_key][subset])
 
-with open("./stats/classes_distribution.json", 'w') as f:
+with open(os.path.join(STATS_DIR, "classes_distribution.json"), 'w') as f:
     json.dump(tasks_classes, f, indent=4)
 print("JSON file saved!")

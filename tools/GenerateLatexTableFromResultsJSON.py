@@ -1,10 +1,13 @@
+import os
 import json
 
+from paths import MODELS_FILE, STATS_DIR
 
-with open("./stats/overall_averaged_metrics.json") as f:
+
+with open(os.path.join(STATS_DIR, "overall_averaged_metrics.json")) as f:
     data = json.load(f)
 
-with open('models.txt') as f_in:
+with open(MODELS_FILE) as f_in:
     models = [l.strip() for l in f_in if l.strip()]
 
 print(models)

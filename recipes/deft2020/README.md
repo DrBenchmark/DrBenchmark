@@ -15,7 +15,7 @@ The subsets are downloaded automatically when `offline` is set to `False` in `co
 
 ## Run Training
 
-The launchers use relative paths: they have to be run from the `scripts/` directory.
+The launchers can be run from any directory: they find their files from their own location.
 
 ```bash
 cd scripts/

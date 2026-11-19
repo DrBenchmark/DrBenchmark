@@ -2,13 +2,25 @@
 
 import importlib.util
 import json
+import os
 import re
+import shlex
+import subprocess
+import sys
 from pathlib import Path
 
 import yaml
 
 REPO = Path(__file__).resolve().parents[1]
 RECIPES = REPO / "recipes"
+
+
+def relative_path(path, start):
+    """`path` as it is typed from the directory `start`.
+
+    Symbolic links are resolved first: `..` is not the parent of a link, but of its target.
+    """
+    return os.path.relpath(os.path.realpath(path), os.path.realpath(start))
 
 
 def load_module(name, path):
@@ -50,13 +62,13 @@ class Task:
 
     @property
     def script(self):
-        """Python script called by the launcher."""
-        return re.search(r"^python (\S+\.py)", self.launcher_path.read_text(), re.M).group(1)
+        """Python script called by the launcher, which looks for it in its own directory."""
+        return re.search(r'^python "\$scripts_dir/(\S+\.py)"', self.launcher_path.read_text(), re.M).group(1)
 
     @property
     def config_arg(self):
-        """Path of the YAML file as the launcher gives it, relative to `scripts/`."""
-        return re.search(r'--config="([^"]+)"', self.launcher_path.read_text()).group(1)
+        """Path of the YAML file given by the launcher, relative to `scripts/`."""
+        return re.search(r'--config="\$scripts_dir/([^"]+)"', self.launcher_path.read_text()).group(1)
 
     @property
     def config_path(self):
@@ -71,15 +83,63 @@ class Task:
         """Subset of the dataset: given on the command line, or else by the YAML file."""
         return self.cli_subset or self.config["subset"]
 
-    def script_args(self, model):
-        """Arguments the launcher gives to the Python script."""
-        args = [f"--config={self.config_arg}", f"--model={model}"]
+    def script_args(self, model, cwd=None):
+        """Arguments the launcher gives to the Python script.
+
+        The path of the YAML file is given from `cwd`, the directory the launcher is run
+        from: `scripts/` by default.
+        """
+        config = self.config_arg if cwd is None else relative_path(self.config_path, cwd)
+        args = [f"--config={config}", f"--model={model}"]
         if self.cli_subset:
             args.append(f"--subset={self.cli_subset}")
         return args
 
+    def command(self, model, cwd=None):
+        """Command of `run.py` for the task, written to be run from `cwd`: `scripts/` by default."""
+        command = TASKS[self.name].format(model_name=shlex.quote(str(model)))
+        if cwd is not None:
+            # ./run.sh <model> -> <path of scripts/ from cwd>/run.sh <model>
+            assert command.startswith("./")
+            command = shlex.quote(relative_path(self.scripts_dir, cwd)) + command[1:]
+        return command
+
 
 ALL_TASKS = [Task(name) for name in TASKS]
+
+
+def run_command(command, cwd, timeout=900):
+    """Run the command of a recipe from the directory `cwd`."""
+    environ = dict(os.environ, TOKENIZERS_PARALLELISM="false")
+    # The launchers call `python`: make it the interpreter running the tests
+    environ["PATH"] = os.path.dirname(sys.executable) + os.pathsep + environ["PATH"]
+    return subprocess.run(command, shell=True, cwd=cwd, env=environ, capture_output=True, text=True, timeout=timeout)
+
+
+def run_without_slurm(script, cwd, directory, task_id=0):
+    """Run a script for SLURM with bash, from the directory `cwd`, as the job `task_id` of its array.
+
+    The programs the script calls (`srun`, `conda`, `module` and `python`) are replaced by
+    one that only records its command line. They are created in `directory`, as the home
+    directory of the script. Returns the process and the commands that were recorded.
+    """
+    programs = directory / "bin"
+    home = directory / "home"
+    programs.mkdir(parents=True, exist_ok=True)
+    home.mkdir(exist_ok=True)
+    for name in (".profile", ".bashrc"):
+        (home / name).touch()
+    recorded = directory / "commands.txt"
+    recorded.write_text("")
+    for name in ("srun", "conda", "module", "python"):
+        program = programs / name
+        program.write_text(f"#!/bin/sh\necho \"{name} $*\" >> '{recorded}'\n")
+        program.chmod(0o755)
+
+    # Nothing of the environment of the tests is given to the script
+    environ = {"PATH": f"{programs}{os.pathsep}/usr/bin{os.pathsep}/bin", "HOME": str(home), "SLURM_ARRAY_TASK_ID": str(task_id)}
+    completed = subprocess.run(["bash", str(script)], cwd=cwd, env=environ, capture_output=True, text=True, timeout=60)
+    return completed, recorded.read_text().splitlines()
 
 
 def read_json(path):

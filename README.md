@@ -30,11 +30,15 @@ python run.py --tasks all --nb-run 4
 
 **Note**: `requirements.txt` bounds each dependency below the next major release after the one the tests were run with. To install exactly the versions of a tested environment, which are listed in `constraints.txt`, use `pip install -r requirements.txt -c constraints.txt` (Python >= 3.12 is needed).
 
+**Note**: `run.py`, the two download scripts, the launchers of the recipes and the tools of `tools/` find the files of the repository from their own location: they can be run from any directory, e.g. `python ~/DrBenchmark/run.py --tasks cas-pos`. A relative path given on their command line, such as the one of a local model, is relative to the current directory.
+
 The tasks, their names for `run.py` and the way to run each of them separately are described in [recipes/README.md](./recipes/README.md).
 
 More information on managing environments with Anaconda can be found in [the conda cheat sheet](https://docs.conda.io/projects/conda/en/4.6.0/_downloads/52a95608c49671267e40c689e0bc00ca/conda-cheatsheet.pdf).
 
 ### Running with SLURM
+
+The scripts for SLURM have to be submitted from the root of the repository: they look for `models.txt` and `recipes/` in the directory they are submitted from, and SLURM writes their logs in `./logs/`.
 
 1. `sbatch run_all_slurm.sh`
 

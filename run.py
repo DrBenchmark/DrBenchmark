@@ -1,7 +1,11 @@
 import logging
+import os
 import shlex
 import subprocess
 import sys
+
+# Root of the repository: `models.txt` and the recipes are found there, wherever `run.py` is run from
+REPO_DIR = os.path.dirname(os.path.realpath(__file__))
 
 task2script = {
     'cas-pos': './run_task_1.sh {model_name}',
@@ -50,7 +54,7 @@ if __name__ == '__main__':
     import argparse
 
     try:
-        with open('models.txt') as f:
+        with open(os.path.join(REPO_DIR, 'models.txt')) as f:
             MODELS_TO_EVALUATE = [l.strip() for l in f if not l.startswith('#') and l.strip()]
     except FileNotFoundError:
         logging.warning('`models.txt` not found. Please provide models in --models')
@@ -62,7 +66,7 @@ if __name__ == '__main__':
         parser.add_argument("--tasks", type=str, nargs='+', required=True, metavar="TASK",
                             help="Tasks to evaluate or 'all'. Choose from %(choices)s", choices=list(task2script.keys()) + ['all'])
         parser.add_argument("--models", type=str, nargs='+', required=False,
-                            help="Name or path of models to evaluate (overrides models defined in ./models.txt)", default=MODELS_TO_EVALUATE)
+                            help="Name or path of models to evaluate (overrides models defined in models.txt)", default=None)
         parser.add_argument("--nb-run", type=int, required=False,
                             help="Number of runs to launch", default=1)
         parser.add_argument("--log-level", type=str, required=False,
@@ -71,7 +75,23 @@ if __name__ == '__main__':
 
         return args
 
+    def from_repository(model):
+        """A model given by a path relative to the current directory, written from the root of the repository.
+
+        The recipes do not run in the current directory: they look for a relative path from
+        the root of the repository. A name of the HuggingFace Hub is not a path that exists.
+        """
+        if os.path.isabs(model) or not os.path.exists(model):
+            return model
+        relative = os.path.relpath(model, REPO_DIR)
+        return relative + '/' if model.endswith('/') else relative
+
     args = arguments()
+
+    if args.models is None:
+        args.models = MODELS_TO_EVALUATE
+    elif not os.path.samefile(os.getcwd(), REPO_DIR):
+        args.models = [from_repository(model) for model in args.models]
 
     logging.basicConfig(
         format='%(asctime)s %(levelname)s::%(message)s',
@@ -96,8 +116,9 @@ if __name__ == '__main__':
                 logging.info('')
 
                 command = task2script[task].format(model_name=shlex.quote(model))
+                scripts_dir = os.path.join(REPO_DIR, 'recipes', corpus.lower(), 'scripts')
                 try:
-                    returncode = subprocess.call(command, shell=True, cwd=f'recipes/{corpus.lower()}/scripts/')
+                    returncode = subprocess.call(command, shell=True, cwd=scripts_dir)
                 except KeyboardInterrupt:
                     logging.info('KeyboardInterrupt Exiting...')
                     sys.exit(130)

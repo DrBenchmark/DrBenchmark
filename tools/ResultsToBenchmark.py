@@ -1,5 +1,8 @@
+import os
 import json
 import pandas as pd
+
+from paths import STATS_DIR
 
 
 dataset2pretty = {
@@ -116,7 +119,7 @@ if __name__ == '__main__':
         parser = argparse.ArgumentParser(
             description='Outputs a benchmark to "stats/overall_results.xlsx".')
         parser.add_argument(
-            "--results", type=str, required=False, default="stats/results.json",
+            "--results", type=str, required=False, default=os.path.join(STATS_DIR, "results.json"),
             help="Path to results.json (default: stats/results.json).")
         parser.add_argument(
             "--nb-run", type=int, required=False, default=4,
@@ -176,6 +179,6 @@ if __name__ == '__main__':
     if args.csv:
         print(df.to_csv())
     else:
-        output_file = f'stats/overall_results_{args.nb_run}runs.xlsx'
+        output_file = os.path.join(STATS_DIR, f'overall_results_{args.nb_run}runs.xlsx')
         logging.info(f"Dumping to {output_file}...")
         df.to_excel(output_file)

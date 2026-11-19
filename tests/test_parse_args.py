@@ -7,7 +7,7 @@ import sys
 import pytest
 import yaml
 
-from helpers import ALL_TASKS, REPO, Task
+from helpers import ALL_TASKS, RECIPES, REPO, Task, relative_path
 
 MODEL = "Dr-BERT/DrBERT-7GB"
 GLOBAL_CONFIG = yaml.safe_load((REPO / "config.yaml").read_text())
@@ -21,17 +21,33 @@ def task_ids(task):
 def parse(utils, monkeypatch):
     """Parse the arguments as the script of a task does.
 
-    The script is run from its `scripts/` directory with the arguments given by its
-    launcher, followed by `extra_args`.
+    The script is run with the arguments given by its launcher, followed by `extra_args`.
+    It is started from `cwd`: from its `scripts/` directory by default.
     """
-    def parse(task, *extra_args, model=MODEL):
+    def parse(task, *extra_args, model=MODEL, cwd=None):
         if isinstance(task, str):
             task = Task(task)
-        monkeypatch.chdir(task.scripts_dir)
-        monkeypatch.setattr(sys, "argv", [task.script, *task.script_args(model), *extra_args])
+        script = task.script if cwd is None else relative_path(task.scripts_dir / task.script, cwd)
+        monkeypatch.chdir(task.scripts_dir if cwd is None else cwd)
+        monkeypatch.setattr(sys, "argv", [script, *task.script_args(model, cwd), *extra_args])
         return utils.parse_args()
 
     return parse
+
+
+@pytest.fixture
+def starting_directories(tmp_path):
+    """Directories a script can be started from, other than its `scripts/` directory."""
+    def directories(task):
+        other_recipe = "essai" if task.recipe != "essai" else "cas"
+        return {
+            "the root of the repository": REPO,
+            "a directory out of the repository": tmp_path,
+            # Its `../yaml/` directory has files with the same names as the one of the task
+            "the scripts of another recipe": RECIPES / other_recipe / "scripts",
+        }
+
+    return directories
 
 
 @pytest.mark.parametrize("task", ALL_TASKS, ids=task_ids)
@@ -116,6 +132,94 @@ def test_hub_model_in_offline_mode(parse):
     assert args.offline is True
     assert args.model_name == os.path.join("..", "..", "..", "models", "dr-bert_drbert-7gb")
     assert os.environ["HF_HUB_OFFLINE"] == "1"
+
+
+@pytest.mark.parametrize("task", ALL_TASKS, ids=task_ids)
+def test_arguments_do_not_depend_on_the_starting_directory(task, parse, starting_directories):
+    """The name of a run is built from its arguments: they are the same wherever the script is started from."""
+    reference = vars(parse(task, "--seed", "1"))
+    assert reference["config"] == task.config_arg
+
+    for description, directory in starting_directories(task).items():
+        args = parse(task, "--seed", "1", cwd=directory)
+        assert vars(args) == reference, description
+        # The paths of the arguments are relative to `scripts/`: the script moved there
+        assert os.path.samefile(os.getcwd(), task.scripts_dir), description
+
+
+@pytest.mark.parametrize("spelling", ["./../yaml/pos.yaml", "../yaml/../yaml/pos.yaml", "absolute"])
+def test_path_of_the_yaml_file_is_always_written_the_same_way(spelling, parse, monkeypatch, utils):
+    """The launchers give `<their directory>/../yaml/<file>.yaml`: the run must keep its name."""
+    task = Task("cas-pos")
+    reference = vars(parse(task, "--seed", "1"))
+
+    config = str(task.config_path) if spelling == "absolute" else spelling
+    monkeypatch.setattr(sys, "argv", [f"./{task.script}", f"--config={config}", f"--model={MODEL}", "--seed", "1"])
+    assert vars(utils.parse_args()) == reference
+
+
+def test_command_line_paths_are_relative_to_the_starting_directory(parse, tmp_path):
+    """`--data_dir data/` typed from a directory is the directory `data/` which is there."""
+    task = Task("cas-pos")
+    typed = ("--data_dir", "data/", "--run_dir", "results", "--output_dir", "models/")
+    args = parse(task, "--seed", "1", *typed, cwd=tmp_path)
+
+    # They are rewritten from `scripts/`, the current directory after the parsing
+    assert os.path.realpath(args.data_dir) == str(tmp_path / "data")
+    assert os.path.realpath(args.run_dir) == str(tmp_path / "results")
+    assert os.path.realpath(args.output_dir) == str(tmp_path / "models")
+    assert not any(os.path.isabs(path) for path in (args.data_dir, args.run_dir, args.output_dir))
+    # Neither the final slash nor its absence are lost: the name of the run depends on them
+    assert args.data_dir.endswith("/") and not args.run_dir.endswith("/")
+
+    # The same directories, typed from `scripts/`, give the same arguments
+    from_scripts = [relative_path(tmp_path / path, task.scripts_dir) for path in ("data", "results", "models")]
+    same = parse(task, "--seed", "1", "--data_dir", from_scripts[0] + "/", "--run_dir", from_scripts[1],
+                 "--output_dir", from_scripts[2] + "/")
+    assert vars(same) == vars(args)
+
+
+def test_absolute_paths_are_kept(parse, tmp_path):
+    typed = ("--data_dir", "/somewhere/data/", "--run_dir", "/somewhere/runs/", "--output_dir", "/somewhere/models/")
+    args = parse("cas-pos", "--seed", "1", *typed, cwd=tmp_path)
+    assert (args.data_dir, args.run_dir, args.output_dir) == ("/somewhere/data/", "/somewhere/runs/", "/somewhere/models")
+    assert parse("cas-pos", "--seed", "1", *typed) == args
+
+
+def test_local_model_relative_to_the_starting_directory(parse, tmp_path):
+    (tmp_path / "my_model").mkdir()
+    args = parse("cas-pos", "--seed", "1", model="my_model", cwd=tmp_path)
+    assert not os.path.isabs(args.model_name)
+    assert os.path.realpath(args.model_name) == str(tmp_path / "my_model")
+
+
+@pytest.mark.parametrize("model", ["assets", "assets/"])
+def test_local_model_gets_the_same_name_from_every_directory(model, parse, starting_directories):
+    """A model of the repository is written `../../../<model>` in the results, as when `run.py` gives it."""
+    task = Task("cas-pos")
+    reference = parse(task, "--seed", "1", model=model)
+    assert reference.model_name == os.path.join("..", "..", "..", model)
+
+    for description, directory in starting_directories(task).items():
+        typed = relative_path(REPO / "assets", directory) + ("/" if model.endswith("/") else "")
+        assert parse(task, "--seed", "1", model=typed, cwd=directory) == reference, description
+        # A path that does not exist from the starting directory is looked for from the root of the repository
+        if directory != REPO:
+            assert parse(task, "--seed", "1", model=model, cwd=directory) == reference, description
+
+
+def test_script_which_is_not_the_one_of_a_recipe_is_not_moved(utils, monkeypatch, tmp_path):
+    """Out of `recipes/<recipe>/scripts/`, the paths stay relative to the current directory."""
+    task = Task("cas-pos")
+    script = tmp_path / "script.py"
+    script.write_text("")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", [str(script), f"--config={task.config_path}", f"--model={MODEL}", "--seed", "1"])
+
+    args = utils.parse_args()
+    assert os.path.samefile(os.getcwd(), tmp_path)
+    assert args.config == str(task.config_path)
+    assert args.run_dir == task.config["run_dir"]
 
 
 def test_fewshot_and_max_train_samples_are_exclusive(parse):

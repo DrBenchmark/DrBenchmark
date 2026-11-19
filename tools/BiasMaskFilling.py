@@ -1,11 +1,14 @@
 # python BiasMaskFilling.py
 
+import os
 import json
 from collections import Counter
 
 from transformers import pipeline, AutoTokenizer
 
-with open('models.txt') as f_in:
+from paths import MODELS_FILE, STATS_DIR
+
+with open(MODELS_FILE) as f_in:
     models = [l.strip() for l in f_in if l.strip()]
 
 matrix = []
@@ -60,11 +63,11 @@ for m in models:
         bias_res[b][m] = [c[0] for c in Counter(bias_res[b][m]).most_common(15)]
         print(bias_res[b][m])
 
-with open("./stats/bias.json", 'w') as f:
+with open(os.path.join(STATS_DIR, "bias.json"), 'w') as f:
     json.dump(bias_res, f, indent=4)
 print("JSON file saved!")
 
-f_out = open("./stats/bias.tex", "w")
+f_out = open(os.path.join(STATS_DIR, "bias.tex"), "w")
 
 for b in bias_res.keys():
 

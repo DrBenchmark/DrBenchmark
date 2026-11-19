@@ -5,7 +5,9 @@ import json
 import pandas as pd
 from liquid import parse
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from paths import REPO_DIR, STATS_DIR
+
+sys.path.append(REPO_DIR)
 from run import task2script
 
 slurm_template = """#!/bin/bash
@@ -25,6 +27,12 @@ slurm_template = """#!/bin/bash
 #SBATCH --partition=gpu
 #SBATCH --constraint='GPURAM_Min_12GB'
 {% endif %}
+# recipes/ and logs/ are looked for in the directory the job is submitted from
+if [ ! -d recipes ]; then
+    echo "This script has to be submitted from the root of the DrBenchmark repository, not from $PWD" >&2
+    exit 1
+fi
+
 {% if JEANZAY -%}
 module purge
 source ~/.bashrc
@@ -72,7 +80,7 @@ if __name__ == '__main__':
 
     args = arguments()
 
-    with open('stats/results.json') as f:
+    with open(os.path.join(STATS_DIR, 'results.json')) as f:
         res = json.load(f)
 
     df = pd.DataFrame(

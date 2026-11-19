@@ -3,8 +3,10 @@ import json
 
 import matplotlib.pyplot as plt
 
+from paths import STATS_DIR
 
-with open("./stats/results.json") as f:
+
+with open(os.path.join(STATS_DIR, "results.json")) as f:
     results = json.load(f)
 
 avg_results = {}
@@ -101,7 +103,7 @@ mapping_line = {
     "XLM-RoBERTa": "-",
 }
 
-os.makedirs("./stats/fewshot", exist_ok=True)
+os.makedirs(os.path.join(STATS_DIR, "fewshot"), exist_ok=True)
 
 for key in results_fewshot:
 
@@ -137,7 +139,7 @@ for key in results_fewshot:
 
     plt.tight_layout()
 
-    output_name = f"./stats/fewshot/{corpus}@{task}.pdf"
+    output_name = os.path.join(STATS_DIR, "fewshot", f"{corpus}@{task}.pdf")
     print(output_name)
     plt.savefig(output_name, bbox_inches='tight', pad_inches=0)
     plt.clf()

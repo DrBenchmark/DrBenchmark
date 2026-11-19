@@ -52,7 +52,7 @@ The subsets are downloaded automatically when `offline` is set to `False` in `co
 
 ## Run Training
 
-The launcher uses relative paths: it has to be run from the `scripts/` directory. Its second argument is the subset.
+The launcher can be run from any directory: it finds its files from its own location. Its second argument is the subset.
 
 ```bash
 cd scripts/

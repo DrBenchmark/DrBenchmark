@@ -1,7 +1,11 @@
+import os
 import aiohttp
 import logging
 
 from datasets import load_dataset
+
+# Root of the repository: the datasets are saved in the recipes, wherever the script is run from
+REPO_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
 ds = [
@@ -48,7 +52,7 @@ def save_locally(arr):
             'client_kwargs': {'timeout': aiohttp.ClientTimeout(20 * 60)}
         }
     )
-    dataset.save_to_disk(f"./recipes/{corpus.lower()}/data/local_hf_{subset}/")
+    dataset.save_to_disk(os.path.join(REPO_DIR, "recipes", corpus.lower(), "data", f"local_hf_{subset}"))
 
 
 if __name__ == '__main__':

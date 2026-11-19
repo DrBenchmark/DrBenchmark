@@ -1,12 +1,15 @@
 # SubwordAnalysis.py
 
+import os
 import json
 
 from datasets import load_dataset
 from transformers import AutoTokenizer
 
+from paths import MODELS_FILE, STATS_DIR
 
-with open('models.txt') as f_in:
+
+with open(MODELS_FILE) as f_in:
     models = [l.strip() for l in f_in if l.strip()]
 
 tasks = [
@@ -150,7 +153,7 @@ for m in models:
             matrix_avg_tokens_per_word[t_key][m].append(nbr_tokens)
             del nbr_tokens
 
-with open("./stats/tokens.json", 'w') as f:
+with open(os.path.join(STATS_DIR, "tokens.json"), 'w') as f:
     json.dump(matrix_avg_tokens_per_word, f, indent=4)
 print("JSON file saved!")
 

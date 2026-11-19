@@ -56,6 +56,9 @@ def start(dataset_name, needs_data_dir=False):
         datefmt="%m/%d/%Y %H:%M:%S",
         level=logging.INFO
     )
+    # The script may have been started from another directory: the relative paths of its
+    # arguments, of its results and of its messages are relative to this one
+    logging.info(f"Working directory: {os.getcwd()}")
 
     set_seed(args.seed)
     if args.offline:

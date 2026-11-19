@@ -18,6 +18,12 @@
 # 2. Edit source ~/.profile for your environment file
 # 3. Edit --account for your JZ account
 
+# models.txt, recipes/ and logs/ are looked for in the directory the job is submitted from
+if [ ! -f models.txt ] || [ ! -d recipes ]; then
+    echo "This script has to be submitted from the root of the DrBenchmark repository, not from $PWD" >&2
+    exit 1
+fi
+
 module purge
 module load pytorch-gpu/py3/1.12.1
 

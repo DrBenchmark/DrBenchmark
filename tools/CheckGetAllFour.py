@@ -1,7 +1,10 @@
+import os
 import json
 
+from paths import STATS_DIR
 
-with open("./stats/results.json") as f:
+
+with open(os.path.join(STATS_DIR, "results.json")) as f:
     data = json.load(f)
 
 for model in data:

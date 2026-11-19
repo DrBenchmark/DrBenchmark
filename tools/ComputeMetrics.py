@@ -3,6 +3,8 @@ import json
 from glob import glob
 from collections import defaultdict
 
+from paths import RECIPES_DIR, STATS_DIR
+
 try:
     from tqdm import tqdm
 except ModuleNotFoundError:
@@ -10,7 +12,7 @@ except ModuleNotFoundError:
         return x
 
 if __name__ == '__main__':
-    path = "recipes"
+    path = RECIPES_DIR
 
     # results: model -> corpus-task -> metric -> list
     results = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
@@ -49,7 +51,7 @@ if __name__ == '__main__':
             results[model_name][key]["spearman_correlation_coef"].append(data["metrics"]["spearman_correlation_coef"])
 
     print('Dumping to stats/results.json')
-    with open("./stats/results.json", 'w') as f:
+    with open(os.path.join(STATS_DIR, "results.json"), 'w') as f:
         json.dump(results, f, indent=4)
 
     print("Averaging runs...")
@@ -65,5 +67,5 @@ if __name__ == '__main__':
                 avg_results[model][task][metric] = avg
 
     print('Dumping to stats/overall_averaged_metrics.json')
-    with open("./stats/overall_averaged_metrics.json", 'w') as f:
+    with open(os.path.join(STATS_DIR, "overall_averaged_metrics.json"), 'w') as f:
         json.dump(avg_results, f, indent=4)

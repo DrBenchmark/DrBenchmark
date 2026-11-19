@@ -16,6 +16,12 @@
 # 1. Edit NBR_RUNS and --array to match (if --array is too low, not all experiments will be run)
 # 2. Edit source ~/.profile for your environment file
 
+# models.txt, recipes/ and logs/ are looked for in the directory the job is submitted from
+if [ ! -f models.txt ] || [ ! -d recipes ]; then
+    echo "This script has to be submitted from the root of the DrBenchmark repository, not from $PWD" >&2
+    exit 1
+fi
+
 source ~/.profile  # or your local configuration file that activates conda for example
 conda activate DrBenchmark
 

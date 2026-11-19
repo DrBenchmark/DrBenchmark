@@ -1,4 +1,5 @@
 import os
+import sys
 import yaml
 import json
 import random
@@ -9,6 +10,10 @@ import argparse
 import torch
 from transformers import TrainingArguments
 
+
+# Root of the repository. This file is `recipes/common/utils.py`: the recipes import it through
+# the link `common` of their `scripts/` directory, which `realpath` follows.
+REPO_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 subset2task_detail = {
     'emea': 'emea', 'medline': 'medline',  # pxcorpus
@@ -66,6 +71,55 @@ def str2bool(value):
     raise argparse.ArgumentTypeError(f"expected true or false, got '{value}'")
 
 
+def relative_path(path, start):
+    """`path` written from the directory `start`, with its final slash if it has one."""
+    relative = os.path.relpath(path, start)
+    return relative + '/' if path.endswith('/') else relative
+
+
+def is_in_repository(path):
+    return os.path.commonpath([os.path.realpath(path), REPO_DIR]) == REPO_DIR
+
+
+def move_to_scripts_dir(args_cli):
+    """Make the `scripts/` directory of the running recipe the current directory.
+
+    A recipe writes its paths from its `scripts/` directory: in its YAML file (`../runs/`),
+    and in its results (`../../../models/<model>`). They are kept as they are, so that
+    neither the name of a run, which is built from its arguments, nor the content of its
+    results depend on the directory the script is started from. The paths given on the
+    command line are relative to that directory: they are rewritten from `scripts/`.
+    """
+    scripts_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
+    if os.path.dirname(os.path.dirname(scripts_dir)) != os.path.join(REPO_DIR, 'recipes'):
+        # Not started as the script of a recipe (`recipes/<recipe>/scripts/<script>.py`):
+        # the paths are left as they are, relative to the current directory
+        return
+    started_from_scripts_dir = os.path.samefile(os.getcwd(), scripts_dir)
+
+    # The YAML file of a recipe is always written from `scripts/` (`../yaml/pos.yaml`),
+    # whatever the way the launcher or the user spells its path
+    config = args_cli["config"]
+    if is_in_repository(config):
+        args_cli["config"] = relative_path(os.path.realpath(config), scripts_dir)
+    elif not os.path.isabs(config) and not started_from_scripts_dir:
+        args_cli["config"] = relative_path(config, scripts_dir)
+
+    if started_from_scripts_dir:
+        return
+
+    for name in ("output_dir", "run_dir", "data_dir"):
+        path = args_cli[name]
+        if path is not None and not os.path.isabs(path):
+            args_cli[name] = relative_path(path, scripts_dir)
+    # A model given by a relative path. A name of the HuggingFace Hub is not a path that exists.
+    model = args_cli["model_name"]
+    if model is not None and not os.path.isabs(model) and os.path.exists(model):
+        args_cli["model_name"] = relative_path(model, scripts_dir)
+
+    os.chdir(scripts_dir)
+
+
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--config", type=str, required=True,
@@ -115,7 +169,10 @@ def parse_args():
     if args_cli["config"]:
         args_local = yaml.safe_load(open(args_cli["config"]))
     # Load global config arguments
-    args_global = yaml.safe_load(open("../../../config.yaml"))
+    args_global = yaml.safe_load(open(os.path.join(REPO_DIR, "config.yaml")))
+
+    # From here, the current directory is the `scripts/` directory of the recipe
+    move_to_scripts_dir(args_cli)
 
     # Update args with local arguments (which contains great default for each task)
     args.update(args_local)
@@ -135,7 +192,8 @@ def parse_args():
     # If path exists, no problem
     if not os.path.exists(m):
         # If path not exist, it's either a model from the hub model or a
-        #  relative path that broke since we `cd` to `recipes/task/scripts`
+        #  path relative to the root of the repository, as `run.py` gives it,
+        #  while the current directory is `recipes/task/scripts`
         # Try to fix the relative path
         fixed_path = os.path.join('..', '..', '..', m)
         if os.path.exists(fixed_path):

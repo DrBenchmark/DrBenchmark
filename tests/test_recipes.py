@@ -6,12 +6,13 @@ writes the results the tools of `tools/` expect.
 """
 
 import math
+import os
 from pathlib import Path
 
 import pytest
 
 import synthetic
-from helpers import ALL_TASKS
+from helpers import ALL_TASKS, RECIPES, Task, read_json, run_command
 
 pytestmark = pytest.mark.e2e
 
@@ -65,6 +66,51 @@ def test_recipe(task, run_recipe, tiny_bert):
         assert isinstance(metrics["spearman_correlation_coef"], float)
     else:
         pytest.fail(f"Unknown kind of task: {task.kind}")
+
+
+def names(directory):
+    return sorted(path.name for path in directory.iterdir() if path.name != "__pycache__")
+
+
+# A launcher without subset, and one with a subset
+@pytest.mark.parametrize("task_name", ["cas-pos", "e3c-ner_clinical"])
+def test_recipe_started_from_another_directory(task_name, run_recipe, tiny_bert, synthetic_data, tmp_path):
+    """The launcher is run from a directory out of the repository, with paths relative to that directory."""
+    task = Task(task_name)
+    os.symlink(tiny_bert, tmp_path / "model")
+    os.symlink(synthetic_data / task.recipe, tmp_path / "data")
+    (tmp_path / "runs").mkdir()
+    recipe = RECIPES / task.recipe
+    before = {name: names(recipe / name) for name in ("runs", "save_models", "scripts")}
+
+    arguments = "--data_dir data/ --run_dir runs/ --output_dir models/ --offline True --seed 0 --epochs 1"
+    completed = run_command(f"{task.command('model', cwd=tmp_path)} {arguments}", cwd=tmp_path)
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    assert f"Working directory: {task.scripts_dir}" in completed.stderr
+
+    # The results are written in the directory given, and nothing in the recipe
+    (run_file,) = (tmp_path / "runs").glob("*.json")
+    result = read_json(run_file)
+    assert {name: names(recipe / name) for name in before} == before
+
+    # The paths are written from `scripts/`, whatever the directory the launcher is run from
+    hyperparameters = result["hyperparameters"]
+    assert hyperparameters["config"] == task.config_arg
+    for argument, typed in (("model_name", "model"), ("data_dir", "data"), ("run_dir", "runs"), ("output_dir", "models")):
+        path = hyperparameters[argument]
+        assert not os.path.isabs(path), argument
+        assert os.path.realpath(task.scripts_dir / path) == os.path.realpath(tmp_path / typed), argument
+
+    best_model = task.scripts_dir / result["model_name"]
+    assert os.path.realpath(best_model).startswith(str(tmp_path / "models"))
+    assert (best_model / "config.json").is_file()
+
+    # The run is the one the launcher does from `scripts/`
+    reference = run_recipe(task_name, tiny_bert).result
+    assert result["predictions"]["identifiers"] == reference["predictions"]["identifiers"]
+    assert result["predictions"]["real_labels"] == reference["predictions"]["real_labels"]
+    assert result["trainer_state"]["global_step"] == reference["trainer_state"]["global_step"]
+    assert set(result["metrics"]) == set(reference["metrics"])
 
 
 def test_flaubert_sequence_classification(run_recipe, tiny_flaubert):

@@ -17,6 +17,12 @@
 # 2. Edit --account for your JZ account
 # 3. Edit MODEL_NAME, NBR_RUNS and TASK (the task names are the ones of `python run.py --help`)
 
+# run.py and logs/ are looked for in the directory the job is submitted from
+if [ ! -f run.py ]; then
+    echo "This script has to be submitted from the root of the DrBenchmark repository, not from $PWD" >&2
+    exit 1
+fi
+
 module purge
 module load pytorch-gpu/py3/1.12.1
 

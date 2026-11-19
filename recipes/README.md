@@ -51,14 +51,13 @@ From the root of the repository, with `run.py`:
 python run.py --tasks cas-pos --models "Dr-BERT/DrBERT-7GB"
 ```
 
-Or directly with the launcher of the task. The launchers use relative paths: they have to be run from the `scripts/` directory of the recipe.
+Or directly with the launcher of the task, which is in the `scripts/` directory of its recipe. The launchers find their files from their own location: they can be run from any directory.
 
 ```bash
-cd recipes/cas/scripts/
-./run_task_1.sh "Dr-BERT/DrBERT-7GB"
+bash recipes/cas/scripts/run_task_1.sh "Dr-BERT/DrBERT-7GB"
 ```
 
-The arguments given after the model (and after the subset, for the launchers that take one) are passed to the Python script and override the values of the YAML file, e.g. `./run_task_1.sh "Dr-BERT/DrBERT-7GB" --seed 42 --epochs 5`.
+The arguments given after the model (and after the subset, for the launchers that take one) are passed to the Python script and override the values of the YAML file, e.g. `bash recipes/cas/scripts/run_task_1.sh "Dr-BERT/DrBERT-7GB" --seed 42 --epochs 5`. A relative path given on the command line (`--data_dir`, `--run_dir`, `--output_dir` or a local model) is relative to the current directory. In the results of the run, it is written from the `scripts/` directory, as the paths of the YAML file are: the name of a run does not depend on the directory it is started from.
 
 Each run writes its metrics, hyper-parameters and predictions on the test set in `runs/DrBenchmark-<task name>-<hash>.json`, and saves its best model in `save_models/DrBenchmark-<task name>-<hash>_best_model/`.
 

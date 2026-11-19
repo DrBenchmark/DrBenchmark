@@ -1,12 +1,16 @@
 # python InterVocabulariesCoverageMatrix.py
 
+import os
+
 import seaborn as sb
 import matplotlib.pyplot as plt
 
 from transformers import AutoTokenizer
 
+from paths import MODELS_FILE, STATS_DIR
 
-with open('models.txt') as f_in:
+
+with open(MODELS_FILE) as f_in:
     models = [l.strip() for l in f_in if l.strip()]
 
 mapping = {
@@ -48,12 +52,12 @@ for m1_path in models:
 
 print(">> Start saving scores!")
 
-with open("./stats/matrix.txt", "w") as f_out:
+with open(os.path.join(STATS_DIR, "matrix.txt"), "w") as f_out:
     # Write in file
     for row in matrix:
         f_out.write("\t".join([str(r) for r in row]) + "\n")
 
-with open("./stats/matrix.txt") as f_in:
+with open(os.path.join(STATS_DIR, "matrix.txt")) as f_in:
     matrix = [[float("%.1f" % float(r)) for r in row.split("\t")] for row in f_in.read().split("\n")[:-1]]
 
 # mask = np.zeros_like(matrix)
@@ -77,4 +81,4 @@ heat_map = sb.heatmap(matrix, cmap=cmap, annot=True, cbar=False, fmt='g', cbar_k
 heat_map.set_yticklabels([mapping[m] for m in models], rotation=0, fontsize=8)
 heat_map.set_xticklabels([mapping[m] for m in models], rotation=rotation_angle, fontsize=8)
 
-plt.savefig(f"./stats/matrix_{cmap}.png", bbox_inches='tight')
+plt.savefig(os.path.join(STATS_DIR, f"matrix_{cmap}.png"), bbox_inches='tight')
