@@ -105,6 +105,19 @@ def test_slurm_script_runs_every_task(script):
     assert commands == sorted((task.recipe, TASKS[task.name]) for task in ALL_TASKS)
 
 
+@pytest.mark.parametrize("script", ["run_all_slurm.sh", "run_all_jean_zay.sh"])
+def test_slurm_script_does_the_runs_of_the_benchmark(script):
+    """One job per run of each task for each model: when the job array is too small, runs are silently skipped."""
+    source = (REPO / script).read_text()
+    runs = int(re.search(r"^NBR_RUNS=(\d+)$", source, re.M).group(1))
+    assert runs == load_module("drbenchmark_protocol", REPO / "tools" / "protocol.py").NB_RUNS
+
+    # The script takes every line of `models.txt` as a model
+    models = (REPO / "models.txt").read_text().splitlines()
+    first, last = re.search(r"^#SBATCH --array=(\d+)-(\d+)%\d+", source, re.M).groups()
+    assert (int(first), int(last)) == (0, len(ALL_TASKS) * len(models) * runs - 1)
+
+
 def test_run_one_jean_zay_lists_every_task():
     """`run_one_jean_zay.sh` proposes one line per task, with the names `run.py` accepts."""
     script = (REPO / "run_one_jean_zay.sh").read_text()

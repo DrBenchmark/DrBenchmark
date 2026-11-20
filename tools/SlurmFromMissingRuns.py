@@ -6,6 +6,7 @@ import pandas as pd
 from liquid import parse
 
 from paths import REPO_DIR, STATS_DIR
+from protocol import NB_RUNS
 
 sys.path.append(REPO_DIR)
 from run import task2script
@@ -61,7 +62,10 @@ if __name__ == '__main__':
 
     def arguments():
         parser = argparse.ArgumentParser(
-            description='Run selected DrBenchmark\'s task on selected models.')
+            description='Write a script for SLURM that does the runs which are missing, for each task and each model '
+                        'of `stats/results.json`.')
+        parser.add_argument("--nb-run", type=int, required=False, default=NB_RUNS,
+                            help=f"Number of runs expected for each task and each model (default: {NB_RUNS}).")
         parser.add_argument("--jeanzay", action='store_true',
                             help="Use jean-zay's slurm variables.")
         parser.add_argument("--filter", type=str, nargs='+', required=False, default=[],
@@ -84,14 +88,15 @@ if __name__ == '__main__':
         columns='model dataset task fewshot metric score'.split()
     )
 
-    # Only keep 4 runs and compute score's mean
+    # Number of runs of each task for each model: the one of its metric that has the most scores
     nb_runs = df.groupby(['model', 'dataset', 'task', 'fewshot', 'metric'])['score'].apply(len)
     nb_runs = nb_runs.unstack(4).fillna(0).apply(max, axis=1)
     # Add all datasets and tasks
     all_models = df['model'].unique()
     dat_tasks = [e.split('-') for e in task2script]
     nb_runs = nb_runs.reindex([(m, d, t, '1.0') for m in all_models for d, t in dat_tasks]).fillna(0)
-    nb_runs = (4 - nb_runs[nb_runs < 4]).astype(int)
+    # Number of runs that are missing
+    nb_runs = (args.nb_run - nb_runs[nb_runs < args.nb_run]).astype(int)
     nb_runs = nb_runs.reset_index().drop_duplicates()
     JOBS = []
     for i, r in nb_runs.iterrows():

@@ -3,6 +3,7 @@ import json
 import pandas as pd
 
 from paths import STATS_DIR
+from protocol import NB_RUNS
 
 
 dataset2pretty = {
@@ -110,8 +111,8 @@ if __name__ == '__main__':
             "--results", type=str, required=False, default=os.path.join(STATS_DIR, "results.json"),
             help="Path to results.json (default: stats/results.json).")
         parser.add_argument(
-            "--nb-run", type=int, required=False, default=4,
-            help="Number of runs to use (default: 4). Methods with less than requested runs won't be shown.")
+            "--nb-run", type=int, required=False, default=NB_RUNS,
+            help=f"Number of runs to use (default: {NB_RUNS}). Methods with less than requested runs won't be shown.")
         parser.add_argument(
             "--csv", action="store_true",
             help="Write the benchmark in csv to stdout")

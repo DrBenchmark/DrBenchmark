@@ -10,7 +10,7 @@ import sys
 
 import pytest
 
-from helpers import ALL_TASKS, REPO, read_json, run_without_slurm
+from helpers import ALL_TASKS, REPO, load_module, read_json, run_without_slurm
 
 TOOLS = sorted(path.name for path in (REPO / "tools").glob("*.py"))
 
@@ -380,11 +380,68 @@ def test_slurm_from_missing_runs(slurm_from_missing_runs):
     assert (int(first), int(last)) == (0, len(jobs) - 1)
 
 
+def test_slurm_from_missing_runs_with_another_number_of_runs(slurm_from_missing_runs):
+    """`--nb-run` is the number of runs that each task must have."""
+    completed = slurm_from_missing_runs({"cas-pos": 4, "cas-cls": 1, "clister-regr": 2}, "--nb-run", "2")
+    assert completed.returncode == 0, completed.stderr[-3000:]
+
+    jobs = re.findall(r'^    "(cd recipes/\w+/scripts/ ; \./run\S*\.sh .+)"$', completed.stdout, re.M)
+    # Nothing for cas-pos and clister-regr, 1 run for cas-cls and 2 runs for each of the other tasks
+    assert len(jobs) == 1 + 2 * (len(ALL_TASKS) - 3)
+    assert jobs.count("cd recipes/cas/scripts/ ; ./run_task_2.sh Dr-BERT/DrBERT-7GB") == 1
+    assert "cd recipes/cas/scripts/ ; ./run_task_1.sh Dr-BERT/DrBERT-7GB" not in jobs
+    assert not any(job.startswith("cd recipes/clister/") for job in jobs)
+
+
 def test_slurm_from_missing_runs_without_missing_run(slurm_from_missing_runs):
     completed = slurm_from_missing_runs({task.name: 4 for task in ALL_TASKS})
     assert completed.returncode != 0
     assert completed.stdout == ""
     assert "No missing run" in completed.stderr
+
+
+def test_number_of_runs_is_checked(tmp_path):
+    """`CheckGetAllFour.py` lists the scores that do not come from the expected number of runs: 4, or `--nb-run`."""
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    copy_tools(repository)
+    (repository / "stats" / "results.json").write_text(json.dumps({
+        "some/model": {
+            "cas|pos|1.0": {"overall_f1": [0.5] * 4, "overall_accuracy": [0.5] * 4},
+            "cas|cls|1.0": {"macro_f1": [0.5] * 2, "weighted_f1": [0.5] * 2},
+        },
+        "another/model": {"cas|pos|1.0": {"overall_f1": [0.5] * 5, "overall_accuracy": [0.5] * 5}},
+    }))
+
+    def listed(*arguments):
+        completed = run_tool("CheckGetAllFour.py", repository, *arguments, cwd=tmp_path)
+        assert completed.returncode == 0, completed.stderr[-3000:]
+        # model  ->  dataset|task|fewshot  ->  metric  ->  number of runs
+        return [tuple(line.split("  ->  ")) for line in completed.stdout.splitlines()]
+
+    assert listed() == [
+        ("some/model", "cas|cls|1.0", "macro_f1", "2"), ("some/model", "cas|cls|1.0", "weighted_f1", "2"),
+        ("another/model", "cas|pos|1.0", "overall_f1", "5"), ("another/model", "cas|pos|1.0", "overall_accuracy", "5"),
+    ]
+    assert listed("--nb-run", "2") == [
+        ("some/model", "cas|pos|1.0", "overall_f1", "4"), ("some/model", "cas|pos|1.0", "overall_accuracy", "4"),
+        ("another/model", "cas|pos|1.0", "overall_f1", "5"), ("another/model", "cas|pos|1.0", "overall_accuracy", "5"),
+    ]
+    assert listed("--nb-run", "5") == [
+        ("some/model", "cas|pos|1.0", "overall_f1", "4"), ("some/model", "cas|pos|1.0", "overall_accuracy", "4"),
+        ("some/model", "cas|cls|1.0", "macro_f1", "2"), ("some/model", "cas|cls|1.0", "weighted_f1", "2"),
+    ]
+
+
+@pytest.mark.parametrize("tool", ["CheckGetAllFour.py", "SlurmFromMissingRuns.py", "ResultsToBenchmark.py"])
+def test_tools_expect_the_same_number_of_runs(tool):
+    """The number of runs of the benchmark is written once, in `tools/protocol.py`."""
+    if tool == "SlurmFromMissingRuns.py":
+        pytest.importorskip("liquid", reason="python-liquid is needed by tools/SlurmFromMissingRuns.py")
+    protocol = load_module("drbenchmark_protocol", REPO / "tools" / "protocol.py")
+    usage = subprocess.run([sys.executable, str(REPO / "tools" / tool), "--help"], capture_output=True, text=True, timeout=120)
+    assert usage.returncode == 0, usage.stderr[-3000:]
+    assert f"(default: {protocol.NB_RUNS})" in " ".join(usage.stdout.split())
 
 
 @pytest.mark.parametrize("arguments", [[], ["--jeanzay"]], ids=["slurm", "jean-zay"])
