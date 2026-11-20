@@ -32,11 +32,11 @@ except ModuleNotFoundError:
         return x
 
 # Hyper-parameters that the runs of a task do not have to share to be averaged: the seed is what
-# distinguishes them, and the others say where the files are, or name the model and the task
-# (the runs are averaged by model, task and proportion of the training set).
+# distinguishes them, and the others say where the files are, whether the model is kept, or name
+# the model and the task (the runs are averaged by model, task and proportion of the training set).
 NOT_COMPARED = {
     "seed", "config", "model_name", "hub_model_name", "output_dir", "run_dir", "data_dir", "offline",
-    "task", "subset", "dataset", "fewshot",
+    "task", "subset", "dataset", "fewshot", "keep_model",
 }
 # Where the models are saved for the offline mode, as the scripts of the recipes write it
 LOCAL_MODELS = '../../../models/'

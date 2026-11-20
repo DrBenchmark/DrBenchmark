@@ -176,9 +176,10 @@ def runs(tmp_path):
 
 
 def test_runs_trained_in_the_same_way_are_averaged(runs):
-    """The seed and the location of the files are what distinguishes the runs of a task."""
+    """The seed, the location of the files and what is kept of a run are what distinguishes the runs of a task."""
     runs.write_run("first", scores=(0.5, 0.25), seed=1, run_dir="../runs/", offline=True)
-    runs.write_run("second", scores=(1.0, 0.75), seed=2, run_dir="/somewhere/else/", offline=False)
+    # A run that did not keep its model: the first scripts always kept it, and did not say so
+    runs.write_run("second", scores=(1.0, 0.75), seed=2, run_dir="/somewhere/else/", offline=False, keep_model=False)
 
     completed = runs.collect_and_average_scores()
     assert completed.returncode == 0, completed.stderr[-3000:]

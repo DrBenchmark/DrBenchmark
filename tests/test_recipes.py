@@ -260,3 +260,17 @@ def test_card_of_a_kept_model(task_name, pipeline, dataset, run_recipe, tiny_ber
     directory = run_recipe(task_name, tiny_bert).result["model_name"]
     header = open(os.path.join(directory, "README.md"), encoding="utf-8").read().split("---\n")[1].splitlines()
     assert header[5:] == [f"pipeline_tag: {pipeline}", *dataset]
+
+
+def test_model_is_not_kept_when_it_is_asked(run_recipe, tiny_bert):
+    """`--keep_model false`: the run is the same one, with its results, without its model."""
+    kept = run_recipe("cas-pos", tiny_bert)
+    not_kept = run_recipe("cas-pos", tiny_bert, "--keep_model", "false")
+    result = not_kept.result
+
+    assert result["model_name"] is None
+    assert not (not_kept.directory / "save_models").exists() or list((not_kept.directory / "save_models").iterdir()) == []
+    assert (result["hyperparameters"]["keep_model"], kept.result["hyperparameters"]["keep_model"]) == (False, True)
+    # What the run computed does not depend on what is kept of it
+    assert result["metrics"] == kept.result["metrics"] and result["predictions"] == kept.result["predictions"]
+    assert os.path.isdir(kept.result["model_name"])

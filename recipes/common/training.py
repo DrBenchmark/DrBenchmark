@@ -445,14 +445,16 @@ python predict.py --model-dir <this directory> "..."
 def save_results(run, trainer, metrics, identifiers, real_labels, system_predictions):
     """Write the results of the run: they are read by `tools/CollectAndAverageScores.py`.
 
-    The best model is kept with what describes it.
+    The best model is kept with what describes it, or removed when the run was asked not to keep it.
     """
     best_model = run.model_path + "_best_model"
-    if run.task is not None:
+    if not run.args.keep_model:
+        shutil.rmtree(best_model, ignore_errors=True)
+    elif run.task is not None:
         describe_model(run, trainer, metrics, best_model)
     with open(run.path, 'w', encoding='utf-8') as f:
         json.dump({
-            "model_name": best_model,
+            "model_name": best_model if run.args.keep_model else None,
             "metrics": metrics,
             "hyperparameters": vars(run.args),
             "validation": validation_score(trainer),

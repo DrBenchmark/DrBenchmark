@@ -155,10 +155,14 @@ def read_run(path):
     # The error of a similarity score is the only score of the benchmark that is better when it is lower
     lower_is_better = metric == "rmse" if metric else any("eval_rmse" in entry for entry in state.get("log_history") or [])
 
-    # The run wrote the path from the directory of its script
-    model_dir, missing = os.path.normpath(os.path.join(scripts_dir, results["model_name"])), None
-    if not os.path.isfile(os.path.join(model_dir, "config.json")):
-        model_dir, missing = None, "not here"
+    model_dir, missing = None, None
+    if results.get("model_name") is None:
+        missing = "not kept (--keep_model false)"
+    else:
+        # The run wrote the path from the directory of its script
+        model_dir = os.path.normpath(os.path.join(scripts_dir, results["model_name"]))
+        if not os.path.isfile(os.path.join(model_dir, "config.json")):
+            model_dir, missing = None, "not here"
 
     return Run(
         path=path,
@@ -288,6 +292,7 @@ def chosen_run(task, model, seed=None):
         raise PredictError(
             f"No run of {task} for {model} kept its model:\n"
             + "\n".join(f"  seed {run.seed}: {run.missing} ({run.path})" for run in runs)
+            + "\nA run keeps its model unless it is given `--keep_model false`."
         )
     return run, runs
 

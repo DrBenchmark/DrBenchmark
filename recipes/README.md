@@ -63,7 +63,7 @@ The arguments given after the model (and after the subset, for the launchers tha
 
 Each run writes its metrics, its hyper-parameters, its predictions on the test set and the versions that computed it (Python, the libraries and the commit of the repository) in `runs/DrBenchmark-<task name>-<hash>.json`, and saves its best model in `save_models/DrBenchmark-<task name>-<hash>_best_model/`. The hash is the one of the arguments of the run, among which its seed. With `--seed`, a run whose results exist is not computed again; without it, a seed that was not used yet is drawn.
 
-The best model is saved with the names of its classes, with a description (`drbenchmark.json`) and with a model card (`README.md`): `predict.py` predicts with it on other data (see [Using a trained model](../README.md#using-a-trained-model)).
+The best model is saved with the names of its classes, with a description (`drbenchmark.json`) and with a model card (`README.md`): `predict.py` predicts with it on other data (see [Using a trained model](../README.md#using-a-trained-model)). `--keep_model false` does not keep it: the run is the same one, with the same name and the same results.
 
 ## The script of a task
 

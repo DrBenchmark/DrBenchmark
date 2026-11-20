@@ -295,6 +295,27 @@ def test_gradient_accumulation_needs_at_least_one_batch(value, parse):
         parse("cas-pos", "--gradient_accumulation_steps", value)
 
 
+@pytest.mark.parametrize("value, expected", [(None, True), ("true", True), ("false", False)])
+def test_model_of_a_run_is_kept_unless_it_is_asked_not_to(value, expected, parse):
+    args = parse("cas-pos", "--seed", "1", *(["--keep_model", value] if value else []))
+    assert args.keep_model is expected
+
+
+def test_what_is_kept_of_a_run_is_not_part_of_its_name(parse, utils, tmp_path):
+    """A run is the same one with or without its model: it is not computed twice."""
+    kept = parse("cas-pos", "--seed", "1", "--run_dir", f"{tmp_path}/")
+    not_kept = parse("cas-pos", "--seed", "1", "--run_dir", f"{tmp_path}/", "--keep_model", "false")
+    assert kept.keep_model != not_kept.keep_model
+    assert utils.create_run_name(kept) == utils.create_run_name(not_kept)
+    assert utils.get_run_path(kept) == utils.get_run_path(not_kept)
+
+    # Once it was computed without its model, it is not computed again to keep it
+    open(utils.get_run_path(not_kept), "w").close()
+    with pytest.raises(SystemExit) as exit_info:
+        parse("cas-pos", "--seed", "1", "--run_dir", f"{tmp_path}/")
+    assert exit_info.value.code == 0
+
+
 def test_name_of_a_run_is_stable(parse, utils):
     """An unchanged configuration keeps the name of its run from one version of the code to the next.
 

@@ -17,8 +17,9 @@ subset2task_detail = {
 }
 
 
-# Arguments that do not take part in the name of a run: they describe it, without changing what it computes
-NOT_IN_RUN_NAME = ("hub_model_name",)
+# Arguments that do not take part in the name of a run: they describe it, or say what is kept of it,
+# without changing what it computes
+NOT_IN_RUN_NAME = ("hub_model_name", "keep_model")
 
 # `run.py` gives, in this variable of the environment, the path of a file where the run it starts
 # writes what it did: it counts this way the runs that it did not have to compute again
@@ -172,6 +173,9 @@ def add_arguments(parser, but=()):
         help="For debugging purposes or quicker training, truncate the number of validation examples to this value if set.")
     add("--max_test_samples", type=int, required=False,
         help="For debugging purposes or quicker evaluation, truncate the number of test examples to this value if set.")
+    add("--keep_model", type=str2bool, required=False, metavar="{true,false}",
+        help="Keep the best model of the run, to predict with it later (default: true). With false, only "
+             "the results of the run are kept: its scores and its predictions on the test set.")
 
     return names
 
@@ -202,6 +206,10 @@ def parse_args():
     # Overwrite local and global with command line arguments (which allow precise param changing)
     #  and fills missing arguments with default values
     args.update({k: v for k, v in args_cli.items() if v is not None or k not in args})
+
+    # The best model of a run is kept unless it is said not to be
+    if args['keep_model'] is None:
+        args['keep_model'] = True
 
     # Without gradient accumulation, the weights are updated after each batch
     if args['gradient_accumulation_steps'] is None:

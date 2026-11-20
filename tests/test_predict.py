@@ -18,7 +18,7 @@ import types
 import pytest
 
 import synthetic
-from helpers import ALL_TASKS, RECIPES, REPO, Task, load_module, read_json, run_command
+from helpers import ALL_TASKS, RECIPES, REPO, Task, copy_tools, load_module, read_json, run_command, run_tool
 
 MODEL = "Some-Org/Some-Model"
 
@@ -91,9 +91,9 @@ class Runs:
               metrics=None, recent=True, offline=False):
         """Write the results of a run, and the model that it kept.
 
-        `kept`: True when the model is there, False when it was removed since. A run which
-        is not `recent` was written by the scripts that did not say which score of the
-        validation set chose its checkpoint.
+        `kept`: True when the model is there, False when it was removed since, None when
+        the run did not keep it. A run which is not `recent` was written by the scripts that
+        did not say which score of the validation set chose its checkpoint.
         """
         recipe = self.recipes / task.split("-")[0]
         for name in ("runs", "scripts", "save_models"):
@@ -105,7 +105,7 @@ class Runs:
         local_copy = f"../../../models/{model.lower().replace('/', '_')}"
         results = {
             # A run writes the path from the directory of its script
-            "model_name": f"../save_models/{name}_best_model",
+            "model_name": None if kept is None else f"../save_models/{name}_best_model",
             "metrics": metrics or {"overall_f1": 0.75, "overall_accuracy": 0.875},
             "hyperparameters": {
                 "task": task, "seed": seed, "fewshot": fewshot, "max_position_embeddings": 512,
@@ -171,8 +171,10 @@ def test_model_of_a_run_is_found_by_its_name_on_the_hub(recent, offline, runs, p
 
 
 def test_model_which_is_not_there(runs, predict):
+    runs.write(seed=0, kept=None)
     runs.write(seed=1, kept=False)
-    [removed] = predict.read_runs()
+    not_kept, removed = predict.read_runs()
+    assert (not_kept.model_dir, not_kept.missing) == (None, "not kept (--keep_model false)")
     assert (removed.model_dir, removed.missing) == (None, "not here")
 
 
@@ -182,6 +184,7 @@ def test_best_run_is_the_best_one_on_the_validation_set(runs, predict):
     runs.write(seed=2, validation=0.625)
     # A run that is better, but whose model is not there, or which read a part of the training set
     runs.write(seed=3, validation=0.875, kept=False)
+    runs.write(seed=4, validation=0.9375, kept=None)
     runs.write(seed=5, validation=0.96875, fewshot=0.5)
     assert predict.best_run(predict.read_runs()).path == str(best)
 
@@ -216,6 +219,7 @@ def test_no_best_run_without_a_kept_model(runs, predict):
 def test_list_of_the_runs(runs, predict):
     runs.write(seed=0, validation=0.5)
     runs.write(seed=1, validation=0.75)
+    runs.write(seed=2, validation=0.875, kept=None)
     runs.write(seed=3, validation=0.9, kept=False)
     runs.write(task="clister-regr", seed=0, validation=1.5, metric="rmse", recent=False,
                metrics={"EDRM": 0.5, "spearman_correlation_coef": 0.25, "spearman_correlation_p": 0.01})
@@ -229,6 +233,7 @@ def test_list_of_the_runs(runs, predict):
         ["cas-cls", MODEL, "0", "0.2500 (accuracy)", "macro_f1 0.1250, weighted_f1 0.3750", "yes, taken"],
         ["cas-pos", MODEL, "0", "0.5000 (f1)", "f1 0.7500, accuracy 0.8750", "yes"],
         ["cas-pos", MODEL, "1", "0.7500 (f1)", "f1 0.7500, accuracy 0.8750", "yes, taken"],
+        ["cas-pos", MODEL, "2", "0.8750 (f1)", "f1 0.7500, accuracy 0.8750", "not kept (--keep_model false)"],
         ["cas-pos", MODEL, "3", "0.9000 (f1)", "f1 0.7500, accuracy 0.8750", "not here"],
         # The first scripts did not write the name of the score of the validation set
         ["clister-regr", MODEL, "0", "1.5000", "edrm 0.5000, spearman 0.2500", "yes, taken"],
@@ -283,10 +288,16 @@ def test_no_run_for_the_model(runs, predict):
 
 
 def test_no_run_kept_its_model(runs, predict):
+    not_kept = runs.write(seed=0, kept=None)
     removed = runs.write(seed=1, kept=False)
     with pytest.raises(predict.PredictError) as error:
         predict.chosen_run("cas-pos", MODEL)
-    assert str(error.value) == f"No run of cas-pos for {MODEL} kept its model:\n  seed 1: not here ({removed})"
+    assert str(error.value) == (
+        f"No run of cas-pos for {MODEL} kept its model:\n"
+        f"  seed 0: not kept (--keep_model false) ({not_kept})\n"
+        f"  seed 1: not here ({removed})\n"
+        "A run keeps its model unless it is given `--keep_model false`."
+    )
 
 
 def test_runs_on_a_part_of_the_training_set_are_not_used(runs, predict):
@@ -728,3 +739,90 @@ def test_directory_of_a_kept_model_is_enough(trained_repository, tiny_bert, tmp_
     completed = run_predict(trained_repository, "--model-dir", moved, "--task", "cas-cls", "le patient présente une douleur", cwd=tmp_path)
     assert completed.returncode == 0, completed.stderr[-3000:]
     assert completed.stdout.strip() in synthetic.NEGATION_CLASSES
+
+
+# ---------------------------------------------------------------------------------------------
+# The models that are kept after the runs: tools/RemoveKeptModels.py
+# ---------------------------------------------------------------------------------------------
+
+@pytest.fixture
+def kept_models(tmp_path):
+    """A copy of the layout of the repository with the tools, and runs that kept their models."""
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    copy_tools(repository)
+    runs = Runs(repository / "recipes")
+    paths = {
+        "first": runs.write(seed=0, validation=0.5),
+        "best": runs.write(seed=1, validation=0.75),
+        "few-shot": runs.write(seed=2, validation=0.875, fewshot=0.25),
+        "not kept": runs.write(seed=3, validation=0.9, kept=None),
+        "other task": runs.write(task="cas-cls", seed=0),
+        "other model": runs.write(seed=0, model="another/model"),
+    }
+    for path in paths.values():
+        if runs.model_dir(path).is_dir():
+            (runs.model_dir(path) / "model.safetensors").write_bytes(b"0" * 1500)
+    return repository, runs, paths
+
+
+def models_there(runs, paths):
+    return sorted(name for name, path in paths.items() if runs.model_dir(path).is_dir())
+
+
+def test_models_that_predict_py_does_not_take_are_listed(kept_models, tmp_path):
+    repository, runs, paths = kept_models
+    completed = run_tool("RemoveKeptModels.py", repository, cwd=tmp_path)
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    assert completed.stdout.splitlines() == [
+        f"{runs.model_dir(paths['first'])}  1.5 kB  (cas-pos, {MODEL}, seed 0)",
+        f"{runs.model_dir(paths['few-shot'])}  1.5 kB  (cas-pos, {MODEL}, seed 2, 0.25 of the training set)",
+        "2 models to remove, 3.0 kB: 3 models stay. Nothing was removed: give --remove to remove them.",
+    ]
+    # Nothing is removed without being asked
+    assert models_there(runs, paths) == ["best", "few-shot", "first", "other model", "other task"]
+
+
+def test_models_that_predict_py_does_not_take_are_removed(kept_models, tmp_path, predict, monkeypatch):
+    repository, runs, paths = kept_models
+    completed = run_tool("RemoveKeptModels.py", repository, "--remove", cwd=tmp_path)
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    assert completed.stdout.splitlines()[-1] == "2 models removed, 3.0 kB: 3 models stay."
+    assert models_there(runs, paths) == ["best", "other model", "other task"]
+    # The results of the runs are left
+    assert all(path.is_file() for path in paths.values())
+
+    # The model that `predict.py` takes is the same one, and nothing else is to remove
+    monkeypatch.setattr(predict, "RECIPES_DIR", str(repository / "recipes"))
+    assert predict.chosen_run("cas-pos", MODEL)[0].path == str(paths["best"])
+    again = run_tool("RemoveKeptModels.py", repository, "--remove", cwd=tmp_path)
+    assert again.stdout.splitlines() == ["No model to remove: 3 models stay."]
+
+
+def test_only_the_directories_that_the_runs_save_are_removed(kept_models, tmp_path):
+    """Results that give another directory for their model, e.g. the model that was fine-tuned: it is left."""
+    repository, runs, paths = kept_models
+    other = repository / "models" / "some-org_some-model"
+    other.mkdir(parents=True)
+    (other / "config.json").write_text("{}")
+    results = read_json(paths["first"])
+    results["model_name"] = "../../../models/some-org_some-model"
+    paths["first"].write_text(json.dumps(results))
+
+    completed = run_tool("RemoveKeptModels.py", repository, "--all", "--remove", cwd=tmp_path)
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    assert completed.stdout.splitlines()[-1] == "4 models removed, 6.0 kB: 0 models stay."
+    assert (other / "config.json").is_file()
+    # The model that the run really saved was not named by its results any more
+    assert models_there(runs, paths) == ["first"]
+
+
+def test_every_model_of_a_task_is_removed_when_it_is_asked(kept_models, tmp_path):
+    repository, runs, paths = kept_models
+    completed = run_tool("RemoveKeptModels.py", repository, "--task", "cas-pos", "--model", MODEL, "--all", "--remove", cwd=tmp_path)
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    assert completed.stdout.splitlines()[-1] == "3 models removed, 4.5 kB: 0 models stay."
+    assert models_there(runs, paths) == ["other model", "other task"]
+
+    completed = run_tool("RemoveKeptModels.py", repository, "--task", "cas-cls", cwd=tmp_path)
+    assert completed.stdout.splitlines() == ["No model to remove: 1 model stays."]

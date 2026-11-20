@@ -21,6 +21,7 @@ python tools/CollectAndAverageScores.py --help
 | [BuildLatexTableOfScores.py](./BuildLatexTableOfScores.py)               | Builds the LaTeX table of the scores                                      | printed                                                                                       |
 | [PlotFewShotScores.py](./PlotFewShotScores.py)                           | Draws the scores for each proportion of the training set                  | `stats/fewshot/<corpus>@<task>.pdf`                                                           |
 | [ShowPredictionErrors.py](./ShowPredictionErrors.py)                     | Shows the test examples that a run got wrong, and the classes it confused | printed                                                                                       |
+| [RemoveKeptModels.py](./RemoveKeptModels.py)                             | Removes models that the runs kept, to free disk space                     | printed                                                                                       |
 | [ProbeBiasesWithMaskFilling.py](./ProbeBiasesWithMaskFilling.py)         | Lists the words the models predict about groups of patients               | `stats/bias.json`, `stats/bias.tex`                                                           |
 | [MeasureVocabularyOverlap.py](./MeasureVocabularyOverlap.py)             | Measures how much the vocabularies of the models overlap                  | `stats/matrix.txt`, `stats/matrix_Blues.png`                                                  |
 | [CountSubwordsPerWord.py](./CountSubwordsPerWord.py)                     | Counts the sub-word tokens per word of each dataset, for each model       | `stats/tokens.json`, LaTeX rows printed                                                       |
@@ -110,6 +111,18 @@ The run is the one of a task for a model on the whole training set, with the low
 - the examples with an error (`--max-examples`, 20 by default), with what was expected and what was predicted. A sentence of a tagging task is shown with its wrong words: `toux [B-NOM -> B-ADJ]`. The other tasks show the texts of the example, cut at 300 characters (`--max-length`).
 
 A similarity score has no class: the examples are the ones whose predicted score is the farthest from the expected one.
+
+### RemoveKeptModels.py
+
+Removes models that the runs kept, to free disk space. Each run keeps its best model in `recipes/<recipe>/save_models/`: about 440 MB for a model of the size of BERT base. To predict for a task with a fine-tuned model, [predict.py](../predict.py) takes one of them: the model of the run with the best score on the validation set, among the runs on the whole training set. `python predict.py --list` shows which one.
+
+```bash
+python tools/RemoveKeptModels.py             # lists the models that predict.py does not take, and their size
+python tools/RemoveKeptModels.py --remove    # removes them
+python tools/RemoveKeptModels.py --task cas-cls --all --remove    # removes every kept model of a task
+```
+
+Nothing is removed without `--remove`. `--task` and `--model` say which runs are concerned, and `--all` removes the models that `predict.py` takes too. The results of the runs are not touched: their scores and their predictions stay, and `predict.py --list` shows that their model is not here. A run does not keep its model at all when it is given `--keep_model false`.
 
 ## Analyses of the models and of the datasets
 

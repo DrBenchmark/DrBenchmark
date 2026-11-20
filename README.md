@@ -100,6 +100,11 @@ Une [femme de 44 ans]/LIVB était hospitalisée pour une [toux sèche]/DISO .
 
 **Words**: for the tasks that read the words of a sentence, the sentence is split as most datasets of the benchmark are: the punctuation is apart, and `l'examen` gives `l'` and `examen`. With `--words`, the sentence is only split at its spaces: its words are given as they are.
 
+**Which models are kept**: a model of the size of BERT base takes about 440 MB, and every run keeps one.
+
+- `--keep_model false`, given to `run.py` or to a launcher, does not keep the model of a run: only its results stay. It is the same run, with the same name: to get its model later, remove its results file and run it again.
+- `python tools/RemoveKeptModels.py` lists the kept models that `predict.py` does not take (for each task and each fine-tuned model, all but the one of the best run), and removes them with `--remove`: see [tools/README.md](./tools/README.md).
+
 **What is kept with a model**: the names of its classes, in its `config.json`, a description for programs, `drbenchmark.json` (task, model that was fine-tuned, seed, hyper-parameters, scores, script that builds what the model reads), and the same as a model card, `README.md`. The directory is enough to predict (`--model-dir`), and can be published on the HuggingFace Hub as it is, e.g. with `huggingface-cli upload <your name>/<name of the model> <directory>`. Outside this repository a model is given the text as it is typed, without what the script of its task does to it (the stop words that DiaMED removes, the texts that other tasks join): `predict.py` is what gives a model what it was trained on.
 
 **Models kept before `predict.py` existed**: the ones of the tasks that label words, of the similarity tasks and of `frenchmedmcqa-mcqa` predict as the recent ones. The classification models were saved without the names of their classes: a class is shown as `LABEL_<number>`. A directory given with `--model-dir` needs its task (`--task`).
