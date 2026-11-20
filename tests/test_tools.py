@@ -5,9 +5,11 @@ import json
 import os
 import re
 import shutil
+import statistics
 import subprocess
 import sys
 
+import pandas
 import pytest
 
 from helpers import ALL_TASKS, REPO, copy_tools, load_module, read_json, run_tool, run_without_slurm
@@ -185,6 +187,64 @@ def test_runs_trained_in_the_same_way_are_averaged(runs):
     }
     averages = read_json(runs.stats / "overall_averaged_metrics.json")
     assert averages["some/model"]["morfitt|cls|1.0"] == {"macro_f1": 0.75, "weighted_f1": 0.5}
+
+
+def test_standard_deviation_of_the_runs(runs):
+    """The scores of the runs of a task are averaged: their standard deviation says how much they differ."""
+    macro, weighted = [0.5, 0.75, 0.25, 1.0], [0.25, 0.5, 0.5, 0.25]
+    for seed, scores in enumerate(zip(macro, weighted)):
+        runs.write_run(f"seed_{seed}", scores=scores, seed=seed)
+    # A task that has one run has no standard deviation
+    runs.write_run("alone", task="deft2021-cls", scores=(0.5, 0.25))
+
+    completed = runs.collect_and_average_scores()
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    deviations = read_json(runs.stats / "overall_std_metrics.json")
+    # The one of a sample: n - 1
+    expected = {"macro_f1": statistics.stdev(macro), "weighted_f1": statistics.stdev(weighted)}
+    assert deviations["some/model"]["morfitt|cls|1.0"] == pytest.approx(expected)
+    assert deviations["some/model"]["deft2021|cls|1.0"] == {"macro_f1": None, "weighted_f1": None}
+    # The averages are the ones of the same tasks
+    assert {model: set(tasks) for model, tasks in deviations.items()} == {
+        model: set(tasks) for model, tasks in read_json(runs.stats / "overall_averaged_metrics.json").items()
+    }
+    average, deviation = round(100 * statistics.mean(weighted), 2), round(100 * expected["weighted_f1"], 2)
+
+    # The table of the benchmark: the score of a classification task is its weighted F1
+    def table(*arguments):
+        completed = run_tool("BuildExcelTableOfScores.py", runs.repository, *arguments, cwd=runs.elsewhere)
+        assert completed.returncode == 0, completed.stderr[-3000:]
+        return completed.stdout.splitlines()
+
+    lines = table("--csv")
+    assert lines[0] == "dataset,task,metric,some/model"
+    assert f"MorFITT,Multi-Label CLS,wF1,{average}" in lines
+    lines = table("--csv", "--std")
+    assert lines[0] == "dataset,task,metric,some/model,some/model (std)"
+    assert f"MorFITT,Multi-Label CLS,wF1,{average},{deviation}" in lines
+
+    # The Excel file: the averages in its first sheet, as before, and the standard deviations in a second one
+    table()
+    sheets = pandas.read_excel(runs.stats / "overall_results_4runs.xlsx", sheet_name=None)
+    assert list(sheets) == ["Sheet1", "std"]
+    for name, value in (("Sheet1", average), ("std", deviation)):
+        (row,) = [row for _, row in sheets[name].iterrows() if row["dataset"] == "MorFITT"]
+        assert row["some/model"] == pytest.approx(value)
+    # The task that has less than 4 runs is not in the table
+    assert all(sheets["Sheet1"]["some/model"].isna() == (sheets["Sheet1"]["dataset"] != "MorFITT"))
+
+    # The LaTeX table
+    def latex(*arguments):
+        completed = run_tool("BuildLatexTableOfScores.py", runs.repository, "--models", "some/model", *arguments, cwd=runs.elsewhere)
+        assert completed.returncode == 0, completed.stderr[-3000:]
+        return completed.stdout
+
+    assert f"& CLS & {average} \\\\" in latex()
+    with_deviations = latex("--std")
+    assert f"& CLS & {average} {{\\scriptsize $\\pm$ {deviation}}} \\\\" in with_deviations
+    # No standard deviation for the task that has one run
+    assert "& CLS & 25.0 \\\\" in with_deviations
+    assert latex("--std", str(runs.stats / "overall_std_metrics.json")) == with_deviations
 
 
 def test_versions_that_differ_between_the_runs_are_listed(runs):

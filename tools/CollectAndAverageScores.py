@@ -1,7 +1,8 @@
 """Collect the scores of the runs of every task, and average them.
 
 The runs are read in `recipes/<recipe>/runs/`. The scores are written in
-`stats/results.json`, and their averages in `stats/overall_averaged_metrics.json`.
+`stats/results.json`, their averages in `stats/overall_averaged_metrics.json` and their
+standard deviations in `stats/overall_std_metrics.json`.
 
 The runs of a task are averaged for each model: they have to be trained in the same
 way. When they are not, nothing is written and the runs that differ are listed.
@@ -17,6 +18,7 @@ import os
 import sys
 import json
 import argparse
+import statistics
 from glob import glob
 from collections import Counter, defaultdict
 
@@ -219,6 +221,11 @@ def different_versions(environments):
     return "\n".join(["The runs were not all computed with the same versions:", *lines])
 
 
+def standard_deviation(values):
+    """Standard deviation of the scores of the runs of a task: the one of a sample (n - 1), None for one run."""
+    return statistics.stdev(values) if len(values) > 1 else None
+
+
 def arguments():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
@@ -285,6 +292,7 @@ if __name__ == '__main__':
     print("Averaging runs...")
     # avg_results = {}
     avg_results = defaultdict(lambda: defaultdict(dict))
+    std_results = defaultdict(lambda: defaultdict(dict))
     for model in results:
         for task in results[model]:
             if not task.endswith("|1.0"):
@@ -293,7 +301,12 @@ if __name__ == '__main__':
             for metric, values in results[model][task].items():
                 avg = sum(values) / len(values)
                 avg_results[model][task][metric] = avg
+                std_results[model][task][metric] = standard_deviation(values)
 
     print('Dumping to stats/overall_averaged_metrics.json')
     with open(os.path.join(STATS_DIR, "overall_averaged_metrics.json"), 'w') as f:
         json.dump(avg_results, f, indent=4)
+
+    print('Dumping to stats/overall_std_metrics.json')
+    with open(os.path.join(STATS_DIR, "overall_std_metrics.json"), 'w') as f:
+        json.dump(std_results, f, indent=4)

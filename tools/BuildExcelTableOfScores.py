@@ -106,7 +106,8 @@ if __name__ == '__main__':
     def arguments():
         import argparse
         parser = argparse.ArgumentParser(
-            description='Outputs a benchmark to "stats/overall_results.xlsx".')
+            description='Outputs a benchmark to "stats/overall_results_<n>runs.xlsx": the average of the runs of each '
+                        'task for each model and, in a second sheet, their standard deviation.')
         parser.add_argument(
             "--results", type=str, required=False, default=os.path.join(STATS_DIR, "results.json"),
             help="Path to results.json (default: stats/results.json).")
@@ -116,6 +117,9 @@ if __name__ == '__main__':
         parser.add_argument(
             "--csv", action="store_true",
             help="Write the benchmark in csv to stdout")
+        parser.add_argument(
+            "--std", action="store_true",
+            help="With --csv, write the standard deviation of the runs in a column after the average of each model.")
         args = parser.parse_args()
 
         return args
@@ -149,24 +153,41 @@ if __name__ == '__main__':
     df = df[nb_runs >= args.nb_run]
 
     logging.info(f"Randomly choosing only {args.nb_run} runs if more are available...")
-    df = df.groupby(['model', 'dataset', 'task', 'fewshot', 'metric'])['score'].apply(lambda x: x.sample(n=args.nb_run, random_state=42).mean())
+    scores = df.groupby(['model', 'dataset', 'task', 'fewshot', 'metric'])['score']
+    # The runs that are chosen are the same ones for the average and for the standard deviation,
+    # which is the one of a sample (n - 1): there is none for one run
+    averages = scores.apply(lambda x: x.sample(n=args.nb_run, random_state=42).mean())
+    deviations = scores.apply(lambda x: x.sample(n=args.nb_run, random_state=42).std())
 
-    # Pretty table
-    # Reorder lines and select metrics
-    df = df.unstack([0, 3])
-    df = df.reindex(index=order)
-    df = df.reset_index()
+    def table(df):
+        """One row per score of the benchmark, and one column per model."""
+        # Pretty table
+        # Reorder lines and select metrics
+        df = df.unstack([0, 3])
+        df = df.reindex(index=order)
+        df = df.reset_index()
 
-    # Remove few-shot colums
-    df.columns = df.columns.droplevel(1)
-    df = df.round(2)
-    df['task'] = df['task'].map(task2pretty.get)
-    df['dataset'] = df['dataset'].map(dataset2pretty.get)
-    df['metric'] = df['metric'].map(metric2pretty.get)
-    df = df.set_index(['dataset', 'task', 'metric'])
+        # Remove few-shot colums
+        df.columns = df.columns.droplevel(1)
+        df = df.round(2)
+        df['task'] = df['task'].map(task2pretty.get)
+        df['dataset'] = df['dataset'].map(dataset2pretty.get)
+        df['metric'] = df['metric'].map(metric2pretty.get)
+        return df.set_index(['dataset', 'task', 'metric'])
+
+    df = table(averages)
+    std = table(deviations)
     if args.csv:
+        if args.std:
+            # The standard deviation of a model follows its average: the columns are taken by their
+            # position, as several ones have the name of a model when it has few-shot runs
+            both = pd.concat([df, std.add_suffix(" (std)")], axis=1)
+            df = both.iloc[:, [column for model in range(df.shape[1]) for column in (model, df.shape[1] + model)]]
         print(df.to_csv())
     else:
         output_file = os.path.join(STATS_DIR, f'overall_results_{args.nb_run}runs.xlsx')
         logging.info(f"Dumping to {output_file}...")
-        df.to_excel(output_file)
+        with pd.ExcelWriter(output_file) as writer:
+            # The first sheet is the table as it always was
+            df.to_excel(writer, sheet_name="Sheet1")
+            std.to_excel(writer, sheet_name="std")

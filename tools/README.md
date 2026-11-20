@@ -12,19 +12,19 @@ python tools/CollectAndAverageScores.py --help
 - Every tool describes itself and its options with `--help`.
 - Their dependencies are in `requirements.txt` (`openpyxl`, `seaborn` and `python-liquid` are only used here).
 
-| Tool                                                                     | What it does                                                        | Writes                                                              |
-|:-------------------------------------------------------------------------|:--------------------------------------------------------------------|:--------------------------------------------------------------------|
-| [CollectAndAverageScores.py](./CollectAndAverageScores.py)               | Collects and averages the scores of the runs                        | `stats/results.json`, `stats/overall_averaged_metrics.json`         |
-| [CheckNumberOfRuns.py](./CheckNumberOfRuns.py)                           | Lists the tasks that do not have the expected number of runs        | printed                                                             |
-| [WriteSlurmScriptForMissingRuns.py](./WriteSlurmScriptForMissingRuns.py) | Writes a script for SLURM that does the missing runs                | printed                                                             |
-| [BuildExcelTableOfScores.py](./BuildExcelTableOfScores.py)               | Builds the table of the benchmark                                   | `stats/overall_results_<n>runs.xlsx`, or CSV printed                |
-| [BuildLatexTableOfScores.py](./BuildLatexTableOfScores.py)               | Builds the LaTeX table of the scores                                | printed                                                             |
-| [PlotFewShotScores.py](./PlotFewShotScores.py)                           | Draws the scores for each proportion of the training set            | `stats/fewshot/<corpus>@<task>.pdf`                                 |
-| [ProbeBiasesWithMaskFilling.py](./ProbeBiasesWithMaskFilling.py)         | Lists the words the models predict about groups of patients         | `stats/bias.json`, `stats/bias.tex`                                 |
-| [MeasureVocabularyOverlap.py](./MeasureVocabularyOverlap.py)             | Measures how much the vocabularies of the models overlap            | `stats/matrix.txt`, `stats/matrix_Blues.png`                        |
-| [CountSubwordsPerWord.py](./CountSubwordsPerWord.py)                     | Counts the sub-word tokens per word of each dataset, for each model | `stats/tokens.json`, LaTeX rows printed                             |
-| [TokenizeBiomedicalTerms.py](./TokenizeBiomedicalTerms.py)               | Shows how the models split some biomedical terms                    | printed                                                             |
-| [CountClassesOfDatasets.py](./CountClassesOfDatasets.py)                 | Counts and draws the classes of each dataset                        | `stats/classes_distribution.json`, `stats/distributions/<task>.png` |
+| Tool                                                                     | What it does                                                              | Writes                                                                                        |
+|:-------------------------------------------------------------------------|:--------------------------------------------------------------------------|:----------------------------------------------------------------------------------------------|
+| [CollectAndAverageScores.py](./CollectAndAverageScores.py)               | Collects and averages the scores of the runs                              | `stats/results.json`, `stats/overall_averaged_metrics.json`, `stats/overall_std_metrics.json` |
+| [CheckNumberOfRuns.py](./CheckNumberOfRuns.py)                           | Lists the tasks that do not have the expected number of runs              | printed                                                                                       |
+| [WriteSlurmScriptForMissingRuns.py](./WriteSlurmScriptForMissingRuns.py) | Writes a script for SLURM that does the missing runs                      | printed                                                                                       |
+| [BuildExcelTableOfScores.py](./BuildExcelTableOfScores.py)               | Builds the table of the benchmark                                         | `stats/overall_results_<n>runs.xlsx`, or CSV printed                                          |
+| [BuildLatexTableOfScores.py](./BuildLatexTableOfScores.py)               | Builds the LaTeX table of the scores                                      | printed                                                                                       |
+| [PlotFewShotScores.py](./PlotFewShotScores.py)                           | Draws the scores for each proportion of the training set                  | `stats/fewshot/<corpus>@<task>.pdf`                                                           |
+| [ProbeBiasesWithMaskFilling.py](./ProbeBiasesWithMaskFilling.py)         | Lists the words the models predict about groups of patients               | `stats/bias.json`, `stats/bias.tex`                                                           |
+| [MeasureVocabularyOverlap.py](./MeasureVocabularyOverlap.py)             | Measures how much the vocabularies of the models overlap                  | `stats/matrix.txt`, `stats/matrix_Blues.png`                                                  |
+| [CountSubwordsPerWord.py](./CountSubwordsPerWord.py)                     | Counts the sub-word tokens per word of each dataset, for each model       | `stats/tokens.json`, LaTeX rows printed                                                       |
+| [TokenizeBiomedicalTerms.py](./TokenizeBiomedicalTerms.py)               | Shows how the models split some biomedical terms                          | printed                                                                                       |
+| [CountClassesOfDatasets.py](./CountClassesOfDatasets.py)                 | Counts and draws the classes of each dataset                              | `stats/classes_distribution.json`, `stats/distributions/<task>.png`                           |
 
 ## From the runs to the tables
 
@@ -41,7 +41,8 @@ python tools/BuildExcelTableOfScores.py    # stats/overall_results_4runs.xlsx
 Reads every run of every recipe and writes:
 
 - `stats/results.json`: the scores of each run, by model, then by `<corpus>|<task>|<proportion of the training set>`, then by metric;
-- `stats/overall_averaged_metrics.json`: their averages, for the runs on the whole training set.
+- `stats/overall_averaged_metrics.json`: their averages, for the runs on the whole training set;
+- `stats/overall_std_metrics.json`: their standard deviations (the ones of a sample, n - 1), which are `null` for one run.
 
 The scores that are kept depend on the kind of task:
 
@@ -83,11 +84,11 @@ sbatch missing_runs.sh
 
 ### BuildExcelTableOfScores.py
 
-Builds the table of the benchmark: one column per model and one row per score of each task but DEFT-2019, with the average of 4 runs (`--nb-run`). The score is the F1 of the task (`overall_f1` or `weighted_f1`); the question answering and the similarity tasks have two rows, for their two scores. A model that has fewer runs on a task has no score for it; when it has more, 4 of them are drawn, always the same ones. The table is written in `stats/overall_results_<n>runs.xlsx`, or printed in CSV with `--csv`. `--results` gives another file than `stats/results.json`.
+Builds the table of the benchmark: one column per model and one row per score of each task but DEFT-2019, with the average of 4 runs (`--nb-run`). The score is the F1 of the task (`overall_f1` or `weighted_f1`); the question answering and the similarity tasks have two rows, for their two scores. A model that has fewer runs on a task has no score for it; when it has more, 4 of them are drawn, always the same ones. The table is written in `stats/overall_results_<n>runs.xlsx`, or printed in CSV with `--csv`. `--results` gives another file than `stats/results.json`. The standard deviations of the same runs are in the second sheet of the Excel file, `std`, and with `--csv --std` in a column after the average of each model.
 
 ### BuildLatexTableOfScores.py
 
-Prints the LaTeX table of the averaged scores (`stats/overall_averaged_metrics.json`, or `--results`): one row per task of the first model, one column per model of `models.txt`, or of `--models`, in that order.
+Prints the LaTeX table of the averaged scores (`stats/overall_averaged_metrics.json`, or `--results`): one row per task of the first model, one column per model of `models.txt`, or of `--models`, in that order. With `--std`, each score is followed by the standard deviation of its runs (`85.12 ± 0.34`), read in `stats/overall_std_metrics.json` or in the file given after `--std`.
 
 ### PlotFewShotScores.py
 

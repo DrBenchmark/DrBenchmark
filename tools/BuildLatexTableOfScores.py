@@ -2,6 +2,7 @@
 
 The scores are the averages over the runs, read in `stats/overall_averaged_metrics.json`,
 which `CollectAndAverageScores.py` writes. The tasks of the table are the ones of the first model.
+With `--std`, each score is followed by the standard deviation of the runs.
 """
 
 import os
@@ -35,7 +36,23 @@ def arguments():
                         help="Models of the table, in the order of its columns (default: the models of models.txt).")
     parser.add_argument("--results", type=str, required=False, default=os.path.join(STATS_DIR, "overall_averaged_metrics.json"),
                         help="Path to the averaged scores (default: stats/overall_averaged_metrics.json).")
+    parser.add_argument("--std", type=str, nargs='?', required=False, default=None, metavar="PATH",
+                        const=os.path.join(STATS_DIR, "overall_std_metrics.json"),
+                        help="Write the standard deviation of the runs after each score. It is read in PATH "
+                             "(default: stats/overall_std_metrics.json).")
     return parser.parse_args()
+
+
+def score(data, deviations, model, task, metric, scale=1):
+    """A score of the table, followed by its standard deviation when the deviations are given.
+
+    There is no standard deviation for a task that has one run.
+    """
+    text = f"{round(data[model][task][metric] * scale, 2)}"
+    deviation = (deviations or {}).get(model, {}).get(task, {}).get(metric)
+    if deviation is not None:
+        text += " {\\scriptsize $\\pm$ " + f"{round(deviation * scale, 2)}" + "}"
+    return text
 
 
 def main():
@@ -43,6 +60,10 @@ def main():
 
     with open(args.results) as f:
         data = json.load(f)
+    deviations = None
+    if args.std is not None:
+        with open(args.std) as f:
+            deviations = json.load(f)
 
     models = args.models if args.models is not None else models_to_evaluate()
 
@@ -78,18 +99,18 @@ def main():
             if m not in data or t not in data[m]:
                 metric = "-"
             elif t.find("deft2020|regr") != -1 or t.find("clister|regr") != -1:
-                metric = f"{round(data[m][t]['edrm'], 2)}" + " / " + f"{round(data[m][t]['spearman_correlation_coef'], 2)}"
+                metric = score(data, deviations, m, t, 'edrm') + " / " + score(data, deviations, m, t, 'spearman_correlation_coef')
 
             elif t.find("frenchmedmcqa|mcqa") != -1:
                 # metric = float(f"{round(data[m][t]['hamming_score'], 2)}")
-                metric = f"{round(data[m][t]['hamming_score'] * 100, 2)} / {round(data[m][t]['exact_match'] * 100, 2)}"
+                metric = score(data, deviations, m, t, 'hamming_score', 100) + " / " + score(data, deviations, m, t, 'exact_match', 100)
 
             elif t.find("|ner") != -1 or t.find("|pos") != -1:
                 # metric = float(f"{round(data[m][t]['overall_f1'], 2)}")
-                metric = f"{round(data[m][t]['overall_f1'] * 100, 2)}"
+                metric = score(data, deviations, m, t, 'overall_f1', 100)
 
             else:
-                metric = f"{round(data[m][t]['weighted_f1'] * 100, 2)}"
+                metric = score(data, deviations, m, t, 'weighted_f1', 100)
 
             runs_metrics.append(metric)
 
