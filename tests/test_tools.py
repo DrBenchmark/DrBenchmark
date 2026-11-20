@@ -130,6 +130,168 @@ def test_results_to_benchmark(results_repository, tmp_path):
     assert with_path.stdout == completed.stdout
 
 
+class RunsRepository:
+    """A copy of the tools in a directory where runs are written by hand, to run `ComputeMetrics.py` on them."""
+
+    def __init__(self, directory):
+        self.repository = directory / "repository"
+        self.repository.mkdir()
+        copy_tools(self.repository)
+        self.elsewhere = directory / "elsewhere"
+        self.elsewhere.mkdir()
+        self.stats = self.repository / "stats"
+
+    def write_run(self, name, *, task="morfitt-cls", updates_per_epoch=None, scores=(0.5, 0.25), **hyperparameters):
+        """Write the results of a run of a classification task, as its training script does.
+
+        The hyper-parameters are the ones the first scripts wrote: `hyperparameters`
+        replaces them or adds the ones of the later scripts. The state of the trainer,
+        which the first scripts did not write either, is given by `updates_per_epoch`.
+        """
+        run = {
+            "hyperparameters": {
+                "task": task, "model_name": "../../../models/some_model", "fewshot": 1.0, "epochs": 35,
+                "batch_size": 12, "learning_rate": 2e-05, "weight_decay": 0.01, "max_position_embeddings": 512,
+                **hyperparameters,
+            },
+            "metrics": {"macro avg": {"f1-score": scores[0]}, "weighted avg": {"f1-score": scores[1]}},
+        }
+        if updates_per_epoch is not None:
+            epochs = run["hyperparameters"]["epochs"]
+            run["trainer_state"] = {"epoch": float(epochs), "global_step": updates_per_epoch * epochs}
+        runs_directory = self.repository / "recipes" / task.split("-")[0] / "runs"
+        runs_directory.mkdir(parents=True, exist_ok=True)
+        (runs_directory / f"{name}.json").write_text(json.dumps(run))
+
+    def compute_metrics(self, *arguments):
+        return run_tool("ComputeMetrics.py", self.repository, *arguments, cwd=self.elsewhere)
+
+    def results(self):
+        return read_json(self.stats / "results.json")
+
+
+@pytest.fixture
+def runs(tmp_path):
+    return RunsRepository(tmp_path)
+
+
+def test_runs_trained_in_the_same_way_are_averaged(runs):
+    """The seed and the location of the files are what distinguishes the runs of a task."""
+    runs.write_run("first", scores=(0.5, 0.25), seed=1, run_dir="../runs/", offline=True)
+    runs.write_run("second", scores=(1.0, 0.75), seed=2, run_dir="/somewhere/else/", offline=False)
+
+    completed = runs.compute_metrics()
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    assert {metric: sorted(values) for metric, values in runs.results()["some/model"]["morfitt|cls|1.0"].items()} == {
+        "macro_f1": [0.5, 1.0], "weighted_f1": [0.25, 0.75],
+    }
+    averages = read_json(runs.stats / "overall_averaged_metrics.json")
+    assert averages["some/model"]["morfitt|cls|1.0"] == {"macro_f1": 0.75, "weighted_f1": 0.5}
+
+
+def test_runs_with_different_hyperparameters_are_not_averaged(runs):
+    runs.write_run("ten_epochs", epochs=10)
+    runs.write_run("ten_epochs_too", epochs=10)
+    runs.write_run("three_epochs", epochs=3)
+
+    completed = runs.compute_metrics()
+    assert completed.returncode == 1
+    assert not (runs.stats / "results.json").exists()
+    assert not (runs.stats / "overall_averaged_metrics.json").exists()
+    # The report says which runs differ, on what, and how to go on
+    for expected in (
+        "some/model | morfitt-cls | 1.0 of the training set",
+        "    epochs\n        10: 2 run(s)\n",
+        "        3: 1 run(s)\n            recipes/morfitt/runs/three_epochs.json\n",
+        "1 set(s) of runs cannot be averaged",
+        "--ignore epochs",
+    ):
+        assert expected in completed.stderr, completed.stderr
+
+    # The difference can be accepted
+    accepted = runs.compute_metrics("--ignore", "epochs")
+    assert accepted.returncode == 0, accepted.stderr[-3000:]
+    assert len(runs.results()["some/model"]["morfitt|cls|1.0"]["macro_f1"]) == 3
+
+
+def test_hyperparameter_which_is_not_set_is_a_value(runs):
+    runs.write_run("truncated", max_position_embeddings=512)
+    runs.write_run("not_truncated", max_position_embeddings=None)
+
+    completed = runs.compute_metrics()
+    assert completed.returncode == 1
+    assert "    max_position_embeddings\n" in completed.stderr
+    assert "        not set: 1 run(s)\n            recipes/morfitt/runs/not_truncated.json\n" in completed.stderr
+
+
+def test_effective_batch_size_is_compared(runs):
+    """12 examples per batch and 12 accumulated batches of one example are the same training."""
+    runs.write_run("batches_of_12", batch_size=12)
+    runs.write_run("accumulated", batch_size=1, gradient_accumulation_steps=12)
+    runs.write_run("accumulated_by_4", batch_size=3, gradient_accumulation_steps=4)
+    completed = runs.compute_metrics()
+    assert completed.returncode == 0, completed.stderr[-3000:]
+
+    # What the scripts did when they read the accumulation without applying it
+    runs.write_run("one_example_per_update", batch_size=1, gradient_accumulation_steps=1)
+    completed = runs.compute_metrics()
+    assert completed.returncode == 1
+    assert "    effective_batch_size (batch_size x gradient_accumulation_steps)\n        12: 3 run(s)\n" in completed.stderr
+    assert "        1: 1 run(s)\n            recipes/morfitt/runs/one_example_per_update.json\n" in completed.stderr
+    assert "--ignore effective_batch_size" in completed.stderr
+
+
+def test_updates_of_the_weights_are_compared(runs):
+    """The state of the trainer says what the training did, even when the hyper-parameters are the same."""
+    accumulation = {"batch_size": 1, "gradient_accumulation_steps": 12}
+    runs.write_run("accumulated", updates_per_epoch=127, **accumulation)
+    # One update more or less per epoch: the last batches of an epoch are not counted in the same way
+    # by every version of transformers
+    runs.write_run("accumulated_too", updates_per_epoch=126, **accumulation)
+    # The first scripts did not write the state of the trainer: unknown is not different
+    runs.write_run("first_scripts", batch_size=12)
+    completed = runs.compute_metrics()
+    assert completed.returncode == 0, completed.stderr[-3000:]
+
+    # The accumulation is written in the hyper-parameters, but the weights were updated after each example
+    runs.write_run("not_accumulated", updates_per_epoch=1514, **accumulation)
+    completed = runs.compute_metrics()
+    assert completed.returncode == 1
+    assert "    updates_per_epoch (measured: updates of the weights during the training / epochs)\n" in completed.stderr
+    assert "        1514: 1 run(s)\n            recipes/morfitt/runs/not_accumulated.json\n" in completed.stderr
+    assert "effective_batch_size" not in completed.stderr
+    assert runs.compute_metrics("--ignore", "updates_per_epoch").returncode == 0
+
+
+def test_runs_of_different_versions_of_the_scripts_are_compared(runs):
+    """The first scripts wrote the learning rate as a string, and had fewer arguments."""
+    runs.write_run("first_scripts", learning_rate="2e-5")
+    runs.write_run(
+        "last_scripts", learning_rate=2e-05, seed=3, run_dir="../runs/", gradient_accumulation_steps=1,
+        max_train_samples=None, max_val_samples=None, max_test_samples=None, updates_per_epoch=127,
+    )
+    completed = runs.compute_metrics()
+    assert completed.returncode == 0, completed.stderr[-3000:]
+
+    runs.write_run("another_learning_rate", learning_rate="1e-5")
+    completed = runs.compute_metrics()
+    assert completed.returncode == 1
+    assert "    learning_rate\n        2e-05: 2 run(s)\n" in completed.stderr
+
+
+def test_only_the_runs_that_are_averaged_together_are_compared(runs):
+    runs.write_run("reference", epochs=10)
+    runs.write_run("another_model", epochs=3, model_name="../../../models/another_model")
+    runs.write_run("another_task", epochs=3, task="diamed-cls")
+    runs.write_run("part_of_the_training_set", epochs=3, fewshot=0.5)
+
+    completed = runs.compute_metrics()
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    results = runs.results()
+    assert set(results) == {"some/model", "another/model"}
+    assert set(results["some/model"]) == {"morfitt|cls|1.0", "diamed|cls|1.0", "morfitt|cls|0.5"}
+
+
 @pytest.fixture
 def slurm_from_missing_runs(tmp_path):
     """Run `tools/SlurmFromMissingRuns.py` on the number of runs given for each task."""
