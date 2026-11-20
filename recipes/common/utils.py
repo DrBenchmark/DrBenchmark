@@ -180,6 +180,29 @@ def add_arguments(parser, but=()):
     return names
 
 
+# The arguments of the run of the script that is started, when the script read them before
+# it loaded the code that trains
+_ARGUMENTS = None
+
+
+def stop_if_already_computed():
+    """Read the arguments of the run that a script is started for, and stop when its results exist.
+
+    A script calls it before it loads the libraries that train, which takes seconds: a run
+    that is already computed is then skipped at once. The arguments are kept for
+    `arguments_of_the_run`, which the training calls.
+    """
+    global _ARGUMENTS
+    _ARGUMENTS = parse_args()
+
+
+def arguments_of_the_run():
+    """The arguments of the run: the ones that `stop_if_already_computed` read, or else the command line."""
+    global _ARGUMENTS
+    args, _ARGUMENTS = _ARGUMENTS, None
+    return parse_args() if args is None else args
+
+
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
     add_arguments(parser)

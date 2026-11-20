@@ -11,6 +11,12 @@ from pathlib import Path
 # The code shared by the recipes is in `recipes/common/`: its parent is added to the search path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from common import utils  # noqa: E402
+
+if __name__ == '__main__':
+    # A run whose results exist stops here, before the libraries that train are loaded: it takes seconds
+    utils.stop_if_already_computed()
+
 from common import regression  # noqa: E402
 
 # What is specific to the task: the code that the recipes share does the rest

@@ -234,7 +234,7 @@ def start(dataset_name, needs_data_dir=False, task=None):
     Otherwise `dataset_name` is given to `datasets.load_dataset`, with `--data_dir`
     when `needs_data_dir` is set (loading script that reads local files).
     """
-    args = utils.parse_args()
+    args = utils.arguments_of_the_run()
     # The names are computed now: they depend on the arguments, which a script may change later
     name = utils.create_run_name(args)
     path = utils.get_run_path(args)

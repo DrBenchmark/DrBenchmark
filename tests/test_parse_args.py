@@ -2,6 +2,7 @@
 
 import os
 import re
+import subprocess
 import sys
 
 import pytest
@@ -116,6 +117,39 @@ def test_run_already_computed_is_skipped(parse, utils, tmp_path):
     assert exit_info.value.code == 0
     # Without a seed, another one is drawn instead of skipping the run
     assert parse("cas-pos", "--run_dir", f"{tmp_path}/").seed is not None
+
+
+@pytest.mark.parametrize("task", ALL_TASKS, ids=task_ids)
+def test_run_already_computed_is_skipped_before_the_libraries_are_loaded(task, parse, utils, tmp_path):
+    """Loading torch and transformers takes seconds: the script of a run whose results exist stops before."""
+    options = ["--seed", "0", "--run_dir", f"{tmp_path}/"]
+    # The results of the run, where its script looks for them
+    open(utils.get_run_path(parse(task, *options)), "w").close()
+
+    # The script, as `run.py` starts it
+    program, *arguments = task.command(MODEL)
+    completed = subprocess.run(
+        [program, "-X", "importtime", *arguments, *options], cwd=task.scripts_dir, capture_output=True, text=True, timeout=120,
+    )
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    assert completed.stdout.startswith("This configuration was already computed (seed: 0, model: ")
+    imported = {line.split("|")[-1].strip().split(".")[0] for line in completed.stderr.splitlines() if line.startswith("import time:")}
+    assert "yaml" in imported and not imported & {"torch", "transformers", "datasets", "numpy"}
+
+
+def test_arguments_of_a_run_are_read_once(parse, utils, monkeypatch):
+    """A script reads its arguments before it loads what trains: the training is given them, and does not read others."""
+    parse("cas-pos")
+    read = []
+    parse_args = utils.parse_args
+    monkeypatch.setattr(utils, "parse_args", lambda: read.append(parse_args()) or read[-1])
+
+    utils.stop_if_already_computed()
+    assert len(read) == 1
+    # Without a seed, each reading draws one: the run has to have the first one
+    assert utils.arguments_of_the_run() is read[0] and len(read) == 1
+    # A script that did not read its arguments first: the training reads them
+    assert utils.arguments_of_the_run() is read[1] and len(read) == 2
 
 
 def test_existing_model_path_is_kept(parse, tmp_path):

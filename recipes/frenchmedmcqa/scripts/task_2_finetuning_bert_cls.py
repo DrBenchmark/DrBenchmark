@@ -11,6 +11,12 @@ from pathlib import Path
 # The code shared by the recipes is in `recipes/common/`: its parent is added to the search path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from common import utils  # noqa: E402
+
+if __name__ == '__main__':
+    # A run whose results exist stops here, before the libraries that train are loaded: it takes seconds
+    utils.stop_if_already_computed()
+
 from common import sequence_classification  # noqa: E402
 
 # A question and its five answers

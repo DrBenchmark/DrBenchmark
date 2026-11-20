@@ -86,6 +86,8 @@ if __name__ == '__main__':
     TASK.train()
 ```
 
+A script reads the arguments of its run first, with `utils.stop_if_already_computed()`, before it imports the module of its kind of task: this import loads the libraries that train, which takes seconds, and a run whose results exist stops before.
+
 `predict.py` loads the same script to predict with a model that a run kept: what the model reads is built by the same code, `TASK.encode`, when the model is trained and when it predicts. A script that builds its text itself, as the one above, also says which columns of an example it reads (`inputs`: a `"text"`, or the `"words"` of a sentence): they are what `predict.py` asks for.
 
 ## Data
