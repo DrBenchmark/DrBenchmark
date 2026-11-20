@@ -1,23 +1,15 @@
+# Environment of the benchmark for conda:
+#     conda env create -f environment.yml
+#     conda activate DrBenchmark
+# The dependencies and their versions are only listed in requirements.txt, which pip installs
+# in the environment: this file does not have to follow it.
 name: DrBenchmark
 channels:
-  - pytorch
-  - huggingface
   - conda-forge
   - nodefaults
 dependencies:
-  - python>3.7
+  # The tests are run with Python 3.12 and above: see .github/workflows/tests.yml
+  - python>=3.12
   - pip
-  # Older versions of transformers can be used but some package tweaking will be necessary
-  - transformers>=4.40 # >4.40 for compatibility
-  - pytorch-gpu
-  - dill<0.4.1  # <0.4.1 because unsupported by datasets (and somehow I ended up with 0.4.1 which disabled dataset's caching) this dependency will need be be removed at some point
-  - datasets>=2.21  # >2.21 for HF_HUB_OFFLINE
-  - evaluate>=0.4.1
-  - scikit-learn>1.4  # >1.4 for root_mean_square_error
-  - seqeval  # for metrics/seqeval.py
-  - accelerate>=0.26  # why ?
-  - tensorboardX
-  - sacremoses  # for flaubert
-  - sentencepiece  # for flaubert
-  - openpyxl  # for tools/*
-  - seaborn  # for tools/*
+  - pip:
+      - -r requirements.txt

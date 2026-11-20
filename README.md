@@ -24,6 +24,8 @@ python run.py --tasks frenchmedmcqa-mcqa --models Dr-BERT/DrBERT-7GB --nb-run 1
 python run.py --tasks all --nb-run 4
 ```
 
+**Note**: With conda, `conda env create -f environment.yml` creates the `DrBenchmark` environment and installs the dependencies of `requirements.txt` in it: it does what the two commands above do.
+
 **Note**: The access to **DEFT-2019** data is restricted. Once data is acquired, add files to `./recipes/deft2019/data/` (see [its README](./recipes/deft2019/README.md) for the expected layout).
 
 **Note**: `offline` is set to `True` by default in `./config.yaml`: the datasets and the models are read from local copies, which have to be built first with `python ./download_datasets_locally.py` and `python ./download_models_locally.py`. This is the mode to use on an **offline machine / cluster**. To download the datasets and the models directly from the HuggingFace Hub instead, set `offline` to `False` in `./config.yaml`, or give `--offline false` to `run.py`.

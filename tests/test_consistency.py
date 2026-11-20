@@ -8,6 +8,7 @@ import os
 import re
 
 import pytest
+import yaml
 
 from helpers import ALL_TASKS, RECIPE_NAMES, RECIPES, REPO, TASKS, load_module
 
@@ -156,3 +157,11 @@ def test_recipe_readme_documents_the_task(task):
     assert f"`yaml/{task.config_path.name}`" in readme
     if task.subset:
         assert f"`{task.subset}`" in readme
+
+
+def test_conda_environment_installs_the_requirements():
+    """`environment.yml` does not list the dependencies a second time: pip installs the ones of `requirements.txt`."""
+    dependencies = yaml.safe_load((REPO / "environment.yml").read_text())["dependencies"]
+    from_conda = [dependency for dependency in dependencies if isinstance(dependency, str)]
+    assert [re.split(r"[<>=!~ ]", dependency)[0] for dependency in from_conda] == ["python", "pip"]
+    assert [dependency for dependency in dependencies if not isinstance(dependency, str)] == [{"pip": ["-r requirements.txt"]}]
