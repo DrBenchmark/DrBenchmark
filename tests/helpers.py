@@ -39,6 +39,11 @@ TASKS = load_module("drbenchmark_run", REPO / "run.py").task2script
 # The directories of `recipes/` with scripts: every one but `common/`, the code they share
 RECIPE_NAMES = sorted(path.name for path in RECIPES.iterdir() if (path / "scripts").is_dir())
 
+# A `models.txt` with what is not a model: empty lines and comments, some after spaces. Its
+# last line does not end with a new line. Whatever reads the file has to find the same models.
+MODELS_FILE = "# The models to evaluate\nfirst/model\n\n   # not/this-one\n\t\n#nor/this-one\n  second/model  "
+MODELS_OF_THE_FILE = ["first/model", "second/model"]
+
 
 class Task:
     """Everything `run.py` and the launcher of a task say about it."""

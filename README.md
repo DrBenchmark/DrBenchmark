@@ -51,7 +51,7 @@ The scripts for SLURM have to be submitted from the root of the repository: they
 ## Evaluate other models
 
 1. Open the `./models.txt` file.
-2. Add HuggingFace repo name or local model path (_prefer absolute file path_) for the models you wish to evaluate.
+2. Add HuggingFace repo name or local model path (_prefer absolute file path_) for the models you wish to evaluate, one per line. The empty lines and the lines that start with `#` are ignored.
 
 For example, we chose the following models for the DrBenchmark paper:
 

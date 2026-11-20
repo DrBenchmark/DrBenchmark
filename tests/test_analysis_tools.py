@@ -126,7 +126,8 @@ def test_models_of_the_models_file_are_read_offline(repository, elsewhere, tiny_
     """Without `--models`, the models are the ones of `models.txt`; with `--offline`, their local copies are read."""
     # Where `download_models_locally.py` saves the model
     shutil.copytree(tiny_bert, repository / "models" / "some-org_some-model")
-    (repository / "models.txt").write_text("# The models to evaluate\nSome-Org/Some-Model\n")
+    # Neither the empty lines nor the comments are models
+    (repository / "models.txt").write_text("# The models to evaluate\n\n   # not/this-one\n  Some-Org/Some-Model  \n#nor/this-one")
 
     completed = run_tool("MeasureVocabularyOverlap.py", repository, "--offline", cwd=elsewhere)
     assert completed.returncode == 0, completed.stderr[-3000:]

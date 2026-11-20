@@ -294,7 +294,9 @@ def test_runs_of_a_model_are_gathered_under_its_name_on_the_hub(runs):
 
 def test_name_of_an_old_run_is_looked_for_in_the_models_file(runs):
     """An old offline run only has the directory of its model, in lower case."""
-    (runs.repository / "models.txt").write_text("# Models to evaluate\nFacebookAI/xlm-roberta-base\n\nflaubert/flaubert_base_uncased")
+    (runs.repository / "models.txt").write_text(
+        "# Models to evaluate\nFacebookAI/xlm-roberta-base\n\n   # Not/This-One\nflaubert/flaubert_base_uncased"
+    )
     runs.write_run("in_the_file", model_name="../../../models/facebookai_xlm-roberta-base")
     runs.write_run("underscores_in_the_name", model_name="../../../models/flaubert_flaubert_base_uncased")
     # Unknown: the name is rebuilt from the directory, in lower case

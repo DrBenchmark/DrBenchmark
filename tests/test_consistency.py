@@ -112,8 +112,9 @@ def test_slurm_script_does_the_runs_of_the_benchmark(script):
     runs = int(re.search(r"^NBR_RUNS=(\d+)$", source, re.M).group(1))
     assert runs == load_module("drbenchmark_number_of_runs", REPO / "tools" / "number_of_runs.py").NB_RUNS
 
-    # The script takes every line of `models.txt` as a model
-    models = (REPO / "models.txt").read_text().splitlines()
+    # The models of `models.txt`: its lines, but the empty ones and the comments
+    lines = [line.strip() for line in (REPO / "models.txt").read_text().splitlines()]
+    models = [line for line in lines if line and not line.startswith("#")]
     first, last = re.search(r"^#SBATCH --array=(\d+)-(\d+)%\d+", source, re.M).groups()
     assert (int(first), int(last)) == (0, len(ALL_TASKS) * len(models) * runs - 1)
 

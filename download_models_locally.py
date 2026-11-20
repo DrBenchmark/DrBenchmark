@@ -8,6 +8,13 @@ from transformers import AutoTokenizer, AutoModel
 REPO_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
+def models_to_download():
+    """Models of `models.txt`: one per line, but the empty lines and the comments (`#`), as for `run.py`."""
+    with open(os.path.join(REPO_DIR, 'models.txt')) as f_in:
+        lines = [line.strip() for line in f_in]
+    return [line for line in lines if line and not line.startswith('#')]
+
+
 def save_locally(model_name):
     logging.info(f">> Downloading {model_name}")
     local_path = os.path.join(REPO_DIR, "models", model_name.lower().replace('/', '_'))
@@ -25,8 +32,5 @@ if __name__ == '__main__':
         level=logging.INFO
     )
 
-    with open(os.path.join(REPO_DIR, 'models.txt')) as f_in:
-        models = [l.strip() for l in f_in if l.strip()]
-
-    for m in models:
+    for m in models_to_download():
         save_locally(m)

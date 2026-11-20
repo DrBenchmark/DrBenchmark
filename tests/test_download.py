@@ -11,7 +11,7 @@ import types
 
 import pytest
 
-from helpers import ALL_TASKS, RECIPES, REPO, Task, load_module
+from helpers import ALL_TASKS, MODELS_FILE, MODELS_OF_THE_FILE, RECIPES, REPO, Task, load_module
 
 
 class Saved:
@@ -46,6 +46,14 @@ def test_dataset_is_saved_where_the_recipe_reads_it(task, monkeypatch, tmp_path)
     assert saved.directories == [os.path.realpath(read)]
     assert saved.directories[0].startswith(str(RECIPES / task.recipe / "data"))
     assert not list(tmp_path.iterdir())
+
+
+def test_models_to_download_are_the_ones_of_the_models_file(monkeypatch, tmp_path):
+    """Neither the empty lines nor the comments of `models.txt` are models to download."""
+    module = load_module("download_models_locally", REPO / "download_models_locally.py")
+    (tmp_path / "models.txt").write_text(MODELS_FILE)
+    monkeypatch.setattr(module, "REPO_DIR", str(tmp_path))
+    assert module.models_to_download() == MODELS_OF_THE_FILE
 
 
 def test_model_is_saved_where_the_recipes_read_it(utils, monkeypatch, tmp_path):

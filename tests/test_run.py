@@ -7,7 +7,7 @@ import sys
 
 import pytest
 
-from helpers import REPO, TASKS, Task
+from helpers import MODELS_FILE, MODELS_OF_THE_FILE, REPO, TASKS, Task
 
 MODEL = "some org/a model"  # with a space, to check that it is given as one argument
 
@@ -133,16 +133,19 @@ def test_runs_from_any_directory(fake_repository, elsewhere):
 
 
 def test_models_file_of_the_repository_is_read(fake_repository, elsewhere):
-    """Without `--models`, the models are the ones of the `models.txt` which is next to `run.py`."""
+    """Without `--models`, the models are the ones of the `models.txt` which is next to `run.py`.
+
+    Neither its empty lines nor its comments are models.
+    """
     fake_repository.create_launchers({"cas-pos": 0})
-    (fake_repository.directory / "models.txt").write_text("# a comment\nfirst/model\n\nsecond/model")
+    (fake_repository.directory / "models.txt").write_text(MODELS_FILE)
     (elsewhere / "models.txt").write_text("another/model\n")
 
     for cwd in (None, elsewhere):
         fake_repository.calls.write_text("")
         completed = fake_repository.run("--tasks", "cas-pos", cwd=cwd)
         assert completed.returncode == 0, completed.stderr
-        assert [call[2] for call in fake_repository.recorded_calls()] == ["first/model", "second/model"], cwd
+        assert [call[2] for call in fake_repository.recorded_calls()] == MODELS_OF_THE_FILE, cwd
 
 
 def test_local_model_typed_from_another_directory(fake_repository, elsewhere):

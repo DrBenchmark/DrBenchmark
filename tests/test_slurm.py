@@ -9,7 +9,7 @@ import re
 
 import pytest
 
-from helpers import REPO, run_without_slurm
+from helpers import MODELS_FILE, REPO, run_without_slurm
 
 ALL_TASKS_SCRIPTS = ["run_all_slurm.sh", "run_all_jean_zay.sh"]
 MODELS = ["first/model", "second/model"]
@@ -52,6 +52,28 @@ def test_script_for_all_tasks_runs_the_job_of_its_index(script, root, tmp_path):
     # The second job is the next task of the same model
     completed, commands = run_without_slurm(REPO / script, cwd=root, directory=tmp_path / "slurm", task_id=1)
     assert commands[-1] == "srun bash run_task_2.sh first/model"
+
+
+@pytest.mark.parametrize("script", ALL_TASKS_SCRIPTS)
+def test_script_for_all_tasks_only_runs_the_models_of_the_models_file(script, root, tmp_path):
+    """Neither the empty lines nor the comments of `models.txt` are models: they have no job."""
+    (root / "models.txt").write_text(MODELS_FILE)
+    source = (REPO / script).read_text()
+    tasks = len(re.findall(r'^\s*"cd \./recipes/', source, re.M))
+    jobs_per_model = tasks * int(re.search(r"^NBR_RUNS=(\d+)$", source, re.M).group(1))
+
+    def jobs(index):
+        completed, commands = run_without_slurm(REPO / script, cwd=root, directory=tmp_path / "slurm", task_id=index)
+        assert completed.returncode == 0, completed.stderr
+        return [command for command in commands if command.startswith("srun")]
+
+    # The first task of the first and of the last run of each model
+    for index in (0, jobs_per_model - tasks):
+        assert jobs(index) == ["srun bash run_task_1.sh first/model"], index
+    for index in (jobs_per_model, 2 * jobs_per_model - tasks):
+        assert jobs(index) == ["srun bash run_task_1.sh second/model"], index
+    # There is no third model
+    assert jobs(2 * jobs_per_model) == []
 
 
 def test_script_for_one_task_calls_run_py(root, tmp_path):

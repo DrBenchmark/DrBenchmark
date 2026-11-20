@@ -7,9 +7,10 @@ from repository_paths import MODELS_FILE, RECIPES_DIR, REPO_DIR
 
 
 def models_to_evaluate():
-    """Names of the models of `models.txt`: its lines, but the empty ones and the comments."""
+    """Models of `models.txt`: one per line, but the empty lines and the comments (`#`), as for `run.py`."""
     with open(MODELS_FILE) as f_in:
-        return [line.strip() for line in f_in if line.strip() and not line.startswith('#')]
+        lines = [line.strip() for line in f_in]
+    return [line for line in lines if line and not line.startswith('#')]
 
 
 def local_model(name, offline):

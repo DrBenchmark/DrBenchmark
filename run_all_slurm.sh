@@ -27,14 +27,16 @@ conda activate DrBenchmark
 
 NBR_RUNS=4
 
-# Read models.txt into a bash array
+# Read models.txt into a bash array: one model per line, but the empty lines and the comments (#)
 # http://mywiki.wooledge.org/BashFAQ/005
 declare -a MODELS
-while read m ; do
+# If there is no newline at the end of the file, `read` fails but $m contains the last line
+while read m || [ -n "$m" ]; do
+    case "$m" in
+        ''|'#'*) continue ;;
+    esac
     MODELS+=("$m")
 done < models.txt
-# If there is no newline at the end of the file $m contains the last model
-test "$m" && MODELS+=("$m")
 
 declare -a JOBS
 

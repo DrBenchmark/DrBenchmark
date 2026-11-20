@@ -17,7 +17,8 @@ import argparse
 from glob import glob
 from collections import Counter, defaultdict
 
-from repository_paths import MODELS_FILE, RECIPES_DIR, REPO_DIR, STATS_DIR
+from models_and_datasets import models_to_evaluate
+from repository_paths import RECIPES_DIR, REPO_DIR, STATS_DIR
 
 try:
     from tqdm import tqdm
@@ -54,8 +55,7 @@ def names_on_the_hub(all_hyperparameters):
     a model is written in several ways, with other upper case letters, the most frequent wins.
     """
     try:
-        with open(MODELS_FILE) as f:
-            names = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+        names = models_to_evaluate()
     except FileNotFoundError:
         names = []
     written = Counter(
