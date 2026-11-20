@@ -1,15 +1,15 @@
 """Print the LaTeX table of the scores of the models on every task.
 
 The scores are the averages over the runs, read in `stats/overall_averaged_metrics.json`,
-which `ComputeMetrics.py` writes. The tasks of the table are the ones of the first model.
+which `CollectAndAverageScores.py` writes. The tasks of the table are the ones of the first model.
 """
 
 import os
 import json
 import argparse
 
-from inputs import models_to_evaluate
-from paths import STATS_DIR
+from models_and_datasets import models_to_evaluate
+from repository_paths import STATS_DIR
 
 # Names of the models in the table
 mapping = {

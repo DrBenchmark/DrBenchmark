@@ -1,14 +1,14 @@
 """List the tasks that do not have the expected number of runs, for each model.
 
-The scores of the runs are read in `stats/results.json`, which `ComputeMetrics.py` writes.
+The scores of the runs are read in `stats/results.json`, which `CollectAndAverageScores.py` writes.
 """
 
 import os
 import json
 import argparse
 
-from paths import STATS_DIR
-from protocol import NB_RUNS
+from number_of_runs import NB_RUNS
+from repository_paths import STATS_DIR
 
 
 def arguments():

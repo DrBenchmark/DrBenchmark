@@ -3,7 +3,7 @@
 import os
 from glob import glob
 
-from paths import MODELS_FILE, RECIPES_DIR, REPO_DIR
+from repository_paths import MODELS_FILE, RECIPES_DIR, REPO_DIR
 
 
 def models_to_evaluate():

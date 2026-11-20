@@ -1,6 +1,6 @@
 """Draw the score of the models on each task, for the proportions of the training set they were trained on.
 
-The scores are read in `stats/results.json`, which `ComputeMetrics.py` writes, and
+The scores are read in `stats/results.json`, which `CollectAndAverageScores.py` writes, and
 averaged over the runs. One figure per task is written in `stats/fewshot/`, with one
 line per model that has a name below. The proportions are 0.25, 0.5, 0.75 and 1.0.
 """
@@ -11,7 +11,7 @@ import argparse
 
 import matplotlib.pyplot as plt
 
-from paths import STATS_DIR
+from repository_paths import STATS_DIR
 
 # Names of the models in the figures: the other models are not drawn
 mapping = {

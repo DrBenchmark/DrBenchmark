@@ -5,8 +5,8 @@ import json
 import pandas as pd
 from liquid import parse
 
-from paths import REPO_DIR, STATS_DIR
-from protocol import NB_RUNS
+from number_of_runs import NB_RUNS
+from repository_paths import REPO_DIR, STATS_DIR
 
 sys.path.append(REPO_DIR)
 from run import task2script

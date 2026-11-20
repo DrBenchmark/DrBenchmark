@@ -9,7 +9,7 @@ import argparse
 
 from transformers import AutoTokenizer
 
-from inputs import local_model
+from models_and_datasets import local_model
 
 words = [
     "asymptomatique",

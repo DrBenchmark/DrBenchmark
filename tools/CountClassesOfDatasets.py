@@ -15,8 +15,8 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from inputs import label_names, load_benchmark_dataset
-from paths import STATS_DIR
+from models_and_datasets import label_names, load_benchmark_dataset
+from repository_paths import STATS_DIR
 
 # The tasks: "corpus" is the name of their dataset on the HuggingFace Hub
 tasks = [

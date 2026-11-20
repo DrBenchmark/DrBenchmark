@@ -10,8 +10,8 @@ import argparse
 
 from transformers import AutoTokenizer
 
-from inputs import load_benchmark_dataset, local_model, models_to_evaluate
-from paths import STATS_DIR
+from models_and_datasets import load_benchmark_dataset, local_model, models_to_evaluate
+from repository_paths import STATS_DIR
 
 # The datasets: "model" is their name on the HuggingFace Hub
 tasks = [

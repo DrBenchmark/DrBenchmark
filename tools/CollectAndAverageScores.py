@@ -17,7 +17,7 @@ import argparse
 from glob import glob
 from collections import Counter, defaultdict
 
-from paths import MODELS_FILE, RECIPES_DIR, REPO_DIR, STATS_DIR
+from repository_paths import MODELS_FILE, RECIPES_DIR, REPO_DIR, STATS_DIR
 
 try:
     from tqdm import tqdm

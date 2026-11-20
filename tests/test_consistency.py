@@ -110,7 +110,7 @@ def test_slurm_script_does_the_runs_of_the_benchmark(script):
     """One job per run of each task for each model: when the job array is too small, runs are silently skipped."""
     source = (REPO / script).read_text()
     runs = int(re.search(r"^NBR_RUNS=(\d+)$", source, re.M).group(1))
-    assert runs == load_module("drbenchmark_protocol", REPO / "tools" / "protocol.py").NB_RUNS
+    assert runs == load_module("drbenchmark_number_of_runs", REPO / "tools" / "number_of_runs.py").NB_RUNS
 
     # The script takes every line of `models.txt` as a model
     models = (REPO / "models.txt").read_text().splitlines()

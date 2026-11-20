@@ -14,7 +14,7 @@ from helpers import ALL_TASKS, REPO, copy_tools, load_module, read_json, run_too
 
 TOOLS = sorted(path.name for path in (REPO / "tools").glob("*.py"))
 
-# Metrics collected by `tools/ComputeMetrics.py` for each kind of task
+# Metrics collected by `tools/CollectAndAverageScores.py` for each kind of task
 COLLECTED_METRICS = {
     "pos": {"overall_f1", "overall_accuracy"},
     "ner": {"overall_f1", "overall_accuracy"},
@@ -44,7 +44,7 @@ def beginning_of_literal(node):
 
 @pytest.mark.parametrize("tool", TOOLS)
 def test_tool_does_not_use_a_path_relative_to_the_current_directory(tool):
-    """The tools find the files of the repository with `tools/paths.py`: they can be run from any directory."""
+    """The tools find the files of the repository with `tools/repository_paths.py`: they can be run from any directory."""
     relative_paths = []
     for node in ast.walk(ast.parse((REPO / "tools" / tool).read_text())):
         if isinstance(node, ast.Call) and node.args:
@@ -85,9 +85,9 @@ def results_repository(run_recipe, tiny_bert, tmp_path_factory):
 
 
 @pytest.mark.e2e
-def test_compute_metrics(results_repository, tiny_bert, tmp_path):
+def test_collect_and_average_scores(results_repository, tiny_bert, tmp_path):
     # The tool is run from another directory: it must find the results in its repository
-    completed = run_tool("ComputeMetrics.py", results_repository, cwd=tmp_path)
+    completed = run_tool("CollectAndAverageScores.py", results_repository, cwd=tmp_path)
     assert completed.returncode == 0, completed.stderr[-3000:]
     assert not list(tmp_path.iterdir())
 
@@ -103,9 +103,9 @@ def test_compute_metrics(results_repository, tiny_bert, tmp_path):
 
 
 @pytest.mark.e2e
-def test_results_to_benchmark(results_repository, tmp_path):
-    assert run_tool("ComputeMetrics.py", results_repository, cwd=tmp_path).returncode == 0
-    completed = run_tool("ResultsToBenchmark.py", results_repository, "--nb-run", "1", "--csv", cwd=tmp_path)
+def test_build_excel_table_of_scores(results_repository, tmp_path):
+    assert run_tool("CollectAndAverageScores.py", results_repository, cwd=tmp_path).returncode == 0
+    completed = run_tool("BuildExcelTableOfScores.py", results_repository, "--nb-run", "1", "--csv", cwd=tmp_path)
     assert completed.returncode == 0, completed.stderr[-3000:]
 
     lines = completed.stdout.strip().splitlines()
@@ -118,14 +118,14 @@ def test_results_to_benchmark(results_repository, tmp_path):
     # A path given on the command line is relative to the current directory, as usual
     shutil.copy(results_repository / "stats" / "results.json", tmp_path / "copy.json")
     with_path = run_tool(
-        "ResultsToBenchmark.py", results_repository, "--nb-run", "1", "--csv", "--results", "copy.json", cwd=tmp_path,
+        "BuildExcelTableOfScores.py", results_repository, "--nb-run", "1", "--csv", "--results", "copy.json", cwd=tmp_path,
     )
     assert with_path.returncode == 0, with_path.stderr[-3000:]
     assert with_path.stdout == completed.stdout
 
 
 class RunsRepository:
-    """A copy of the tools in a directory where runs are written by hand, to run `ComputeMetrics.py` on them."""
+    """A copy of the tools in a directory where runs are written by hand, to run `CollectAndAverageScores.py` on them."""
 
     def __init__(self, directory):
         self.repository = directory / "repository"
@@ -157,8 +157,8 @@ class RunsRepository:
         runs_directory.mkdir(parents=True, exist_ok=True)
         (runs_directory / f"{name}.json").write_text(json.dumps(run))
 
-    def compute_metrics(self, *arguments):
-        return run_tool("ComputeMetrics.py", self.repository, *arguments, cwd=self.elsewhere)
+    def collect_and_average_scores(self, *arguments):
+        return run_tool("CollectAndAverageScores.py", self.repository, *arguments, cwd=self.elsewhere)
 
     def results(self):
         return read_json(self.stats / "results.json")
@@ -174,7 +174,7 @@ def test_runs_trained_in_the_same_way_are_averaged(runs):
     runs.write_run("first", scores=(0.5, 0.25), seed=1, run_dir="../runs/", offline=True)
     runs.write_run("second", scores=(1.0, 0.75), seed=2, run_dir="/somewhere/else/", offline=False)
 
-    completed = runs.compute_metrics()
+    completed = runs.collect_and_average_scores()
     assert completed.returncode == 0, completed.stderr[-3000:]
     assert {metric: sorted(values) for metric, values in runs.results()["some/model"]["morfitt|cls|1.0"].items()} == {
         "macro_f1": [0.5, 1.0], "weighted_f1": [0.25, 0.75],
@@ -188,7 +188,7 @@ def test_runs_with_different_hyperparameters_are_not_averaged(runs):
     runs.write_run("ten_epochs_too", epochs=10)
     runs.write_run("three_epochs", epochs=3)
 
-    completed = runs.compute_metrics()
+    completed = runs.collect_and_average_scores()
     assert completed.returncode == 1
     assert not (runs.stats / "results.json").exists()
     assert not (runs.stats / "overall_averaged_metrics.json").exists()
@@ -203,7 +203,7 @@ def test_runs_with_different_hyperparameters_are_not_averaged(runs):
         assert expected in completed.stderr, completed.stderr
 
     # The difference can be accepted
-    accepted = runs.compute_metrics("--ignore", "epochs")
+    accepted = runs.collect_and_average_scores("--ignore", "epochs")
     assert accepted.returncode == 0, accepted.stderr[-3000:]
     assert len(runs.results()["some/model"]["morfitt|cls|1.0"]["macro_f1"]) == 3
 
@@ -212,7 +212,7 @@ def test_hyperparameter_which_is_not_set_is_a_value(runs):
     runs.write_run("truncated", max_position_embeddings=512)
     runs.write_run("not_truncated", max_position_embeddings=None)
 
-    completed = runs.compute_metrics()
+    completed = runs.collect_and_average_scores()
     assert completed.returncode == 1
     assert "    max_position_embeddings\n" in completed.stderr
     assert "        not set: 1 run(s)\n            recipes/morfitt/runs/not_truncated.json\n" in completed.stderr
@@ -223,12 +223,12 @@ def test_effective_batch_size_is_compared(runs):
     runs.write_run("batches_of_12", batch_size=12)
     runs.write_run("accumulated", batch_size=1, gradient_accumulation_steps=12)
     runs.write_run("accumulated_by_4", batch_size=3, gradient_accumulation_steps=4)
-    completed = runs.compute_metrics()
+    completed = runs.collect_and_average_scores()
     assert completed.returncode == 0, completed.stderr[-3000:]
 
     # What the scripts did when they read the accumulation without applying it
     runs.write_run("one_example_per_update", batch_size=1, gradient_accumulation_steps=1)
-    completed = runs.compute_metrics()
+    completed = runs.collect_and_average_scores()
     assert completed.returncode == 1
     assert "    effective_batch_size (batch_size x gradient_accumulation_steps)\n        12: 3 run(s)\n" in completed.stderr
     assert "        1: 1 run(s)\n            recipes/morfitt/runs/one_example_per_update.json\n" in completed.stderr
@@ -244,17 +244,17 @@ def test_updates_of_the_weights_are_compared(runs):
     runs.write_run("accumulated_too", updates_per_epoch=126, **accumulation)
     # The first scripts did not write the state of the trainer: unknown is not different
     runs.write_run("first_scripts", batch_size=12)
-    completed = runs.compute_metrics()
+    completed = runs.collect_and_average_scores()
     assert completed.returncode == 0, completed.stderr[-3000:]
 
     # The accumulation is written in the hyper-parameters, but the weights were updated after each example
     runs.write_run("not_accumulated", updates_per_epoch=1514, **accumulation)
-    completed = runs.compute_metrics()
+    completed = runs.collect_and_average_scores()
     assert completed.returncode == 1
     assert "    updates_per_epoch (measured: updates of the weights during the training / epochs)\n" in completed.stderr
     assert "        1514: 1 run(s)\n            recipes/morfitt/runs/not_accumulated.json\n" in completed.stderr
     assert "effective_batch_size" not in completed.stderr
-    assert runs.compute_metrics("--ignore", "updates_per_epoch").returncode == 0
+    assert runs.collect_and_average_scores("--ignore", "updates_per_epoch").returncode == 0
 
 
 def test_runs_of_different_versions_of_the_scripts_are_compared(runs):
@@ -264,11 +264,11 @@ def test_runs_of_different_versions_of_the_scripts_are_compared(runs):
         "last_scripts", learning_rate=2e-05, seed=3, run_dir="../runs/", gradient_accumulation_steps=1,
         max_train_samples=None, max_val_samples=None, max_test_samples=None, updates_per_epoch=127,
     )
-    completed = runs.compute_metrics()
+    completed = runs.collect_and_average_scores()
     assert completed.returncode == 0, completed.stderr[-3000:]
 
     runs.write_run("another_learning_rate", learning_rate="1e-5")
-    completed = runs.compute_metrics()
+    completed = runs.collect_and_average_scores()
     assert completed.returncode == 1
     assert "    learning_rate\n        2e-05: 2 run(s)\n" in completed.stderr
 
@@ -284,7 +284,7 @@ def test_runs_of_a_model_are_gathered_under_its_name_on_the_hub(runs):
     # The same model, named with other upper case letters
     runs.write_run("other_case", scores=(0.5, 0.5), model_name="dr-bert/DrBERT-7GB", hub_model_name="dr-bert/DrBERT-7GB")
 
-    completed = runs.compute_metrics()
+    completed = runs.collect_and_average_scores()
     assert completed.returncode == 0, completed.stderr[-3000:]
     results = runs.results()
     assert list(results) == [name]
@@ -303,7 +303,7 @@ def test_name_of_an_old_run_is_looked_for_in_the_models_file(runs):
     runs.write_run("path", model_name="/somewhere/my_model", hub_model_name=None)
     runs.write_run("other_relative_path", model_name="../../../assets/my_model", hub_model_name=None)
 
-    completed = runs.compute_metrics()
+    completed = runs.collect_and_average_scores()
     assert completed.returncode == 0, completed.stderr[-3000:]
     assert set(runs.results()) == {
         "FacebookAI/xlm-roberta-base", "flaubert/flaubert_base_uncased", "dr-bert/drbert-7gb",
@@ -317,7 +317,7 @@ def test_runs_gathered_under_the_name_of_a_model_are_compared(runs):
     runs.write_run("offline", epochs=10, model_name="../../../models/dr-bert_drbert-7gb", hub_model_name=name)
     runs.write_run("online", epochs=3, model_name=name, hub_model_name=name)
 
-    completed = runs.compute_metrics()
+    completed = runs.collect_and_average_scores()
     assert completed.returncode == 1
     assert "Dr-BERT/DrBERT-7GB | morfitt-cls | 1.0 of the training set\n    epochs\n" in completed.stderr
     # The name of the model is not a difference between the runs
@@ -330,7 +330,7 @@ def test_only_the_runs_that_are_averaged_together_are_compared(runs):
     runs.write_run("another_task", epochs=3, task="diamed-cls")
     runs.write_run("part_of_the_training_set", epochs=3, fewshot=0.5)
 
-    completed = runs.compute_metrics()
+    completed = runs.collect_and_average_scores()
     assert completed.returncode == 0, completed.stderr[-3000:]
     results = runs.results()
     assert set(results) == {"some/model", "another/model"}
@@ -338,9 +338,9 @@ def test_only_the_runs_that_are_averaged_together_are_compared(runs):
 
 
 @pytest.fixture
-def slurm_from_missing_runs(tmp_path):
-    """Run `tools/SlurmFromMissingRuns.py` on the number of runs given for each task."""
-    pytest.importorskip("liquid", reason="python-liquid is needed by tools/SlurmFromMissingRuns.py")
+def write_slurm_script(tmp_path):
+    """Run `tools/WriteSlurmScriptForMissingRuns.py` on the number of runs given for each task."""
+    pytest.importorskip("liquid", reason="python-liquid is needed by tools/WriteSlurmScriptForMissingRuns.py")
     repository = tmp_path / "repository"
     repository.mkdir()
     copy_tools(repository)
@@ -353,14 +353,14 @@ def slurm_from_missing_runs(tmp_path):
             for task in ALL_TASKS if runs_per_task.get(task.name)
         }
         (repository / "stats" / "results.json").write_text(json.dumps({"Dr-BERT/DrBERT-7GB": results}))
-        return run_tool("SlurmFromMissingRuns.py", repository, *arguments, cwd=elsewhere)
+        return run_tool("WriteSlurmScriptForMissingRuns.py", repository, *arguments, cwd=elsewhere)
 
     return run
 
 
-def test_slurm_from_missing_runs(slurm_from_missing_runs):
+def test_write_slurm_script_for_missing_runs(write_slurm_script):
     """The generated job array has one index per missing run, for 4 runs per task."""
-    completed = slurm_from_missing_runs({"cas-pos": 4, "cas-cls": 1})
+    completed = write_slurm_script({"cas-pos": 4, "cas-cls": 1})
     assert completed.returncode == 0, completed.stderr[-3000:]
     script = completed.stdout
 
@@ -374,9 +374,9 @@ def test_slurm_from_missing_runs(slurm_from_missing_runs):
     assert (int(first), int(last)) == (0, len(jobs) - 1)
 
 
-def test_slurm_from_missing_runs_with_another_number_of_runs(slurm_from_missing_runs):
+def test_write_slurm_script_with_another_number_of_runs(write_slurm_script):
     """`--nb-run` is the number of runs that each task must have."""
-    completed = slurm_from_missing_runs({"cas-pos": 4, "cas-cls": 1, "clister-regr": 2}, "--nb-run", "2")
+    completed = write_slurm_script({"cas-pos": 4, "cas-cls": 1, "clister-regr": 2}, "--nb-run", "2")
     assert completed.returncode == 0, completed.stderr[-3000:]
 
     jobs = re.findall(r'^    "(cd recipes/\w+/scripts/ ; \./run\S*\.sh .+)"$', completed.stdout, re.M)
@@ -387,15 +387,15 @@ def test_slurm_from_missing_runs_with_another_number_of_runs(slurm_from_missing_
     assert not any(job.startswith("cd recipes/clister/") for job in jobs)
 
 
-def test_slurm_from_missing_runs_without_missing_run(slurm_from_missing_runs):
-    completed = slurm_from_missing_runs({task.name: 4 for task in ALL_TASKS})
+def test_write_slurm_script_without_missing_run(write_slurm_script):
+    completed = write_slurm_script({task.name: 4 for task in ALL_TASKS})
     assert completed.returncode != 0
     assert completed.stdout == ""
     assert "No missing run" in completed.stderr
 
 
 def test_number_of_runs_is_checked(tmp_path):
-    """`CheckGetAllFour.py` lists the scores that do not come from the expected number of runs: 4, or `--nb-run`."""
+    """`CheckNumberOfRuns.py` lists the scores that do not come from the expected number of runs: 4, or `--nb-run`."""
     repository = tmp_path / "repository"
     repository.mkdir()
     copy_tools(repository)
@@ -408,7 +408,7 @@ def test_number_of_runs_is_checked(tmp_path):
     }))
 
     def listed(*arguments):
-        completed = run_tool("CheckGetAllFour.py", repository, *arguments, cwd=tmp_path)
+        completed = run_tool("CheckNumberOfRuns.py", repository, *arguments, cwd=tmp_path)
         assert completed.returncode == 0, completed.stderr[-3000:]
         # model  ->  dataset|task|fewshot  ->  metric  ->  number of runs
         return [tuple(line.split("  ->  ")) for line in completed.stdout.splitlines()]
@@ -427,22 +427,22 @@ def test_number_of_runs_is_checked(tmp_path):
     ]
 
 
-@pytest.mark.parametrize("tool", ["CheckGetAllFour.py", "SlurmFromMissingRuns.py", "ResultsToBenchmark.py"])
+@pytest.mark.parametrize("tool", ["CheckNumberOfRuns.py", "WriteSlurmScriptForMissingRuns.py", "BuildExcelTableOfScores.py"])
 def test_tools_expect_the_same_number_of_runs(tool):
-    """The number of runs of the benchmark is written once, in `tools/protocol.py`."""
-    if tool == "SlurmFromMissingRuns.py":
-        pytest.importorskip("liquid", reason="python-liquid is needed by tools/SlurmFromMissingRuns.py")
-    protocol = load_module("drbenchmark_protocol", REPO / "tools" / "protocol.py")
+    """The number of runs of the benchmark is written once, in `tools/number_of_runs.py`."""
+    if tool == "WriteSlurmScriptForMissingRuns.py":
+        pytest.importorskip("liquid", reason="python-liquid is needed by tools/WriteSlurmScriptForMissingRuns.py")
+    nb_runs = load_module("drbenchmark_number_of_runs", REPO / "tools" / "number_of_runs.py").NB_RUNS
     usage = subprocess.run([sys.executable, str(REPO / "tools" / tool), "--help"], capture_output=True, text=True, timeout=120)
     assert usage.returncode == 0, usage.stderr[-3000:]
-    assert f"(default: {protocol.NB_RUNS})" in " ".join(usage.stdout.split())
+    assert f"(default: {nb_runs})" in " ".join(usage.stdout.split())
 
 
 @pytest.mark.parametrize("arguments", [[], ["--jeanzay"]], ids=["slurm", "jean-zay"])
-def test_generated_slurm_script_is_submitted_from_the_root_of_the_repository(arguments, slurm_from_missing_runs, tmp_path):
+def test_generated_slurm_script_is_submitted_from_the_root_of_the_repository(arguments, write_slurm_script, tmp_path):
     """The jobs of the generated script are relative to the root of the repository: it refuses to run elsewhere."""
     script = tmp_path / "missing_runs.sh"
-    script.write_text(slurm_from_missing_runs({"cas-pos": 4}, *arguments).stdout)
+    script.write_text(write_slurm_script({"cas-pos": 4}, *arguments).stdout)
 
     refused, commands = run_without_slurm(script, cwd=tmp_path / "elsewhere", directory=tmp_path / "slurm")
     assert refused.returncode == 1

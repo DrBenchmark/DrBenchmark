@@ -2,8 +2,8 @@ import os
 import json
 import pandas as pd
 
-from paths import STATS_DIR
-from protocol import NB_RUNS
+from number_of_runs import NB_RUNS
+from repository_paths import STATS_DIR
 
 
 dataset2pretty = {

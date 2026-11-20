@@ -46,7 +46,7 @@ def test_recipe(task, run_recipe, tiny_bert):
     assert len(predictions["real_labels"]) == N_TEST
     assert len(predictions["system_predictions"]) == N_TEST
 
-    # The metrics read by `tools/ComputeMetrics.py`
+    # The metrics read by `tools/CollectAndAverageScores.py`
     metrics = result["metrics"]
     if task.kind in ("pos", "ner"):
         for name in ("overall_precision", "overall_recall", "overall_f1", "overall_accuracy"):

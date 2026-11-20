@@ -20,4 +20,4 @@ sacremoses<1  # for flaubert
 sentencepiece<1  # for flaubert
 openpyxl<4  # for tools/*
 seaborn<1  # for tools/*
-python-liquid>=2,<4  # for tools/SlurmFromMissingRuns.py
+python-liquid>=2,<4  # for tools/WriteSlurmScriptForMissingRuns.py

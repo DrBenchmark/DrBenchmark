@@ -151,7 +151,7 @@ def np_encoder(object):
 
 
 def save_results(run, trainer, metrics, identifiers, real_labels, system_predictions):
-    """Write the results of the run: they are read by `tools/ComputeMetrics.py`."""
+    """Write the results of the run: they are read by `tools/CollectAndAverageScores.py`."""
     with open(run.path, 'w', encoding='utf-8') as f:
         json.dump({
             "model_name": run.model_path + "_best_model",

@@ -124,7 +124,7 @@ def copy_tools(repository):
     copies use the ones of `repository`.
     """
     shutil.copytree(REPO / "tools", repository / "tools", ignore=shutil.ignore_patterns("__pycache__"))
-    # `tools/SlurmFromMissingRuns.py` reads the tasks in `run.py`
+    # `tools/WriteSlurmScriptForMissingRuns.py` reads the tasks in `run.py`
     shutil.copy(REPO / "run.py", repository)
     (repository / "stats").mkdir()
 

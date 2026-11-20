@@ -53,7 +53,7 @@ def offline_datasets(repository, synthetic_data):
 def tiny_masked_lm(tmp_path_factory):
     """A tiny BERT that predicts masked words.
 
-    `BiasMaskFilling.py` asks for the 500 most probable words: the vocabulary has more.
+    `ProbeBiasesWithMaskFilling.py` asks for the 500 most probable words: the vocabulary has more.
     """
     from tokenizers import Tokenizer, models, pre_tokenizers, processors
     from transformers import BertConfig, BertForMaskedLM, PreTrainedTokenizerFast
@@ -81,9 +81,9 @@ def tiny_masked_lm(tmp_path_factory):
 
 
 @pytest.mark.e2e
-def test_bias_mask_filling(repository, elsewhere, tiny_masked_lm):
+def test_probe_biases_with_mask_filling(repository, elsewhere, tiny_masked_lm):
     model = str(tiny_masked_lm)
-    completed = run_tool("BiasMaskFilling.py", repository, "--models", model, cwd=elsewhere)
+    completed = run_tool("ProbeBiasesWithMaskFilling.py", repository, "--models", model, cwd=elsewhere)
     assert completed.returncode == 0, completed.stderr[-3000:]
 
     bias = read_json(repository / "stats" / "bias.json")
@@ -102,9 +102,9 @@ def test_bias_mask_filling(repository, elsewhere, tiny_masked_lm):
 
 
 @pytest.mark.e2e
-def test_inter_vocabularies_coverage_matrix(repository, elsewhere, tiny_bert, tiny_flaubert):
+def test_measure_vocabulary_overlap(repository, elsewhere, tiny_bert, tiny_flaubert):
     completed = run_tool(
-        "InterVocabulariesCoverageMatrix.py", repository, "--models", str(tiny_bert), str(tiny_flaubert), cwd=elsewhere,
+        "MeasureVocabularyOverlap.py", repository, "--models", str(tiny_bert), str(tiny_flaubert), cwd=elsewhere,
     )
     assert completed.returncode == 0, completed.stderr[-3000:]
 
@@ -128,16 +128,16 @@ def test_models_of_the_models_file_are_read_offline(repository, elsewhere, tiny_
     shutil.copytree(tiny_bert, repository / "models" / "some-org_some-model")
     (repository / "models.txt").write_text("# The models to evaluate\nSome-Org/Some-Model\n")
 
-    completed = run_tool("InterVocabulariesCoverageMatrix.py", repository, "--offline", cwd=elsewhere)
+    completed = run_tool("MeasureVocabularyOverlap.py", repository, "--offline", cwd=elsewhere)
     assert completed.returncode == 0, completed.stderr[-3000:]
     assert completed.stdout.splitlines()[0] == "Some-Org/Some-Model - Some-Org/Some-Model : 100.0"
     assert (repository / "stats" / "matrix.txt").read_text() == "100.0\n"
 
 
 @pytest.mark.e2e
-def test_subword_analysis(repository, elsewhere, offline_datasets, tiny_bert):
+def test_count_subwords_per_word(repository, elsewhere, offline_datasets, tiny_bert):
     model = str(tiny_bert)
-    completed = run_tool("SubwordAnalysis.py", repository, "--models", model, "--offline", cwd=elsewhere)
+    completed = run_tool("CountSubwordsPerWord.py", repository, "--models", model, "--offline", cwd=elsewhere)
     assert completed.returncode == 0, completed.stderr[-3000:]
 
     # Number of tokens per word, for each example of the test set of each dataset
@@ -159,8 +159,8 @@ def test_subword_analysis(repository, elsewhere, offline_datasets, tiny_bert):
 
 
 @pytest.mark.e2e
-def test_classes_distribution(repository, elsewhere, offline_datasets):
-    completed = run_tool("ClassesDistribution.py", repository, "--offline", cwd=elsewhere)
+def test_count_classes_of_datasets(repository, elsewhere, offline_datasets):
+    completed = run_tool("CountClassesOfDatasets.py", repository, "--offline", cwd=elsewhere)
     assert completed.returncode == 0, completed.stderr[-3000:]
 
     distribution = read_json(repository / "stats" / "classes_distribution.json")
@@ -179,9 +179,9 @@ def test_classes_distribution(repository, elsewhere, offline_datasets):
 
 
 @pytest.mark.e2e
-def test_make_table_tokenization(repository, elsewhere, tiny_bert, tiny_flaubert):
+def test_tokenize_biomedical_terms(repository, elsewhere, tiny_bert, tiny_flaubert):
     models = [str(tiny_bert), str(tiny_flaubert)]
-    completed = run_tool("MakeTableTokenization.py", repository, "--models", *models, cwd=elsewhere)
+    completed = run_tool("TokenizeBiomedicalTerms.py", repository, "--models", *models, cwd=elsewhere)
     assert completed.returncode == 0, completed.stderr[-3000:]
 
     table = completed.stdout[completed.stdout.index("\\begin{table}"):]
@@ -195,7 +195,7 @@ def test_make_table_tokenization(repository, elsewhere, tiny_bert, tiny_flaubert
     assert all("-" in tokens or tokens == "\\checkmark" for _, *row in rows for tokens in row)
 
 
-def test_generate_latex_table(repository, elsewhere):
+def test_build_latex_table_of_scores(repository, elsewhere):
     (repository / "stats" / "overall_averaged_metrics.json").write_text(json.dumps({
         "Dr-BERT/DrBERT-7GB": {
             "cas|pos|1.0": {"overall_f1": 0.9, "overall_accuracy": 0.95},
@@ -206,7 +206,7 @@ def test_generate_latex_table(repository, elsewhere):
         "another/model": {"cas|pos|1.0": {"overall_f1": 0.8, "overall_accuracy": 0.85}},
     }))
     completed = run_tool(
-        "GenerateLatexTableFromResultsJSON.py", repository, "--models", "Dr-BERT/DrBERT-7GB", "another/model", cwd=elsewhere,
+        "BuildLatexTableOfScores.py", repository, "--models", "Dr-BERT/DrBERT-7GB", "another/model", cwd=elsewhere,
     )
     assert completed.returncode == 0, completed.stderr[-3000:]
 
@@ -222,20 +222,20 @@ def test_generate_latex_table(repository, elsewhere):
     assert table.count(" \\\\ ") == 5
 
 
-def test_generate_latex_table_of_the_models_file(repository, elsewhere):
+def test_build_latex_table_of_the_models_file(repository, elsewhere):
     """Without `--models`, the columns are the models of `models.txt`, but its comments."""
     (repository / "models.txt").write_text("# The models to evaluate\nalmanach/camembert-base\n\nDr-BERT/DrBERT-7GB\n")
     scores = {"cas|pos|1.0": {"overall_f1": 0.5, "overall_accuracy": 0.5}}
     (elsewhere / "averages.json").write_text(json.dumps({"almanach/camembert-base": scores, "Dr-BERT/DrBERT-7GB": scores}))
 
     # A path given on the command line is relative to the current directory
-    completed = run_tool("GenerateLatexTableFromResultsJSON.py", repository, "--results", "averages.json", cwd=elsewhere)
+    completed = run_tool("BuildLatexTableOfScores.py", repository, "--results", "averages.json", cwd=elsewhere)
     assert completed.returncode == 0, completed.stderr[-3000:]
     assert "\\textbf{Dataset} & \\textbf{Task} & \\textbf{CamemBERT} & \\textbf{DrBERT-FS} \\\\ " in completed.stdout
     assert "\\begin{tabular}{|l|l|c|c|}\n" in completed.stdout
 
 
-def test_draw_lines_plots_few_shot(repository, elsewhere):
+def test_plot_few_shot_scores(repository, elsewhere):
     def scores(base):
         """Scores of two runs of two tasks, for each proportion of the training set."""
         metrics_of_tasks = {"cas|pos": ("overall_f1", "overall_accuracy"), "clister|regr": ("edrm", "spearman_correlation_coef")}
@@ -251,7 +251,7 @@ def test_draw_lines_plots_few_shot(repository, elsewhere):
         # A model without a name for the figures is not drawn
         "another/model": scores(0.1),
     }))
-    completed = run_tool("DrawLinesPlotsFewShot.py", repository, cwd=elsewhere)
+    completed = run_tool("PlotFewShotScores.py", repository, cwd=elsewhere)
     assert completed.returncode == 0, completed.stderr[-3000:]
 
     # One figure per task

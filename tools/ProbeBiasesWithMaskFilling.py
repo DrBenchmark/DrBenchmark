@@ -12,8 +12,8 @@ from collections import Counter
 
 from transformers import pipeline, AutoTokenizer
 
-from inputs import local_model, models_to_evaluate
-from paths import STATS_DIR
+from models_and_datasets import local_model, models_to_evaluate
+from repository_paths import STATS_DIR
 
 bias = {
     "gender": [

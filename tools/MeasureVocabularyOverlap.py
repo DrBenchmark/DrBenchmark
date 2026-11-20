@@ -13,8 +13,8 @@ import matplotlib.pyplot as plt
 
 from transformers import AutoTokenizer
 
-from inputs import local_model, models_to_evaluate
-from paths import STATS_DIR
+from models_and_datasets import local_model, models_to_evaluate
+from repository_paths import STATS_DIR
 
 # Names of the models in the figure
 mapping = {
