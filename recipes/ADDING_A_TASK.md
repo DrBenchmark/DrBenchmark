@@ -74,7 +74,7 @@ python tools/CollectAndAverageScores.py
 python predict.py --task mycorpus-cls --model Dr-BERT/DrBERT-7GB "Le patient présente une toux sèche."
 ```
 
-The first command trains and evaluates a model, and writes its results in `recipes/mycorpus/runs/`. The second one collects the scores in `stats/results.json`. The third one predicts the class of a sentence with the model that the run kept.
+The first command trains and evaluates a model, and writes its results in `recipes/mycorpus/runs/`. The second one collects the scores in `stats/results.json`. The third one predicts the class of a sentence with the model that the run kept. [TUTORIAL.md](../TUTORIAL.md) shows what these commands print, for a task of the benchmark.
 
 ## 6. Add it to the tests
 

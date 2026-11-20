@@ -24,6 +24,8 @@ python run.py --tasks frenchmedmcqa-mcqa --models Dr-BERT/DrBERT-7GB --nb-run 1
 python run.py --tasks all --nb-run 4
 ```
 
+**New to the benchmark?** [TUTORIAL.md](./TUTORIAL.md) goes through one task step by step, with what each command prints: it trains a model, collects the scores of its runs and tests the model on a sentence.
+
 **Note**: With conda, `conda env create -f environment.yml` creates the `DrBenchmark` environment and installs the dependencies of `requirements.txt` in it: it does what the two commands above do.
 
 **Note**: The access to **DEFT-2019** data is restricted. Once data is acquired, add files to `./recipes/deft2019/data/` (see [its README](./recipes/deft2019/README.md) for the expected layout).
