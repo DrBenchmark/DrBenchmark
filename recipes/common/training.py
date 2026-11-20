@@ -7,6 +7,7 @@
 """Steps shared by the fine-tuning scripts of every kind of task."""
 
 import os
+import sys
 import json
 import shutil
 import logging
@@ -38,10 +39,57 @@ class Run:
     model_path: str
 
 
+def local_dataset(args):
+    """Directory of the copy of the dataset that is read in offline mode."""
+    return f"{args.data_dir.rstrip('/')}/local_hf_{args.subset}/"
+
+
+def check_local_copies(args, needs_data_dir=False):
+    """In offline mode, stop the script when the copy of its dataset or of its model is missing, and say what to do.
+
+    Otherwise `load_from_disk` and `from_pretrained` fail on a directory that they do not
+    find, without a word about the scripts that save these copies.
+    """
+    hub = "on a machine that has access to the HuggingFace Hub"
+    missing = []
+    # What can be read from the Hub instead
+    on_the_hub = []
+
+    if not os.path.isdir(local_dataset(args)):
+        subset = f" (subset {args.subset})" if args.subset else ""
+        message = f"The dataset {args.dataset}{subset} is not in {os.path.abspath(local_dataset(args))}, where it is read in offline mode.\n"
+        if needs_data_dir:
+            # DEFT-2019: its access is restricted
+            message += "It is not on the HuggingFace Hub and `download_datasets_locally.py` does not save it: see the README of its recipe."
+        else:
+            message += f"Save the datasets with `python {os.path.join(utils.REPO_DIR, 'download_datasets_locally.py')}`, {hub}."
+            on_the_hub.append("the dataset")
+        missing.append(message)
+
+    # `hub_model_name` is the model when it is not a path that exists: its copy is read in `models/`
+    if args.hub_model_name is not None and not os.path.isdir(args.model_name):
+        missing.append(
+            f"The model {args.hub_model_name} is not a directory, and its copy is not in {os.path.abspath(args.model_name)}, "
+            "where it is read in offline mode.\n"
+            f"Save the models of models.txt with `python {os.path.join(utils.REPO_DIR, 'download_models_locally.py')}`, {hub}."
+        )
+        on_the_hub.append("the model")
+
+    if not missing:
+        return
+    if on_the_hub:
+        missing.append(
+            f"To read {' and '.join(on_the_hub)} from the HuggingFace Hub instead, give `--offline false` "
+            f"or set `offline: False` in {os.path.join(utils.REPO_DIR, 'config.yaml')}."
+        )
+    sys.exit("\n\n".join(missing))
+
+
 def start(dataset_name, needs_data_dir=False):
     """Parse the command line, fix the seed and load the dataset.
 
-    In offline mode, the dataset is read from `<data_dir>/local_hf_<subset>/`.
+    In offline mode, the dataset is read from `<data_dir>/local_hf_<subset>/`: the script stops,
+    and says which script saves them, when this copy or the one of the model is missing.
     Otherwise `dataset_name` is given to `datasets.load_dataset`, with `--data_dir`
     when `needs_data_dir` is set (loading script that reads local files).
     """
@@ -62,7 +110,8 @@ def start(dataset_name, needs_data_dir=False):
 
     set_seed(args.seed)
     if args.offline:
-        dataset = load_from_disk(f"{args.data_dir.rstrip('/')}/local_hf_{args.subset}/")
+        check_local_copies(args, needs_data_dir)
+        dataset = load_from_disk(local_dataset(args))
     else:
         kwargs = {"data_dir": args.data_dir} if needs_data_dir else {}
         dataset = load_dataset(dataset_name, name=args.subset, **kwargs)

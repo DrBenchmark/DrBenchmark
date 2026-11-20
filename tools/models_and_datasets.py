@@ -1,9 +1,13 @@
 """What the tools analyse: the models of `models.txt` and the datasets of the benchmark."""
 
 import os
+import sys
 from glob import glob
 
 from repository_paths import MODELS_FILE, RECIPES_DIR, REPO_DIR
+
+
+HUB = "on a machine that has access to the HuggingFace Hub"
 
 
 def models_to_evaluate():
@@ -17,10 +21,17 @@ def local_model(name, offline):
     """What is given to `from_pretrained` to load a model.
 
     In offline mode, a model that is not given by a path is read where
-    `download_models_locally.py` saves it, as the recipes do.
+    `download_models_locally.py` saves it, as the recipes do. The tool stops when it is not there.
     """
     if offline and not os.path.exists(name):
-        return os.path.join(REPO_DIR, "models", name.lower().replace('/', '_'))
+        path = os.path.join(REPO_DIR, "models", name.lower().replace('/', '_'))
+        if not os.path.isdir(path):
+            sys.exit(
+                f"The model {name} is not a directory, and its copy is not in {path}, where it is read with --offline.\n"
+                f"Save the models of models.txt with `python {os.path.join(REPO_DIR, 'download_models_locally.py')}`, "
+                f"{HUB}, or do not give --offline."
+            )
+        return path
     return name
 
 
@@ -28,8 +39,8 @@ def load_benchmark_dataset(name, subset, offline, **kwargs):
     """A dataset of the benchmark, with its three splits: `DrBenchmark/<corpus>` on the HuggingFace Hub.
 
     In offline mode, it is read where `download_datasets_locally.py` saves it, as the
-    recipes do: `recipes/<corpus>/data/local_hf_<subset>/`. `kwargs` are given to
-    `datasets.load_dataset`.
+    recipes do: `recipes/<corpus>/data/local_hf_<subset>/`. The tool stops when it is not
+    there. `kwargs` are given to `datasets.load_dataset`.
     """
     # Imported here: most of the tools do not read any dataset
     from datasets import load_dataset, load_from_disk
@@ -44,6 +55,13 @@ def load_benchmark_dataset(name, subset, offline, **kwargs):
         copies = glob(os.path.join(data_dir, "local_hf_*"))
         if len(copies) == 1:
             path = copies[0]
+    if not os.path.isdir(path):
+        of_the_subset = f" (subset {subset})" if subset else ""
+        sys.exit(
+            f"The dataset {name}{of_the_subset} is not in {path}, where it is read with --offline.\n"
+            f"Save the datasets with `python {os.path.join(REPO_DIR, 'download_datasets_locally.py')}`, "
+            f"{HUB}, or do not give --offline."
+        )
     return load_from_disk(path)
 
 

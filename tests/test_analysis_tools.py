@@ -136,6 +136,28 @@ def test_models_of_the_models_file_are_read_offline(repository, elsewhere, tiny_
 
 
 @pytest.mark.e2e
+def test_missing_model_in_offline_mode(repository, elsewhere):
+    """A tool says which script saves the copy of a model that it does not find, instead of failing on a directory."""
+    completed = run_tool("MeasureVocabularyOverlap.py", repository, "--offline", "--models", "Some-Org/Some-Model", cwd=elsewhere)
+    assert completed.returncode == 1
+    assert "Traceback" not in completed.stderr
+    assert f"its copy is not in {repository / 'models' / 'some-org_some-model'}, where it is read with --offline." in completed.stderr
+    assert f"`python {repository / 'download_models_locally.py'}`" in completed.stderr
+
+
+@pytest.mark.e2e
+def test_missing_dataset_in_offline_mode(repository, elsewhere):
+    """A tool says which script saves the copy of a dataset that it does not find."""
+    completed = run_tool("CountClassesOfDatasets.py", repository, "--offline", cwd=elsewhere)
+    assert completed.returncode == 1
+    assert "Traceback" not in completed.stderr
+    data = repository / "recipes" / "quaero" / "data" / "local_hf_emea"
+    assert f"The dataset DrBenchmark/QUAERO (subset emea) is not in {data}, where it is read with --offline." in completed.stderr
+    assert f"`python {repository / 'download_datasets_locally.py'}`" in completed.stderr
+    assert not (repository / "stats" / "classes_distribution.json").exists()
+
+
+@pytest.mark.e2e
 def test_count_subwords_per_word(repository, elsewhere, offline_datasets, tiny_bert):
     model = str(tiny_bert)
     completed = run_tool("CountSubwordsPerWord.py", repository, "--models", model, "--offline", cwd=elsewhere)
