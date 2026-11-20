@@ -20,6 +20,7 @@ python tools/CollectAndAverageScores.py --help
 | [BuildExcelTableOfScores.py](./BuildExcelTableOfScores.py)               | Builds the table of the benchmark                                         | `stats/overall_results_<n>runs.xlsx`, or CSV printed                                          |
 | [BuildLatexTableOfScores.py](./BuildLatexTableOfScores.py)               | Builds the LaTeX table of the scores                                      | printed                                                                                       |
 | [PlotFewShotScores.py](./PlotFewShotScores.py)                           | Draws the scores for each proportion of the training set                  | `stats/fewshot/<corpus>@<task>.pdf`                                                           |
+| [ShowPredictionErrors.py](./ShowPredictionErrors.py)                     | Shows the test examples that a run got wrong, and the classes it confused | printed                                                                                       |
 | [ProbeBiasesWithMaskFilling.py](./ProbeBiasesWithMaskFilling.py)         | Lists the words the models predict about groups of patients               | `stats/bias.json`, `stats/bias.tex`                                                           |
 | [MeasureVocabularyOverlap.py](./MeasureVocabularyOverlap.py)             | Measures how much the vocabularies of the models overlap                  | `stats/matrix.txt`, `stats/matrix_Blues.png`                                                  |
 | [CountSubwordsPerWord.py](./CountSubwordsPerWord.py)                     | Counts the sub-word tokens per word of each dataset, for each model       | `stats/tokens.json`, LaTeX rows printed                                                       |
@@ -93,6 +94,22 @@ Prints the LaTeX table of the averaged scores (`stats/overall_averaged_metrics.j
 ### PlotFewShotScores.py
 
 Draws, for each task, the score of the models when they are trained on 25%, 50%, 75% and 100% of the training set: `stats/fewshot/<corpus>@<task>.pdf`. The runs on a part of the training set are the ones started with `--fewshot 0.25`, `0.5` or `0.75`; a run with another proportion makes the tool fail. Only the models that have a short name in the `mapping` of the tool are drawn. `--results` gives another file than `stats/results.json`.
+
+### ShowPredictionErrors.py
+
+Shows what a run got wrong on the test set. The results of a run have its predictions, but neither the text of the examples nor, for some tasks, the names of the classes: the test set is read again (from the HuggingFace Hub, or from its local copy with `--offline`).
+
+```bash
+python tools/ShowPredictionErrors.py --task cas-pos --model Dr-BERT/DrBERT-7GB
+python tools/ShowPredictionErrors.py --run recipes/cas/runs/DrBenchmark-cas-pos-8c05112b3a9ba5af.json
+```
+
+The run is the one of a task for a model on the whole training set, with the lowest seed or the one of `--seed`, or the one of a results file (`--run`). The tool prints:
+
+- the confusions, the most frequent ones first (`--max-confusions`, 20 by default): `expected -> predicted: number of times`. For a multi-label task, a class is `(missing)` or added to `(none)`;
+- the examples with an error (`--max-examples`, 20 by default), with what was expected and what was predicted. A sentence of a tagging task is shown with its wrong words: `toux [B-NOM -> B-ADJ]`. The other tasks show the texts of the example, cut at 300 characters (`--max-length`).
+
+A similarity score has no class: the examples are the ones whose predicted score is the farthest from the expected one.
 
 ## Analyses of the models and of the datasets
 
