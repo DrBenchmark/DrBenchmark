@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Predict with a model that a run of the benchmark kept, on sentences that are typed.
 
+    python predict.py --list
     python predict.py --task cas-pos --model Dr-BERT/DrBERT-7GB "Le patient présente une toux sèche."
     python predict.py --task cas-pos --model Dr-BERT/DrBERT-7GB
     python predict.py --model-dir recipes/cas/save_models/<run>_best_model "Le patient présente une toux sèche."
@@ -8,7 +9,8 @@
 A run keeps its best model in `recipes/<recipe>/save_models/` and writes its results in
 `recipes/<recipe>/runs/`. The model is the one of a task (`--task`, a name of `python run.py
 --help`) for a model that was fine-tuned (`--model`, as it was given to `run.py`). When
-several runs kept their model, the one of the first seed is taken, or the one of `--seed`.
+several runs kept their model, the one with the best score on the validation set is taken,
+or the one of `--seed`. `--list` shows the runs, their scores and the one that is taken.
 `--model-dir` gives the directory of a kept model instead, wherever it is.
 
 What the model reads is built by the script of the task, as when the model was trained.
@@ -134,6 +136,7 @@ class Run:
     # Score on the validation set of the checkpoint that the run kept, and the name of this score when it is known
     validation: float
     validation_metric: str
+    lower_is_better: bool
     # Directory of the model that the run kept: None when it is not there
     model_dir: str
     # Why the model is not there
@@ -149,6 +152,8 @@ def read_run(path):
     state = results.get("trainer_state") or {}
     validation = results.get("validation") or {}
     metric = validation.get("metric")
+    # The error of a similarity score is the only score of the benchmark that is better when it is lower
+    lower_is_better = metric == "rmse" if metric else any("eval_rmse" in entry for entry in state.get("log_history") or [])
 
     # The run wrote the path from the directory of its script
     model_dir, missing = os.path.normpath(os.path.join(scripts_dir, results["model_name"])), None
@@ -165,6 +170,7 @@ def read_run(path):
         metrics=results["metrics"],
         validation=validation.get("score", state.get("best_metric")),
         validation_metric=metric,
+        lower_is_better=lower_is_better,
         model_dir=model_dir,
         missing=missing,
     )
@@ -187,6 +193,70 @@ def read_runs(task=None, model=None):
     runs = [read_run(path) for path in sorted(glob(os.path.join(RECIPES_DIR, recipe, "runs", "*.json")))]
     runs = [run for run in runs if (task is None or run.task == task) and (model is None or is_model(run, model))]
     return sorted(runs, key=lambda run: (run.task, run.model, run.fewshot != 1.0, run.fewshot, run.seed))
+
+
+def best_run(runs):
+    """The run whose kept model is taken among the ones of a task for a model: the best one on the validation set.
+
+    The runs on a part of the training set are not taken. None when no run kept its model.
+    """
+    candidates = [run for run in runs if run.model_dir is not None and run.fewshot == 1.0]
+    if not candidates:
+        return None
+
+    def rank(run):
+        if run.validation is None:
+            return (1, 0, run.seed)
+        return (0, run.validation if run.lower_is_better else -run.validation, run.seed)
+
+    return min(candidates, key=rank)
+
+
+def main_scores(metrics):
+    """The scores of a run that the tables of the benchmark show: {name: score}."""
+    if "overall_f1" in metrics:
+        return {"f1": metrics["overall_f1"], "accuracy": metrics["overall_accuracy"]}
+    if "macro avg" in metrics:
+        return {"macro_f1": metrics["macro avg"]["f1-score"], "weighted_f1": metrics["weighted avg"]["f1-score"]}
+    if "hamming_score" in metrics:
+        return {"hamming": metrics["hamming_score"], "exact_match": metrics["exact_match"]}
+    if "EDRM" in metrics:
+        return {"edrm": metrics["EDRM"], "spearman": metrics["spearman_correlation_coef"]}
+    return {name: value for name, value in metrics.items() if isinstance(value, float)}
+
+
+def number(value):
+    return "-" if value is None else f"{value:.4f}"
+
+
+def list_runs(task=None, model=None):
+    """A table of the runs: their scores, whether their model is there, and the one that is taken for each model."""
+    runs = read_runs(task, model)
+    if not runs:
+        return f"No run in {os.path.join(RECIPES_DIR, task.split('-')[0] if task else '*', 'runs')}" \
+            + (f" for the task {task}" if task else "") + (f" for the model {model}" if model else "") + "."
+
+    taken = set()
+    for name in sorted({(run.task, run.model) for run in runs}):
+        best = best_run([run for run in runs if (run.task, run.model) == name])
+        if best is not None:
+            taken.add(best.path)
+
+    few_shot = any(run.fewshot != 1.0 for run in runs)
+    header = ["task", "model", "seed"] + (["train"] if few_shot else []) + ["validation", "test", "kept model"]
+    rows = []
+    for run in runs:
+        validation = number(run.validation) + (f" ({run.validation_metric})" if run.validation_metric and run.validation is not None else "")
+        test = ", ".join(f"{name} {number(score)}" for name, score in main_scores(run.metrics).items())
+        kept = ("yes, taken" if run.path in taken else "yes") if run.model_dir is not None else run.missing
+        rows.append([run.task, run.model, str(run.seed)] + ([f"{run.fewshot:g}"] if few_shot else []) + [validation, test, kept])
+
+    widths = [max(len(row[column]) for row in [header] + rows) for column in range(len(header))]
+    lines = ["  ".join(cell.ljust(width) for cell, width in zip(row, widths)).rstrip() for row in [header] + rows]
+    lines.append("")
+    lines.append("validation: score, on the validation set, of the checkpoint that the run kept. For a task and a model, "
+                 "the model that is taken is the one of the run with the best one, among the runs on the whole training set.")
+    return "\n".join(lines)
 
 
 def chosen_run(task, model, seed=None):
@@ -213,8 +283,7 @@ def chosen_run(task, model, seed=None):
             raise PredictError(f"The model of the run of {task} for {model} with the seed {seed} is {run.missing}: {run.path}")
         return run, runs
 
-    # The first of the runs, which are sorted by their seeds
-    run = next((run for run in runs if run.model_dir is not None), None)
+    run = best_run(runs)
     if run is None:
         raise PredictError(
             f"No run of {task} for {model} kept its model:\n"
@@ -279,6 +348,8 @@ def load(task=None, model=None, seed=None, model_dir=None):
             "task": run.task, "model": run.model, "seed": run.seed, "max_length": run.hyperparameters.get("max_position_embeddings"),
             "validation": {"metric": run.validation_metric, "score": run.validation},
             "metrics": run.metrics, "results": run.path,
+            # The number of runs the model was chosen among: one when its seed is given
+            "chosen_among": 1 if seed is not None else len([other for other in runs if other.model_dir is not None]),
         }
 
     # What the run wrote next to its model
@@ -356,20 +427,26 @@ def arguments():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("texts", nargs="*", metavar="TEXT",
                         help="Texts of the examples to predict: one text per example, or as many as the task reads.")
+    parser.add_argument("--list", action="store_true",
+                        help="List the runs, their scores and the models that they kept. With --task or --model: only their runs.")
     parser.add_argument("--task", type=str, default=None,
                         help="Task of the model: one of the names of `python run.py --help`.")
     parser.add_argument("--model", type=str, default=None,
                         help="Model that was fine-tuned: its name on the HuggingFace Hub, or its path.")
     parser.add_argument("--seed", type=int, default=None,
-                        help="Seed of the run whose model is used (default: the first seed whose run kept its model).")
+                        help="Seed of the run whose model is used (default: the run with the best score on the validation set).")
     parser.add_argument("--model-dir", type=str, default=None, metavar="DIR",
                         help="Directory of a model that a run kept, instead of --task and --model.")
     parser.add_argument("--words", action="store_true",
                         help="The sentences are already split into words, at their spaces: they are not split again.")
     args = parser.parse_args()
 
+    if args.list:
+        if args.texts or args.model_dir:
+            parser.error("--list only goes with --task and --model")
+        return args
     if args.model_dir is None and (args.task is None or args.model is None):
-        parser.error("give the model: --task and --model, or --model-dir")
+        parser.error("give the model: --task and --model, or --model-dir (the runs are listed by --list)")
     if args.model_dir is not None and (args.model is not None or args.seed is not None):
         parser.error("--model-dir is the directory of one model: --model and --seed choose one among runs")
     return args
@@ -416,12 +493,18 @@ def what_is_loaded(model):
     validation = description.get("validation") or {}
     if validation.get("score") is not None:
         line += f" (validation{' ' + validation['metric'] if validation.get('metric') else ''}: {validation['score']:.4f}"
+        if description.get("chosen_among", 1) > 1:
+            line += f", the best of the {description['chosen_among']} runs that kept their model"
         line += ")"
     return line
 
 
 def main():
     args = arguments()
+    if args.list:
+        print(list_runs(args.task, args.model))
+        return
+
     model = load(args.task, args.model, args.seed, args.model_dir)
     # On the standard error: the standard output only has the predictions
     print(what_is_loaded(model), file=sys.stderr)

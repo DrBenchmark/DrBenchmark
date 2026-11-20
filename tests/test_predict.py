@@ -8,6 +8,7 @@ ones marked `e2e` use the models that the recipes keep after a training on synth
 import json
 import math
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -175,23 +176,96 @@ def test_model_which_is_not_there(runs, predict):
     assert (removed.model_dir, removed.missing) == (None, "not here")
 
 
-def test_run_whose_model_is_used(runs, predict):
-    removed = runs.write(seed=0, validation=0.875, kept=False)
+def test_best_run_is_the_best_one_on_the_validation_set(runs, predict):
+    runs.write(seed=0, validation=0.5)
+    best = runs.write(seed=1, validation=0.75)
+    runs.write(seed=2, validation=0.625)
+    # A run that is better, but whose model is not there, or which read a part of the training set
+    runs.write(seed=3, validation=0.875, kept=False)
+    runs.write(seed=5, validation=0.96875, fewshot=0.5)
+    assert predict.best_run(predict.read_runs()).path == str(best)
+
+
+def test_first_seed_is_taken_among_equal_runs(runs, predict):
+    runs.write(seed=2, validation=0.5)
     first = runs.write(seed=1, validation=0.5)
-    runs.write(seed=2, validation=0.75)
+    assert predict.best_run(predict.read_runs()).path == str(first)
+
+
+@pytest.mark.parametrize("recent", [True, False])
+def test_lowest_error_is_the_best_similarity_run(recent, runs, predict):
+    """The error of a similarity score is better when it is lower: the first scripts did not write its name."""
+    scores = {"EDRM": 0.5, "spearman_correlation_coef": 0.25, "spearman_correlation_p": 0.01}
+    runs.write(task="clister-regr", seed=0, validation=1.5, metric="rmse", metrics=scores, recent=recent)
+    best = runs.write(task="clister-regr", seed=1, validation=0.75, metric="rmse", metrics=scores, recent=recent)
+    runs.write(task="clister-regr", seed=2, validation=1.25, metric="rmse", metrics=scores, recent=recent)
+    read = predict.read_runs()
+    assert all(run.lower_is_better for run in read)
+    assert predict.best_run(read).path == str(best)
+    # The other scores are better when they are higher
+    runs.write(task="cas-pos", recent=recent)
+    assert not predict.read_runs("cas-pos")[0].lower_is_better
+
+
+def test_no_best_run_without_a_kept_model(runs, predict):
+    runs.write(seed=0, kept=False)
+    assert predict.best_run(predict.read_runs()) is None
+    assert predict.best_run([]) is None
+
+
+def test_list_of_the_runs(runs, predict):
+    runs.write(seed=0, validation=0.5)
+    runs.write(seed=1, validation=0.75)
+    runs.write(seed=3, validation=0.9, kept=False)
+    runs.write(task="clister-regr", seed=0, validation=1.5, metric="rmse", recent=False,
+               metrics={"EDRM": 0.5, "spearman_correlation_coef": 0.25, "spearman_correlation_p": 0.01})
+    runs.write(task="cas-cls", seed=0, validation=0.25, metric="accuracy",
+               metrics={"macro avg": {"f1-score": 0.125}, "weighted avg": {"f1-score": 0.375}, "accuracy": 0.5})
+
+    lines = predict.list_runs().splitlines()
+    table = [re.split(r"  +", line) for line in lines[:lines.index("")]]
+    assert table == [
+        ["task", "model", "seed", "validation", "test", "kept model"],
+        ["cas-cls", MODEL, "0", "0.2500 (accuracy)", "macro_f1 0.1250, weighted_f1 0.3750", "yes, taken"],
+        ["cas-pos", MODEL, "0", "0.5000 (f1)", "f1 0.7500, accuracy 0.8750", "yes"],
+        ["cas-pos", MODEL, "1", "0.7500 (f1)", "f1 0.7500, accuracy 0.8750", "yes, taken"],
+        ["cas-pos", MODEL, "3", "0.9000 (f1)", "f1 0.7500, accuracy 0.8750", "not here"],
+        # The first scripts did not write the name of the score of the validation set
+        ["clister-regr", MODEL, "0", "1.5000", "edrm 0.5000, spearman 0.2500", "yes, taken"],
+    ]
+    # The columns are aligned
+    assert len({line.index(MODEL) for line in lines[1:lines.index("")]}) == 1
+
+    assert {line.split()[0] for line in predict.list_runs("cas-pos").splitlines()[1:4]} == {"cas-pos"}
+    assert predict.list_runs("essai-pos") == f"No run in {runs.recipes / 'essai' / 'runs'} for the task essai-pos."
+    assert predict.list_runs(model="x/y") == f"No run in {runs.recipes / '*' / 'runs'} for the model x/y."
+
+
+def test_list_says_which_part_of_the_training_set_a_run_read(runs, predict):
+    runs.write(seed=0)
+    runs.write(seed=0, fewshot=0.25, validation=0.75)
+    lines = predict.list_runs().splitlines()
+    assert re.split(r"  +", lines[0]) == ["task", "model", "seed", "train", "validation", "test", "kept model"]
+    # The run on a part of the training set is not the one that is taken
+    assert [re.split(r"  +", line)[3::3] for line in lines[1:3]] == [["1", "yes, taken"], ["0.25", "yes"]]
+
+
+def test_run_whose_model_is_used(runs, predict):
+    runs.write(seed=0, validation=0.5)
+    best = runs.write(seed=1, validation=0.75)
+    removed = runs.write(seed=2, validation=0.875, kept=False)
     runs.write(task="cas-cls", seed=7, validation=0.9)
 
-    # The first seed whose run kept its model
     run, among = predict.chosen_run("cas-pos", MODEL)
-    assert run.path == str(first) and [other.seed for other in among] == [0, 1, 2]
-    assert predict.chosen_run("cas-pos", MODEL, seed=2)[0].seed == 2
+    assert run.path == str(best) and [other.seed for other in among] == [0, 1, 2]
+    assert predict.chosen_run("cas-pos", MODEL, seed=0)[0].seed == 0
 
     with pytest.raises(predict.PredictError) as error:
         predict.chosen_run("cas-pos", MODEL, seed=7)
     assert str(error.value) == f"No run of cas-pos for {MODEL} has the seed 7: the seeds of its runs are 0, 1, 2."
     with pytest.raises(predict.PredictError) as error:
-        predict.chosen_run("cas-pos", MODEL, seed=0)
-    assert str(error.value) == f"The model of the run of cas-pos for {MODEL} with the seed 0 is not here: {removed}"
+        predict.chosen_run("cas-pos", MODEL, seed=2)
+    assert str(error.value) == f"The model of the run of cas-pos for {MODEL} with the seed 2 is not here: {removed}"
 
 
 def test_no_run_for_the_model(runs, predict):
@@ -268,10 +342,24 @@ def imported_modules(stderr):
     return {line.split("|")[-1].strip().split(".")[0] for line in stderr.splitlines() if line.startswith("import time:")}
 
 
+def test_predict_py_does_not_load_torch_to_list_the_runs():
+    """The list of the runs is read in their results: nothing of what trains a model is needed."""
+    completed = subprocess.run(
+        [sys.executable, "-X", "importtime", str(REPO / "predict.py"), "--list", "--task", "cas-pos", "--model", "no/model"],
+        capture_output=True, text=True, timeout=120,
+    )
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    assert completed.stdout.startswith("No run in ")
+    imported = imported_modules(completed.stderr)
+    assert "json" in imported and not imported & {"torch", "transformers", "datasets"}
+
+
 @pytest.mark.parametrize("arguments, message", [
     ([], "give the model: --task and --model, or --model-dir"),
     (["--task", "cas-pos"], "give the model: --task and --model, or --model-dir"),
     (["--model-dir", "somewhere", "--seed", "1"], "--model-dir is the directory of one model"),
+    ([], "(the runs are listed by --list)"),
+    (["--list", "a sentence"], "--list only goes with --task and --model"),
 ], ids=lambda value: " ".join(value) if isinstance(value, list) else None)
 def test_wrong_arguments(arguments, message):
     completed = subprocess.run([sys.executable, str(REPO / "predict.py"), *arguments], capture_output=True, text=True, timeout=120)
@@ -562,8 +650,27 @@ def runs_of(repository, task_name):
 def taken_run(repository, task_name):
     """The seed and the results of the run whose model `predict.py` takes for a task."""
     runs = runs_of(repository, task_name)
-    seed = min(runs)
+    seed = min(runs, key=lambda seed: (-runs[seed]["validation"]["score"], seed))
     return seed, runs[seed]
+
+
+@pytest.mark.e2e
+def test_list_of_the_models_that_run_py_trained(trained_repository, tiny_bert, tmp_path):
+    completed = run_predict(trained_repository, "--list", cwd=tmp_path)
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    lines = completed.stdout.splitlines()
+    rows = [re.split(r"  +", line) for line in lines[1:5]]
+    assert [row[:3] for row in rows] == [
+        ["cas-cls", str(tiny_bert), "0"], ["cas-cls", str(tiny_bert), "1"], ["cas-pos", str(tiny_bert), "0"], ["cas-pos", str(tiny_bert), "1"],
+    ]
+    for task_name, task_rows in (("cas-cls", rows[:2]), ("cas-pos", rows[2:])):
+        runs = runs_of(trained_repository, task_name)
+        for row in task_rows:
+            seed = int(row[2])
+            metric = "accuracy" if task_name == "cas-cls" else "f1"
+            assert row[3] == f"{runs[seed]['validation']['score']:.4f} ({metric})"
+            assert row[5] == ("yes, taken" if seed == taken_run(trained_repository, task_name)[0] else "yes")
+    assert rows[2][4] == "f1 {overall_f1:.4f}, accuracy {overall_accuracy:.4f}".format(**runs_of(trained_repository, "cas-pos")[0]["metrics"])
 
 
 @pytest.mark.e2e
@@ -578,7 +685,8 @@ def test_sentence_is_labelled_by_the_model_that_a_run_kept(trained_repository, t
     assert all(word.rsplit("/", 1)[1] in [tag[2:] for tag in synthetic.POS_TAGS] for word in words)
 
     seed, run = taken_run(trained_repository, "cas-pos")
-    assert f"Model: tiny-bert fine-tuned on cas-pos, seed {seed} (validation f1: {run['validation']['score']:.4f})" in completed.stderr
+    assert (f"Model: tiny-bert fine-tuned on cas-pos, seed {seed} (validation f1: {run['validation']['score']:.4f}, "
+            "the best of the 2 runs that kept their model)") in completed.stderr
 
     # The model of the other run
     other = run_predict(trained_repository, "--task", "cas-pos", "--model", tiny_bert, "--seed", 1 - seed, "le patient présente une douleur thoracique.")

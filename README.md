@@ -79,13 +79,15 @@ almanach/camembert-bio-base
 Each run keeps its best model in `recipes/<recipe>/save_models/`. `predict.py` predicts with it on your own sentences.
 
 ```bash
+# The runs, their scores and the models that they kept
+python predict.py --list
 # The labels of the words of a sentence
 python predict.py --task cas-pos --model Dr-BERT/DrBERT-7GB "Le patient présente une toux sèche."
 # Without a sentence, they are asked for until an empty line
 python predict.py --task cas-pos --model Dr-BERT/DrBERT-7GB
 ```
 
-**Which model**: `--task` is a name of `python run.py --help` and `--model` the model that was fine-tuned, as it was given to `run.py`. When several runs kept their model, the one of the first seed is taken (`--seed` takes another one); the runs on a part of the training set (`--fewshot`) are not taken. `--model-dir` gives the directory of a kept model instead, wherever it is.
+**Which model**: `--task` is a name of `python run.py --help` and `--model` the model that was fine-tuned, as it was given to `run.py`. When several runs kept their model, the one with the best score on the validation set is taken (`--seed` takes another one); the runs on a part of the training set (`--fewshot`) are not taken. `python predict.py --list` shows, for each run, its score on the validation set, its scores on the test set, whether its model is there and which one is taken. `--model-dir` gives the directory of a kept model instead, wherever it is.
 
 **What the model reads** is built by the script of the task, by the code that built it when the model was trained: the stop words of DiaMED are removed, the question and the five answers of FrenchMedMCQA are joined, and so on. A task that reads several texts is given them in their order, which `predict.py` says when their number is wrong: two sentences for CLISTER, a question and its five answers for FrenchMedMCQA.
 
