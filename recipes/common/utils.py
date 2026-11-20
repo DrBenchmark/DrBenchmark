@@ -4,7 +4,6 @@ import yaml
 import json
 import random
 import hashlib
-import logging
 import argparse
 
 

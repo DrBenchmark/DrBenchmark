@@ -37,7 +37,7 @@ def main():
         res = tokenizer(text, truncation=True, max_length=args.max_position_embeddings, padding="do_not_pad")
         res["text"] = text
 
-        labels_letters = [original_labels_list[l] for l in e["correct_answers"]]  # Get from the answers indexes to the original letters
+        labels_letters = [original_labels_list[label] for label in e["correct_answers"]]  # Get from the answers indexes to the original letters
         labels_letters = "".join(sorted(labels_letters))  # Transform the multi-label answers into a multi-class problem
         labels_letters = labels_list.index(labels_letters)  # Get the corresponding index of the class
         res["label"] = labels_letters

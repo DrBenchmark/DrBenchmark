@@ -9,7 +9,7 @@ from number_of_runs import NB_RUNS
 from repository_paths import REPO_DIR, STATS_DIR
 
 sys.path.append(REPO_DIR)
-from run import task2script
+from run import task2script  # noqa: E402
 
 slurm_template = """#!/bin/bash
 #SBATCH --job-name=DrBenchmark

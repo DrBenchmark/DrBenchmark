@@ -14,6 +14,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install the linter
+        # One version: a newer one may have new rules, and fail on code that did not change
+        run: pip install flake8==7.5.0
+
+      - name: Check the code
+        # The default rules of flake8, but the length of the lines: see .flake8
+        run: flake8
+
   tests:
     name: tests (Python ${{ matrix.python-version }}, ${{ matrix.dependencies }} dependencies)
     runs-on: ubuntu-latest

@@ -44,7 +44,7 @@ def EDRM(ref, systm, debug=False):
         if debug:
             logging.info(f"dsum: {dsum}")
     edrm = dsum / len(ref)
-    return(edrm)
+    return edrm
 
 
 def SpMnCorr(ref, systm, alpha=0.05):
@@ -57,9 +57,9 @@ def SpMnCorr(ref, systm, alpha=0.05):
             logging.info("Spearman Correlation: reference and system result are NOT correlated")
         else:
             logging.info("Spearman Correlation: reference and system result are correlated")
-        return([c, p])
+        return [c, p]
     else:
-        return(["error", "error"])
+        return ["error", "error"]
 
 
 def main(dataset, text_columns, label_column):

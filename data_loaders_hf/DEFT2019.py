@@ -13,15 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
 import os
-import ast
-import json
 import random
 from pathlib import Path
-from itertools import product
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import datasets
 import numpy as np
@@ -85,9 +81,9 @@ class DEFT2019(datasets.GeneratorBasedBuilder):
 
     BUILDER_CONFIGS.append(
         DrBenchmarkConfig(
-            name=f"DEFT_2019",
+            name="DEFT_2019",
             version=SOURCE_VERSION,
-            description=f"DEFT 2019",
+            description="DEFT 2019",
             schema="source"
         )
     )
@@ -428,14 +424,14 @@ class DEFT2019(datasets.GeneratorBasedBuilder):
                 for idx_j, j in enumerate(i['spans']):
 
                     len_j = int(j['end']) - int(j['start'])
-                    range_j = [l for l in range(int(j['start']), int(j['end']), 1)]
+                    range_j = [position for position in range(int(j['start']), int(j['end']), 1)]
 
                     keep = True
 
                     for idx_k, k in enumerate(i['spans'][idx_j + 1:]):
 
                         len_k = int(k['end']) - int(k['start'])
-                        range_k = [l for l in range(int(k['start']), int(k['end']), 1)]
+                        range_k = [position for position in range(int(k['start']), int(k['end']), 1)]
 
                         inter = list(set(range_k).intersection(set(range_j)))
                         if len(inter) > 0 and len_j < len_k:

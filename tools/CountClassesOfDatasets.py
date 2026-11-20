@@ -83,12 +83,12 @@ def main():
 
                 if task["corpus"].lower().find("quaero") != -1 or task["corpus"].lower().find("mantragsc") != -1:
 
-                    label_list = dataset.features[f"ner_tags"].feature.names
+                    label_list = dataset.features["ner_tags"].feature.names
                     current_classes = [label_list[n] for n in e['ner_tags']]
 
                 if task["corpus"].lower().find("e3c") != -1:
 
-                    label_list = dataset.features[f"ner_tags"].feature.names
+                    label_list = dataset.features["ner_tags"].feature.names
                     current_classes = [label_list[n] for n in e['ner_tags']]
 
                 if (task["corpus"].lower().find("essai") != -1 or task["corpus"].lower().find("cas") != -1) and task["subset"] == "pos":
@@ -128,17 +128,17 @@ def main():
 
                 if task["corpus"].lower().find("deft2021") != -1 and task["subset"] == "ner":
 
-                    label_list = dataset.features[f"ner_tags"].feature.names
+                    label_list = dataset.features["ner_tags"].feature.names
                     current_classes = [label_list[n] for n in e['ner_tags']]
 
                 if task["corpus"].lower().find("deft2019") != -1:
 
-                    label_list = dataset.features[f"ner_tags"].feature.names
+                    label_list = dataset.features["ner_tags"].feature.names
                     current_classes = [label_list[n] for n in e['ner_tags']]
 
                 if task["corpus"].lower().find("pxcorpus") != -1 and task["task"] == 1:
 
-                    label_list = dataset.features[f"ner_tags"].feature.names
+                    label_list = dataset.features["ner_tags"].feature.names
                     current_classes = [label_list[n] for n in e['ner_tags']]
 
                 if task["corpus"].lower().find("pxcorpus") != -1 and task["task"] == 2:
@@ -181,7 +181,7 @@ def main():
                 plt.title('Distribution of the values', fontsize=16)
                 plt.xlabel('Frequencies')
                 plt.ylabel('Classes')
-                plt.savefig(os.path.join(STATS_DIR, "distributions", f"{t_key.replace('/','_')}.png"), bbox_inches='tight', dpi=200)
+                plt.savefig(os.path.join(STATS_DIR, "distributions", f"{t_key.replace('/', '_')}.png"), bbox_inches='tight', dpi=200)
                 plt.cla()
                 plt.clf()
 
@@ -197,7 +197,7 @@ def main():
                 plt.title('Distribution of classes', fontsize=16)
                 plt.xlabel('Frequencies')
                 plt.ylabel('Classes')
-                plt.savefig(os.path.join(STATS_DIR, "distributions", f"{t_key.replace('/','_')}.png"), bbox_inches='tight', dpi=200)
+                plt.savefig(os.path.join(STATS_DIR, "distributions", f"{t_key.replace('/', '_')}.png"), bbox_inches='tight', dpi=200)
                 plt.cla()
                 plt.clf()
 

@@ -1,0 +1,4 @@
+[flake8]
+# The rules are the default ones, but the length of the lines: they are long in this repository
+extend-ignore = E501
+extend-exclude = .venv,venv

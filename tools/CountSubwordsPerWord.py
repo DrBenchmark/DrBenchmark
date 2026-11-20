@@ -184,7 +184,7 @@ def main():
 
     for t in list(matrix_avg_tokens_per_word.keys()):
 
-        print(f"{t.replace('DrBenchmark/','').replace('-',' ').replace('_',' ').replace('None','')} & ", end="")
+        print(f"{t.replace('DrBenchmark/', '').replace('-', ' ').replace('_', ' ').replace('None', '')} & ", end="")
 
         values = []
 

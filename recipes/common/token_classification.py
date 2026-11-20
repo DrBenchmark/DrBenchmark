@@ -184,7 +184,7 @@ def main(dataset, tag_column="ner_tags", metric_for_best_model="f1", needs_data_
 
     # We might have truncated the labels in `tokenize_and_align_labels`
     # We retrieve the untruncated labels
-    _true_labels = [[label_list[l] for l in doc] for doc in test_tokenized_datasets[tag_column]]
+    _true_labels = [[label_list[label] for label in doc] for doc in test_tokenized_datasets[tag_column]]
     # We pad the predictions with 'O' to match untruncated labels
     _true_predictions = [p + ['O'] * (len(l) - len(p)) for p, l in zip(_true_predictions, _true_labels)]
 

@@ -152,6 +152,8 @@ The known bugs are kept as expected failures (`xfail`): they are listed at the e
 
 The tests are run by GitHub Actions on every push to `master` and on every pull request (see [.github/workflows/tests.yml](./.github/workflows/tests.yml)), with the latest versions of the dependencies allowed by `requirements.txt`, with the versions of `constraints.txt`, and with the lowest versions that `requirements.txt` allows (the ones that `python tests/minimum_versions.py` prints).
 
+The code is also checked there by [flake8](https://flake8.pycqa.org), with the rules of [.flake8](./.flake8): `pip install flake8==7.5.0`, which is the version of the workflow, then `flake8` at the root of the repository.
+
 To support a new major release of a dependency, raise its bound in `requirements.txt`, check that the tests pass, then update `constraints.txt` (the command is given at the top of that file).
 
 ## Citing DrBenchmark

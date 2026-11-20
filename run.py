@@ -70,7 +70,7 @@ if __name__ == '__main__':
     try:
         with open(os.path.join(REPO_DIR, 'models.txt')) as f:
             # One model per line, but the empty lines and the comments
-            MODELS_TO_EVALUATE = [l.strip() for l in f if l.strip() and not l.strip().startswith('#')]
+            MODELS_TO_EVALUATE = [line.strip() for line in f if line.strip() and not line.strip().startswith('#')]
     except FileNotFoundError:
         logging.warning('`models.txt` not found. Please provide models in --models')
         MODELS_TO_EVALUATE = []

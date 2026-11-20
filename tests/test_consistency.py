@@ -159,6 +159,29 @@ def test_recipe_readme_documents_the_task(task):
         assert f"`{task.subset}`" in readme
 
 
+def text_files():
+    """The files of the repository that are written by hand: code, scripts, configuration and documentation."""
+    patterns = [
+        "*.md", "*.py", "*.sh", "*.txt", "*.yml", "*.yaml", "*.ini", ".flake8", ".gitignore", ".github/workflows/*.yml",
+        "data_loaders_hf/*.py", "metrics/*.py", "recipes/*.md", "recipes/common/*.py", "recipes/*/*.md",
+        "recipes/*/scripts/*.py", "recipes/*/scripts/*.sh", "recipes/*/yaml/*.yaml", "tests/*.py", "tools/*.py", "tools/*.md",
+    ]
+    return sorted({path for pattern in patterns for path in REPO.glob(pattern) if path.is_file()})
+
+
+def test_text_files_have_unix_line_endings():
+    """With a Windows line ending, a script for bash fails, and every line of a file differs when it is compared."""
+    files = text_files()
+    # The README file of each recipe, among other ones
+    assert len(files) > 100
+    assert [str(path.relative_to(REPO)) for path in files if b"\r" in path.read_bytes()] == []
+
+
+@pytest.mark.parametrize("script", ["run_all_slurm.sh", "run_all_jean_zay.sh", "run_one_jean_zay.sh"])
+def test_script_for_slurm_is_executable(script):
+    assert os.access(REPO / script, os.X_OK), f"{script} is not executable"
+
+
 def test_conda_environment_installs_the_requirements():
     """`environment.yml` does not list the dependencies a second time: pip installs the ones of `requirements.txt`."""
     dependencies = yaml.safe_load((REPO / "environment.yml").read_text())["dependencies"]
