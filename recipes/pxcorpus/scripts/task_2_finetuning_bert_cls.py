@@ -5,7 +5,13 @@
 # Status     To validate 12/06/2023 Yanis LABRAK
 # Apache 2.0
 
-from common import sequence_classification
+import sys
+from pathlib import Path
+
+# The code shared by the recipes is in `recipes/common/`: its parent is added to the search path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from common import sequence_classification  # noqa: E402
 
 
 def build_text(e, tokenizer):

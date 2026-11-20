@@ -308,8 +308,7 @@ def small_repository(tmp_path, synthetic_data):
     shutil.copytree(REPO / "metrics", repository / "metrics", ignore=not_copied)
     shutil.copytree(RECIPES / "common", repository / "recipes" / "common", ignore=not_copied)
     for name in ("scripts", "yaml"):
-        # `scripts/common` stays a link to the code shared by the recipes
-        shutil.copytree(RECIPES / "cas" / name, recipe / name, symlinks=True, ignore=not_copied)
+        shutil.copytree(RECIPES / "cas" / name, recipe / name, ignore=not_copied)
     # Where `download_datasets_locally.py` saves the datasets: `data/local_hf_<subset>/`
     os.symlink(synthetic_data / "cas", recipe / "data")
     (recipe / "runs").mkdir()

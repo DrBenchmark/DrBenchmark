@@ -40,12 +40,24 @@ def test_no_unused_file(recipe):
     assert sorted((RECIPES / recipe / "yaml").glob("*.yaml")) == sorted({task.config_path for task in tasks})
 
 
-@pytest.mark.parametrize("recipe", RECIPE_NAMES)
-def test_common_package_is_shared(recipe):
-    """Every recipe uses the code of `recipes/common/`, through a symbolic link."""
-    link = RECIPES / recipe / "scripts" / "common"
-    assert link.is_symlink()
-    assert link.resolve() == (RECIPES / "common").resolve()
+def test_code_of_the_recipes_has_no_symbolic_link():
+    """A symbolic link may be lost on Windows, or when the repository is extracted from a zip archive.
+
+    The scripts of the recipes used to import the code they share through a link `scripts/common`.
+    """
+    directories = [RECIPES / "common"] + [RECIPES / recipe / name for recipe in RECIPE_NAMES for name in ("scripts", "yaml")]
+    assert [path for directory in directories for path in directory.rglob("*") if path.is_symlink()] == []
+    assert not any((RECIPES / recipe / "scripts" / "common").exists() for recipe in RECIPE_NAMES)
+
+
+@pytest.mark.parametrize("task", ALL_TASKS, ids=task_ids)
+def test_training_script_finds_the_shared_code_by_itself(task):
+    """A training script adds `recipes/` to the search path, from its own location, before it imports `common`."""
+    lines = (task.scripts_dir / task.script).read_text().splitlines()
+    path = lines.index("sys.path.insert(0, str(Path(__file__).resolve().parents[2]))")
+    assert (task.scripts_dir / task.script).resolve().parents[2] == RECIPES.resolve()
+    imports = [number for number, line in enumerate(lines) if line.startswith(("from common", "import common"))]
+    assert imports and path < min(imports)
 
 
 @pytest.mark.parametrize("task", ALL_TASKS, ids=task_ids)

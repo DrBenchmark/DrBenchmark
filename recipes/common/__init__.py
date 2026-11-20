@@ -1,7 +1,9 @@
 """Code shared by the recipes.
 
-Each recipe has a symbolic link `scripts/common` to this package: its training scripts
-only state what is specific to their task, and call the module of their kind of task.
+The training scripts of the recipes only state what is specific to their task, and call
+the module of their kind of task. They add `recipes/` to the search path of Python to
+import this package. There is no symbolic link to it in the recipes: a link may be lost
+on Windows, or when the repository is extracted from a zip archive.
 
 - `utils`: command line and names of the output files
 - `training`: steps shared by every kind of task

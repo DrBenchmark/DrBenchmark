@@ -5,7 +5,13 @@
 # Status     Validated 28/04/2023 Yanis LABRAK
 # Apache 2.0
 
-from common import multi_label_classification
+import sys
+from pathlib import Path
+
+# The code shared by the recipes is in `recipes/common/`: its parent is added to the search path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from common import multi_label_classification  # noqa: E402
 
 if __name__ == '__main__':
     multi_label_classification.main(dataset="DrBenchmark/MORFITT", text_column="abstract")

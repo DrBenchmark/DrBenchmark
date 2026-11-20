@@ -3,7 +3,7 @@
 Each sub-directory contains the recipe of one dataset of DrBenchmark:
 
 - `README.md`: description of the dataset and of its tasks
-- `scripts/`: fine-tuning and evaluation scripts, with one launcher (`run*.sh`) per task. A script only states what is specific to its task: the code shared by the recipes is in [common/](./common/), to which each `scripts/` directory has a symbolic link
+- `scripts/`: fine-tuning and evaluation scripts, with one launcher (`run*.sh`) per task. A script only states what is specific to its task: the code shared by the recipes is in [common/](./common/), which each script finds from its own location
 - `yaml/`: default hyper-parameters of each task
 - `data/`: local copy of the data (only used in offline mode and for DEFT 2019)
 - `runs/`: results of the runs (one JSON file per run)

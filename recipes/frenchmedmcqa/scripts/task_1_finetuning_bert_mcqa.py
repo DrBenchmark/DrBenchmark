@@ -5,12 +5,17 @@
 # Apache 2.0
 
 import logging
+import sys
+from pathlib import Path
 
 from transformers import pipeline
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
-from common import training
-from common.sequence_classification import compute_metrics
+# The code shared by the recipes is in `recipes/common/`: its parent is added to the search path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from common import training  # noqa: E402
+from common.sequence_classification import compute_metrics  # noqa: E402
 
 
 def main():

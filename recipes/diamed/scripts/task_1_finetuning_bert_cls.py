@@ -5,7 +5,13 @@
 # Status     To validate 01/05/2023 Yanis LABRAK
 # Apache 2.0
 
-from common import sequence_classification
+import sys
+from pathlib import Path
+
+# The code shared by the recipes is in `recipes/common/`: its parent is added to the search path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from common import sequence_classification  # noqa: E402
 
 STOPWORDS = {
     "figure", ",", "(", ")", ").", "(figure", "a", "abord", "absolument", "afin", "ah", "ai", "aie", "aient", "aies", "ailleurs", "ainsi", "ait", "allaient", "allo", "allons", "allô", "alors", "anterieur", "anterieure", "anterieures", "apres", "après", "as", "assez", "attendu", "au", "aucun", "aucune", "aucuns", "aujourd", "aujourd'hui", "aupres", "auquel", "aura", "aurai", "auraient", "aurais", "aurait", "auras", "aurez", "auriez", "aurions", "aurons", "auront", "aussi", "autant", "autre", "autrefois", "autrement", "autres", "autrui", "aux", "auxquelles", "auxquels", "avaient", "avais", "avait", "avant", "avec", "avez", "aviez", "avions", "avoir", "avons", "ayant", "ayez", "ayons", "b", "bah", "bas", "basee", "bat", "beau", "beaucoup", "bien", "bigre", "bon", "boum", "bravo", "brrr", "c", "car", "ce", "ceci", "cela", "celle", "celle-ci", "celle-là", "celles", "celles-ci", "celles-là", "celui", "celui-ci", "celui-là", "celà", "cent", "cependant", "certain", "certaine",

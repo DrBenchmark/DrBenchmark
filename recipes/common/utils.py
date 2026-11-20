@@ -8,8 +8,7 @@ import logging
 import argparse
 
 
-# Root of the repository. This file is `recipes/common/utils.py`: the recipes import it through
-# the link `common` of their `scripts/` directory, which `realpath` follows.
+# Root of the repository: this file is `recipes/common/utils.py`
 REPO_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 subset2task_detail = {
