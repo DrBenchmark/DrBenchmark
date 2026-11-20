@@ -76,7 +76,7 @@ almanach/camembert-bio-base
 
 ## Using a trained model
 
-Each run keeps its best model in `recipes/<recipe>/save_models/`. `predict.py` predicts with it on your own sentences.
+Each run keeps its best model in `recipes/<recipe>/save_models/`. `predict.py` predicts with it on your own data: a sentence or a file.
 
 ```bash
 # The runs, their scores and the models that they kept
@@ -85,6 +85,8 @@ python predict.py --list
 python predict.py --task cas-pos --model Dr-BERT/DrBERT-7GB "Le patient présente une toux sèche."
 # Without a sentence, they are asked for until an empty line
 python predict.py --task cas-pos --model Dr-BERT/DrBERT-7GB
+# The sentences of a file, one per line
+python predict.py --task cas-pos --model Dr-BERT/DrBERT-7GB --input sentences.txt --output labels.conll
 ```
 
 **Which model**: `--task` is a name of `python run.py --help` and `--model` the model that was fine-tuned, as it was given to `run.py`. When several runs kept their model, the one with the best score on the validation set is taken (`--seed` takes another one); the runs on a part of the training set (`--fewshot`) are not taken. `python predict.py --list` shows, for each run, its score on the validation set, its scores on the test set, whether its model is there and which one is taken. `--model-dir` gives the directory of a kept model instead, wherever it is.
@@ -99,6 +101,16 @@ Une [femme de 44 ans]/LIVB était hospitalisée pour une [toux sèche]/DISO .
 ```
 
 **Words**: for the tasks that read the words of a sentence, the sentence is split as most datasets of the benchmark are: the punctuation is apart, and `l'examen` gives `l'` and `examen`. With `--words`, the sentence is only split at its spaces: its words are given as they are.
+
+**Files**: `--input` reads the examples to predict, in one of these forms (`--format` says which one when the name of the file does not):
+
+| Form                              | Tasks                                 | Content                                                                           |
+|:----------------------------------|:--------------------------------------|:----------------------------------------------------------------------------------|
+| Text file                         | all                                   | One example per line. A tabulation between the texts of a task that reads several |
+| CoNLL file (`.conll`)             | the ones that label words (POS, NER)  | One word per line, an empty line after each sentence                              |
+| CSV or TSV file (`.csv`, `.tsv`)  | the other ones                        | A first line that names the columns: the ones of the dataset of the task          |
+
+The predictions are written on the standard output, or in the file of `--output`: in the CoNLL format for the tasks that label words (the word, then its label), in CSV for the other ones (the columns that were read, then `prediction`).
 
 **Which models are kept**: a model of the size of BERT base takes about 440 MB, and every run keeps one.
 

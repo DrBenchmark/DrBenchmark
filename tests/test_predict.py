@@ -5,6 +5,8 @@ ones marked `e2e` use the models that the recipes keep after a training on synth
 `predict.py` has to give, for the examples of the test set, the predictions that the run wrote.
 """
 
+import csv
+import io
 import json
 import math
 import os
@@ -75,6 +77,13 @@ def test_sentence_is_shown_with_its_entities(predict):
     assert predict.words_with_labels(words, labels) == "une [toux sèche]/DISO sous aspirine/CHEM ."
     assert predict.words_with_labels(["Le", "patient"], ["B-DET:ART", "B-NOM"]) == "Le/DET:ART patient/NOM"
     assert predict.words_with_labels(["rien"], ["O"]) == "rien"
+
+
+@pytest.mark.parametrize("prediction, text", [
+    ("negation", "negation"), (["microbiology", "virology"], "microbiology|virology"), ([], ""), (3.14159, "3.1416"), ("ab", "ab"),
+])
+def test_prediction_as_it_is_written_in_a_file(prediction, text, predict):
+    assert predict.as_text(prediction) == text
 
 
 # ---------------------------------------------------------------------------------------------
@@ -371,6 +380,9 @@ def test_predict_py_does_not_load_torch_to_list_the_runs():
     (["--model-dir", "somewhere", "--seed", "1"], "--model-dir is the directory of one model"),
     ([], "(the runs are listed by --list)"),
     (["--list", "a sentence"], "--list only goes with --task and --model"),
+    (["--list", "--input", "a.txt"], "--list only goes with --task and --model"),
+    (["--task", "cas-pos", "--model", MODEL, "--input", "a.txt", "a sentence"], "give texts, or --input"),
+    (["--task", "cas-pos", "--model", MODEL, "--input", "a.txt", "--format", "json"], "argument --format: invalid choice: 'json'"),
 ], ids=lambda value: " ".join(value) if isinstance(value, list) else None)
 def test_wrong_arguments(arguments, message):
     completed = subprocess.run([sys.executable, str(REPO / "predict.py"), *arguments], capture_output=True, text=True, timeout=120)
@@ -453,6 +465,108 @@ def test_prediction_as_it_is_shown(tagger, classifier, comparer, predict):
     assert predict.shown(classifier, {}, []) == "(no label)"
     assert predict.shown(classifier, {}, "ab") == "ab"
     assert predict.shown(comparer, {}, 3.14159) == "3.14"
+
+
+# ---------------------------------------------------------------------------------------------
+# The files that are read and written
+# ---------------------------------------------------------------------------------------------
+
+def test_text_file(tagger, comparer, predict, tmp_path):
+    path = tmp_path / "sentences.txt"
+    path.write_text("Le patient tousse.\n\n  \nl'examen est normal\r\n", encoding="utf-8")
+    read = predict.read_examples(str(path), tagger)
+    assert read.examples == [{"tokens": ["Le", "patient", "tousse", "."]}, {"tokens": ["l'", "examen", "est", "normal"]}]
+    assert read.columns == ["tokens"]
+    # The words are given as they are
+    assert predict.read_examples(str(path), tagger, words=True).examples[0] == {"tokens": ["Le", "patient", "tousse."]}
+
+    pairs = tmp_path / "pairs.txt"
+    pairs.write_text("une toux\tune fièvre\nseule\n", encoding="utf-8")
+    with pytest.raises(predict.PredictError) as error:
+        predict.read_examples(str(pairs), comparer)
+    assert str(error.value) == (
+        f"{pairs}, line 2: clister-regr reads 2 texts (text_1, text_2): 1 given. The texts of an example are separated by tabulations.")
+    pairs.write_text("une toux\tune fièvre\n", encoding="utf-8")
+    assert predict.read_examples(str(pairs), comparer).examples == [{"text_1": "une toux", "text_2": "une fièvre"}]
+
+
+CONLL = "-DOCSTART- -X- O\n\nLe\tx\tB-DET\npatient\tx\tB-NOM\n\n\ntousse B-VER\n. B-SENT\n"
+
+
+def test_conll_file(tagger, predict, tmp_path):
+    """One word per line, which starts with it, and an empty line after a sentence."""
+    path = tmp_path / "corpus.conll"
+    path.write_text(CONLL, encoding="utf-8")
+    read = predict.read_examples(str(path), tagger)
+    assert read.examples == [{"tokens": ["Le", "patient"]}, {"tokens": ["tousse", "."]}]
+    assert read.columns == ["tokens"]
+
+    # A file which is not named as a CoNLL file is a text file, unless its format is given
+    other = tmp_path / "words.txt"
+    other.write_text("Le\npatient\n", encoding="utf-8")
+    assert predict.read_examples(str(other), tagger).examples == [{"tokens": ["Le"]}, {"tokens": ["patient"]}]
+    assert predict.read_examples(str(other), tagger, file_format="conll").examples == [{"tokens": ["Le", "patient"]}]
+
+
+def write_table(path, rows, delimiter=","):
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        csv.writer(f, delimiter=delimiter).writerows(rows)
+
+
+@pytest.mark.parametrize("name, delimiter", [("examples.csv", ","), ("examples.tsv", "\t")])
+def test_table_file(name, delimiter, classifier, predict, tmp_path):
+    path = tmp_path / name
+    write_table(path, [["patient", "tokens"], ["p1", "pas de toux, ni fièvre"], ["p2", "une toux"]], delimiter)
+    read = predict.read_examples(str(path), classifier)
+    assert read.examples == [{"patient": "p1", "tokens": ["pas", "de", "toux", ",", "ni", "fièvre"]}, {"patient": "p2", "tokens": ["une", "toux"]}]
+    # The columns of the file are written again with the predictions
+    assert read.columns == ["patient", "tokens"]
+    assert predict.read_examples(str(path), classifier, words=True).examples[0]["tokens"] == ["pas", "de", "toux,", "ni", "fièvre"]
+
+
+def test_table_file_without_a_column(classifier, comparer, predict, tmp_path):
+    path = tmp_path / "examples.csv"
+    path.write_text("tokens,class\nune toux,neutral\n", encoding="utf-8")
+    assert len(predict.read_examples(str(path), classifier).examples) == 1
+    with pytest.raises(predict.PredictError) as error:
+        predict.read_examples(str(path), comparer)
+    assert str(error.value) == (
+        f"{path} has no column text_1, text_2: its first line names its columns, which are tokens, class. "
+        "clister-regr reads the columns text_1, text_2.")
+
+
+def test_file_that_a_task_does_not_read(tagger, classifier, predict, tmp_path):
+    for name in ("examples.csv", "examples.conll"):
+        (tmp_path / name).write_text("tokens\nune toux\n", encoding="utf-8")
+    with pytest.raises(predict.PredictError, match="cas-cls does not label words, its examples are not read in a CoNLL file"):
+        predict.read_examples(str(tmp_path / "examples.conll"), classifier)
+    with pytest.raises(predict.PredictError, match="cas-pos labels words, its examples are read in a CoNLL file"):
+        predict.read_examples(str(tmp_path / "examples.csv"), tagger)
+    with pytest.raises(predict.PredictError, match="nothing.txt does not exist"):
+        predict.read_examples(str(tmp_path / "nothing.txt"), classifier)
+
+
+def written(predict, model, read, predictions, **options):
+    output = io.StringIO()
+    predict.write_predictions(output, model, read, predictions, **options)
+    return output.getvalue()
+
+
+def test_labels_are_written_in_the_conll_format(tagger, predict):
+    read = predict.Examples([{"tokens": ["Le", "patient"]}, {"tokens": ["tousse"]}], ["tokens"])
+    assert written(predict, tagger, read, [["B-DET", "B-NOM"], ["B-VER"]]) == "Le\tB-DET\npatient\tB-NOM\n\ntousse\tB-VER\n\n"
+
+
+def test_classes_are_written_in_csv(classifier, comparer, predict):
+    read = predict.Examples(
+        [{"patient": "p1", "tokens": ["pas", "de", "toux"]}, {"patient": "p2", "tokens": ["une", '"toux"']}], ["patient", "tokens"])
+    assert list(csv.reader(io.StringIO(written(predict, classifier, read, ["negation", "neutral"])))) == [
+        ["patient", "tokens", "prediction"], ["p1", "pas de toux", "negation"], ["p2", 'une "toux"', "neutral"],
+    ]
+    # Several labels, and a score
+    assert written(predict, classifier, read, [["a", "b"], []]).splitlines()[1:] == ["p1,pas de toux,a|b", 'p2,"une ""toux""",']
+    read = predict.Examples([{"text_1": "a, b", "text_2": "c"}], ["text_1", "text_2"])
+    assert written(predict, comparer, read, [2.5]) == 'text_1,text_2,prediction\n"a, b",c,2.5000\n'
 
 
 # ---------------------------------------------------------------------------------------------
@@ -717,6 +831,64 @@ def test_sentences_are_asked_for_without_one(trained_repository, tiny_bert):
     assert completed.returncode == 0, completed.stderr[-3000:]
     lines = completed.stdout.splitlines()
     assert len(lines) == 2 and set(lines) <= set(synthetic.NEGATION_CLASSES)
+
+
+def predicted_by_the_run(repository, task_name):
+    return taken_run(repository, task_name)[1]["predictions"]["system_predictions"]
+
+
+@pytest.mark.e2e
+def test_file_is_labelled_in_the_conll_format(trained_repository, tiny_bert, synthetic_data, tmp_path):
+    test = the_test_set(Task("cas-pos"), synthetic_data)
+    sentences = tmp_path / "sentences.txt"
+    sentences.write_text("".join(" ".join(example["tokens"]) + "\n" for example in test), encoding="utf-8")
+    words = tmp_path / "words.conll"
+    words.write_text("".join("".join(f"{word}\n" for word in example["tokens"]) + "\n" for example in test), encoding="utf-8")
+
+    # The sentences of a text file, on the standard output
+    completed = run_predict(trained_repository, "--task", "cas-pos", "--model", tiny_bert, "--input", sentences, cwd=tmp_path)
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    labelled = [[line.split("\t") for line in sentence.splitlines()] for sentence in completed.stdout.strip("\n").split("\n\n")]
+    assert [[word for word, _ in sentence] for sentence in labelled] == [example["tokens"] for example in test]
+    # The labels are the ones that the run wrote for its test set
+    assert [[label for _, label in sentence] for sentence in labelled] == predicted_by_the_run(trained_repository, "cas-pos")
+
+    # The words of a CoNLL file, in a file
+    output = tmp_path / "labels.conll"
+    in_a_file = run_predict(
+        trained_repository, "--task", "cas-pos", "--model", tiny_bert, "--input", words, "--output", output, cwd=tmp_path)
+    assert in_a_file.returncode == 0, in_a_file.stderr[-3000:]
+    assert in_a_file.stdout == "" and output.read_text(encoding="utf-8") == completed.stdout
+
+
+@pytest.mark.e2e
+def test_classes_of_a_file_are_written_in_csv(trained_repository, tiny_bert, synthetic_data, tmp_path):
+    test = the_test_set(Task("cas-cls"), synthetic_data)
+    names = test.features["label"].names
+    predicted = [names[index] for index in predicted_by_the_run(trained_repository, "cas-cls")]
+
+    # The sentences of a table, whose words are already apart: its columns are written again
+    table = tmp_path / "sentences.csv"
+    write_table(table, [["id", "tokens"]] + [[example["id"], " ".join(example["tokens"])] for example in test])
+    completed = run_predict(trained_repository, "--task", "cas-cls", "--model", tiny_bert, "--input", table, "--words", cwd=tmp_path)
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    rows = list(csv.reader(io.StringIO(completed.stdout)))
+    assert rows[0] == ["id", "tokens", "prediction"]
+    assert [row[:2] for row in rows[1:]] == [[example["id"], " ".join(example["tokens"])] for example in test]
+    assert [row[2] for row in rows[1:]] == predicted
+
+    # The sentences of a text file
+    sentences = tmp_path / "sentences.txt"
+    sentences.write_text("".join(" ".join(example["tokens"]) + "\n" for example in test), encoding="utf-8")
+    completed = run_predict(trained_repository, "--task", "cas-cls", "--model", tiny_bert, "--input", sentences, cwd=tmp_path)
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    rows = list(csv.reader(io.StringIO(completed.stdout)))
+    assert rows[0] == ["tokens", "prediction"] and [row[1] for row in rows[1:]] == predicted
+
+    # A file without any example
+    sentences.write_text("\n", encoding="utf-8")
+    completed = run_predict(trained_repository, "--task", "cas-cls", "--model", tiny_bert, "--input", sentences, cwd=tmp_path)
+    assert (completed.returncode, completed.stderr.splitlines()[-1]) == (1, f"{sentences} has no example")
 
 
 @pytest.mark.e2e
