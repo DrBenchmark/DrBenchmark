@@ -103,6 +103,71 @@ def build_tiny_flaubert(path):
     FlaubertModel(config).save_pretrained(path)
 
 
+def build_tiny_drbert(path):
+    """A CamemBERT with 2 small layers and the tokenizer files of a DrBERT model.
+
+    `tokenizer_config.json` names the class `CamembertTokenizer`, which is a Unigram model,
+    while `tokenizer.json` stores a BPE model. transformers 4 reads `tokenizer.json` as it
+    is, whatever the class. transformers 5 builds the Unigram model of the class and fails.
+
+    Three words are split into several sub-tokens, to exercise the alignment between the
+    sub-tokens and the labels of the words.
+    """
+    from tokenizers import AddedToken, Tokenizer, decoders, models, pre_tokenizers, processors
+    from transformers import CamembertConfig, CamembertModel
+
+    path.mkdir(parents=True)
+    # The first identifiers of the DrBERT models
+    tokens = ["<s>NOTUSED", "<pad>", "</s>NOTUSED", "<unk>", "<unk>NOTUSED", "<s>", "</s>", "▁"] + characters()
+    # One merge per character builds each word from its first letters: ▁ + p, ▁p + a, ▁pa + t, ...
+    beginnings = {"thoracique": "thor", "traitement": "trait", "dyspnée": "dys"}
+    merges = []
+    for word in synthetic.WORDS:
+        piece = "▁"
+        for character in beginnings.get(word, word):
+            if piece + character not in tokens:
+                merges.append((piece, character))
+                tokens.append(piece + character)
+            piece += character
+    tokens.append("<mask>")
+    vocab = {token: index for index, token in enumerate(tokens)}
+
+    tokenizer = Tokenizer(models.BPE(vocab=vocab, merges=merges, unk_token="<unk>", fuse_unk=True))
+    tokenizer.pre_tokenizer = pre_tokenizers.Metaspace(replacement="▁", prepend_scheme="always")
+    tokenizer.decoder = decoders.Metaspace(replacement="▁", prepend_scheme="always")
+    tokenizer.post_processor = processors.TemplateProcessing(
+        single="<s> $A </s>",
+        pair="<s> $A </s> </s> $B </s>",
+        special_tokens=[("<s>", vocab["<s>"]), ("</s>", vocab["</s>"])],
+    )
+    tokenizer.add_special_tokens(
+        ["<s>NOTUSED", "<pad>", "</s>NOTUSED", "<unk>", "<s>", "</s>", AddedToken("<mask>", lstrip=True)]
+    )
+    tokenizer.save(str(path / "tokenizer.json"))
+
+    special_tokens = {
+        "bos_token": "<s>", "cls_token": "<s>", "eos_token": "</s>", "sep_token": "</s>",
+        "unk_token": "<unk>", "pad_token": "<pad>", "mask_token": "<mask>",
+    }
+    tokenizer_config = {**special_tokens, "model_max_length": 512, "tokenizer_class": "CamembertTokenizer"}
+    (path / "tokenizer_config.json").write_text(json.dumps(tokenizer_config), encoding="utf-8")
+    (path / "special_tokens_map.json").write_text(json.dumps(special_tokens), encoding="utf-8")
+
+    config = CamembertConfig(
+        vocab_size=len(vocab),
+        hidden_size=32,
+        num_hidden_layers=2,
+        num_attention_heads=2,
+        intermediate_size=64,
+        max_position_embeddings=514,
+        type_vocab_size=1,
+        pad_token_id=vocab["<pad>"],
+        bos_token_id=vocab["<s>"],
+        eos_token_id=vocab["</s>"],
+    )
+    CamembertModel(config).save_pretrained(path)
+
+
 @pytest.fixture(scope="session")
 def tiny_bert(tmp_path_factory):
     path = tmp_path_factory.mktemp("models") / "tiny-bert"
@@ -114,6 +179,13 @@ def tiny_bert(tmp_path_factory):
 def tiny_flaubert(tmp_path_factory):
     path = tmp_path_factory.mktemp("models") / "tiny-flaubert"
     build_tiny_flaubert(path)
+    return path
+
+
+@pytest.fixture(scope="session")
+def tiny_drbert(tmp_path_factory):
+    path = tmp_path_factory.mktemp("models") / "tiny-drbert"
+    build_tiny_drbert(path)
     return path
 
 

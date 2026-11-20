@@ -2,8 +2,12 @@
 # a new major release is only installed once the tests pass with it and its bound is raised.
 # The exact versions of a tested environment are in constraints.txt.
 
-# Older versions of transformers can be used but some package tweaking will be necessary
-transformers>=4.40,<6  # >4.40 for compatibility
+# Older versions of transformers can be used but some package tweaking will be necessary.
+# transformers 5 cannot be used: its AutoTokenizer fails on the DrBERT models, whose tokenizer is a
+# BPE model declared as a CamembertTokenizer (see tests/test_tokenizer.py), and it does not split
+# the text as transformers 4 does for almanach/camemberta-base
+# (https://github.com/huggingface/transformers/issues/49622).
+transformers>=4.40,<5  # >4.40 for compatibility
 torch<3
 dill<0.4.1  # <0.4.1 because unsupported by datasets (and somehow I ended up with 0.4.1 which disabled dataset's caching) this dependency will need be be removed at some point
 datasets>=2.21,<6  # >2.21 for HF_HUB_OFFLINE
