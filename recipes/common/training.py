@@ -63,6 +63,12 @@ def model_of(args):
     return args.hub_model_name or args.model_name
 
 
+def name_outputs(model, labels):
+    """Give the outputs of a model the names of the classes of its task: they are saved with the model."""
+    model.config.id2label = dict(enumerate(labels))
+    model.config.label2id = {label: index for index, label in enumerate(labels)}
+
+
 @dataclasses.dataclass
 class Run:
     """What a script needs to know about the run it is doing."""

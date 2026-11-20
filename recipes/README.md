@@ -63,6 +63,8 @@ The arguments given after the model (and after the subset, for the launchers tha
 
 Each run writes its metrics, its hyper-parameters, its predictions on the test set and the versions that computed it (Python, the libraries and the commit of the repository) in `runs/DrBenchmark-<task name>-<hash>.json`, and saves its best model in `save_models/DrBenchmark-<task name>-<hash>_best_model/`. The hash is the one of the arguments of the run, among which its seed. With `--seed`, a run whose results exist is not computed again; without it, a seed that was not used yet is drawn.
 
+The best model is saved with the names of its classes: what it predicts can be read without the dataset.
+
 ## The script of a task
 
 The Python script of a task only states what is specific to the task, in a line `TASK = ...`, and trains a model when it is started (`TASK.train()`). The rest is in [common/](./common/), which has one module for each kind of task: `token_classification`, `sequence_classification`, `multi_label_classification` and `regression`.

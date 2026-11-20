@@ -176,3 +176,29 @@ def test_regression_keeps_the_checkpoint_with_the_lowest_rmse(task, run_recipe, 
     rmse = [log["eval_rmse"] for log in state["log_history"] if "eval_rmse" in log]
     assert len(rmse) >= 3
     assert state["best_metric"] == pytest.approx(min(rmse))
+
+
+def expected_labels(task):
+    """The names of the outputs of a model of a task: the classes of the column of its dataset that the model learns."""
+    features = synthetic.dataset_of(task.recipe, task.subset)["train"].features
+    if task.kind in ("pos", "ner"):
+        return features["pos_tags" if task.kind == "pos" else "ner_tags"].feature.names
+    if task.kind == "regr":
+        return ["LABEL_0"]
+    for column in ("label", "correct_cible", "icd-10", "number_correct_answers"):
+        if column in features:
+            return features[column].names
+    return features["specialities"].feature.names
+
+
+@pytest.mark.parametrize("task", ALL_TASKS, ids=task_ids)
+def test_names_of_the_classes_are_saved_with_the_model(task, run_recipe, tiny_bert):
+    """Without them a prediction is a number, which only the dataset explains."""
+    config = read_json(os.path.join(run_recipe(task.name, tiny_bert).result["model_name"], "config.json"))
+    names = [config["id2label"][str(index)] for index in range(len(config["id2label"]))]
+    if task.kind == "mcqa":
+        # Every set of answers among five
+        assert len(names) == 31 and sorted(names, key=lambda name: (len(name), name))[:6] == ["a", "b", "c", "d", "e", "ab"]
+    else:
+        assert names == expected_labels(task)
+    assert config["label2id"] == {name: index for index, name in enumerate(names)}

@@ -88,6 +88,7 @@ class Task(training.Task):
 
         tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
         model = AutoModelForSequenceClassification.from_pretrained(args.model_name, num_labels=len(labels_list))
+        training.name_outputs(model, labels_list)
 
         def preprocess_function(e):
 

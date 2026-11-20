@@ -21,18 +21,6 @@ from . import training, utils
 OUTSIDE = "O"
 
 
-def getConfig(raw_labels):
-
-    label2id = {}
-    id2label = {}
-
-    for i, class_name in enumerate(raw_labels):
-        label2id[class_name] = str(i)
-        id2label[str(i)] = class_name
-
-    return label2id, id2label
-
-
 def word_by_word(model_name):
     """Whether the words of a sentence are tokenized one by one.
 
@@ -146,13 +134,10 @@ class Task(training.Task):
             # For datasets<4
             label_list = dataset["train"].features[tag_column][0].names
 
-        label2id, id2label = getConfig(label_list)
-
         tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
         model = AutoModelForTokenClassification.from_pretrained(args.model_name, num_labels=len(label_list))
-        model.config.label2id = label2id
-        model.config.id2label = id2label
+        training.name_outputs(model, label_list)
 
         # Every sub-token of a word learns its label when the words are tokenized one by one
         label_all_tokens = word_by_word(model_name)
