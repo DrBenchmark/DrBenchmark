@@ -63,7 +63,7 @@ The arguments given after the model (and after the subset, for the launchers tha
 
 Each run writes its metrics, its hyper-parameters, its predictions on the test set and the versions that computed it (Python, the libraries and the commit of the repository) in `runs/DrBenchmark-<task name>-<hash>.json`, and saves its best model in `save_models/DrBenchmark-<task name>-<hash>_best_model/`. The hash is the one of the arguments of the run, among which its seed. With `--seed`, a run whose results exist is not computed again; without it, a seed that was not used yet is drawn.
 
-The best model is saved with the names of its classes, with a description (`drbenchmark.json`) and with a model card (`README.md`): its directory says what the model is, and can be published on the HuggingFace Hub as it is.
+The best model is saved with the names of its classes, with a description (`drbenchmark.json`) and with a model card (`README.md`): `predict.py` predicts with it on other data (see [Using a trained model](../README.md#using-a-trained-model)).
 
 ## The script of a task
 
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     TASK.train()
 ```
 
-What the model reads for an example is built by the task, in one place: `TASK.encode`. A script that builds its text itself, as the one above, also says which columns of an example it reads (`inputs`: a `"text"`, or the `"words"` of a sentence).
+`predict.py` loads the same script to predict with a model that a run kept: what the model reads is built by the same code, `TASK.encode`, when the model is trained and when it predicts. A script that builds its text itself, as the one above, also says which columns of an example it reads (`inputs`: a `"text"`, or the `"words"` of a sentence): they are what `predict.py` asks for.
 
 ## Data
 

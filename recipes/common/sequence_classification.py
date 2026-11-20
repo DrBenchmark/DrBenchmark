@@ -66,6 +66,9 @@ class Task(training.Task):
         text = self.build_text(example, tokenizer)
         return {"inputs": dict(tokenizer(text, truncation=True, max_length=max_length, padding="do_not_pad")), "text": text}
 
+    def decode(self, logits, encoded, labels):
+        return labels[int(np.argmax(logits))]
+
     def results(self, references, predictions, labels):
         """What a run writes, from the classes of the test set given by their numbers: its scores, the references and the predictions."""
         logging.info(classification_report(

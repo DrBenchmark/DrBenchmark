@@ -82,6 +82,10 @@ class Task(training.Task):
     def encode(self, example, tokenizer, max_length, model_name=None):
         return {"inputs": dict(tokenizer(example[self.text_column], truncation=True, max_length=max_length, padding="do_not_pad"))}
 
+    def decode(self, logits, encoded, labels):
+        """The labels whose probability reaches the threshold."""
+        return [label for label, predicted in zip(labels, toLogits(logits[None], THRESHOLD_VALUE)[0]) if predicted]
+
     def train(self):
         text_column = self.text_column
         run = training.start(self.dataset, task=self)

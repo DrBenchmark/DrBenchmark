@@ -110,6 +110,7 @@ class Task(training.Task):
     kind = "token classification"
     model_class = AutoModelForTokenClassification
     inputs = {"tokens": "words"}
+    word_labels = True
 
     def __init__(self, dataset, tag_column="ner_tags", metric_for_best_model="f1", needs_data_dir=False):
         self.dataset = dataset
@@ -121,6 +122,17 @@ class Task(training.Task):
         words = list(example["tokens"])
         inputs, word_ids = tokenize(tokenizer, [words], max_length, model_name)
         return {"inputs": {name: values[0] for name, values in inputs.items()}, "word_ids": word_ids[0], "words": len(words)}
+
+    def decode(self, logits, encoded, labels):
+        """One label per word: the one of its first sub-token, and `O` for a word that the model did not read."""
+        predicted = np.argmax(logits, axis=-1)
+        prediction = [OUTSIDE] * encoded["words"]
+        seen = set()
+        for position, word in enumerate(encoded["word_ids"]):
+            if word is not None and word not in seen:
+                seen.add(word)
+                prediction[word] = labels[predicted[position]]
+        return prediction
 
     def train(self):
         tag_column = self.tag_column

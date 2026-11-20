@@ -8,6 +8,7 @@
 
 import logging
 
+import numpy as np
 from scipy import stats
 from sklearn.metrics import root_mean_squared_error
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
@@ -102,6 +103,9 @@ class Task(training.Task):
         first_column, second_column = self.text_columns
         text = f"{tokenizer.cls_token} {example[first_column]} {tokenizer.sep_token}  {example[second_column]} {tokenizer.eos_token}"
         return {"inputs": dict(tokenizer(text, truncation=True, max_length=max_length, padding="do_not_pad")), "text": text}
+
+    def decode(self, logits, encoded, labels):
+        return float(np.reshape(logits, -1)[0])
 
     def train(self):
         run = training.start(self.dataset, task=self)

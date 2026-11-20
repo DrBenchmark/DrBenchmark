@@ -17,10 +17,11 @@ import dataclasses
 import importlib.metadata
 
 import numpy as np
+import torch
 from transformers import set_seed
 from packaging.version import parse as parse_version
 from datasets import load_dataset, load_from_disk
-from transformers import Trainer, TrainingArguments
+from transformers import AutoTokenizer, Trainer, TrainingArguments
 from transformers import __version__ as transformers_version
 
 from . import utils
@@ -30,7 +31,7 @@ transformers_version = parse_version(transformers_version)
 # The libraries whose version is written in the results of a run: the ones that train and evaluate
 LIBRARIES = ("torch", "transformers", "tokenizers", "datasets", "accelerate", "evaluate", "numpy", "scipy", "scikit-learn", "seqeval")
 
-# The file, next to a model that a run kept, which says what the model is
+# The file, next to a model that a run kept, which says what the model is: `predict.py` reads it
 DESCRIPTION = "drbenchmark.json"
 
 
@@ -38,8 +39,11 @@ class Task:
     """A task of the benchmark, as the script of its recipe defines it.
 
     The script creates a task with what is specific to it, and trains a model for it:
-    `TASK.train()`. What the model reads for an example is built by the task, in one place:
-    `encode`.
+    `TASK.train()`. `predict.py` loads the same script to predict with a model that a run
+    kept: what the model reads is built by the same code when it is trained and when it predicts.
+
+    A prediction is what a person reads: the labels of the words of a sentence, the name of a
+    class, the names of several classes, a score, or the letters of the right answers.
     """
 
     #: Name of the kind of task
@@ -48,16 +52,24 @@ class Task:
     model_class = None
     #: The columns of an example that the model reads, in their order: {column: "text" or "words"}
     inputs = {}
+    #: Whether a prediction is one label for each word of the column `tokens`
+    word_labels = False
+    #: The names of the classes, for a task whose classes are not the ones of a column of its dataset
+    labels = None
 
     def train(self):
         """Fine-tune a model, evaluate it on the test set and write the results of the run."""
         raise NotImplementedError
 
     def encode(self, example, tokenizer, max_length, model_name):
-        """What is given to the model for an example: its arguments are in `inputs`.
+        """What is given to the model for an example: its arguments in `inputs`, and what `decode` needs.
 
         `model_name` is the name of the model that is fine-tuned, as `model_of` gives it.
         """
+        raise NotImplementedError
+
+    def decode(self, logits, encoded, labels):
+        """The prediction for an example, from the output of the model for what `encode` returned."""
         raise NotImplementedError
 
 
@@ -70,6 +82,43 @@ def name_outputs(model, labels):
     """Give the outputs of a model the names of the classes of its task: they are saved with the model."""
     model.config.id2label = dict(enumerate(labels))
     model.config.label2id = {label: index for index, label in enumerate(labels)}
+
+
+class Predictor:
+    """A model that a run kept, loaded to predict.
+
+    Args:
+        task: the task of the model.
+        directory: where the model and its tokenizer were saved.
+        max_length: number of sub-word tokens the texts are cut at: the one of the run that trained the model.
+        model_name: name of the model that was fine-tuned, as `model_of` gives it.
+    """
+
+    def __init__(self, task, directory, max_length=None, model_name=None):
+        self.task = task
+        self.max_length = max_length
+        self.tokenizer = AutoTokenizer.from_pretrained(directory)
+        # Without the name of the model that was fine-tuned, the one of its tokenizer says which model it is
+        self.model_name = model_name or type(self.tokenizer).__name__
+        self.model = task.model_class.from_pretrained(directory)
+        self.model.eval()
+        # The names that the run gave to the outputs of the model
+        self.labels = [self.model.config.id2label[index] for index in range(self.model.config.num_labels)]
+        unnamed = self.labels == [f"LABEL_{index}" for index in range(len(self.labels))]
+        if unnamed and task.labels is not None and len(task.labels) == len(self.labels):
+            # A model that the first scripts saved without these names, for a task that knows them without its dataset
+            self.labels = list(task.labels)
+
+    def __call__(self, examples):
+        """Predictions for examples: dictionaries that have the columns of `task.inputs`."""
+        predictions = []
+        with torch.no_grad():
+            for example in examples:
+                encoded = self.task.encode(example, self.tokenizer, self.max_length, self.model_name)
+                inputs = {name: torch.tensor([values]) for name, values in encoded["inputs"].items()}
+                logits = self.model(**inputs).logits[0]
+                predictions.append(self.task.decode(logits.numpy(), encoded, self.labels))
+        return predictions
 
 
 @dataclasses.dataclass
@@ -303,10 +352,10 @@ def validation_score(trainer):
 
 
 def describe_model(run, trainer, metrics, directory):
-    """Write, next to the model that the run keeps, what it is: for programs and for the reader.
+    """Write, next to the model that the run keeps, what it is: for `predict.py` and for the reader.
 
     - `drbenchmark.json`: the task, the script that builds what the model reads, the names of
-      its outputs and the scores of the run.
+      its outputs and the scores of the run. With it the directory is enough to predict.
     - `README.md`: the same as a model card, which the HuggingFace Hub shows when the
       directory is published there.
     """
@@ -380,6 +429,14 @@ on the validation set ({validation['score']:.4f}).
 The model reads {inputs}. The script that says how they are given to it is `{script}`:
 another tool, such as a `pipeline` of `transformers` or the widget of the HuggingFace Hub, gives
 the model the text as it is typed. `{DESCRIPTION}` has what is written here for programs.
+
+## Predicting
+
+With the repository of DrBenchmark, which builds what the model reads as when it was trained:
+
+```bash
+python predict.py --model-dir <this directory> "..."
+```
 """
     with open(os.path.join(directory, "README.md"), "w", encoding="utf-8") as f:
         f.write(card)

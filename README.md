@@ -74,6 +74,34 @@ Dr-BERT/DrBERT-4GB-CP-PubMedBERT
 almanach/camembert-bio-base
 ```
 
+## Using a trained model
+
+Each run keeps its best model in `recipes/<recipe>/save_models/`. `predict.py` predicts with it on your own sentences.
+
+```bash
+# The labels of the words of a sentence
+python predict.py --task cas-pos --model Dr-BERT/DrBERT-7GB "Le patient présente une toux sèche."
+# Without a sentence, they are asked for until an empty line
+python predict.py --task cas-pos --model Dr-BERT/DrBERT-7GB
+```
+
+**Which model**: `--task` is a name of `python run.py --help` and `--model` the model that was fine-tuned, as it was given to `run.py`. When several runs kept their model, the one of the first seed is taken (`--seed` takes another one); the runs on a part of the training set (`--fewshot`) are not taken. `--model-dir` gives the directory of a kept model instead, wherever it is.
+
+**What the model reads** is built by the script of the task, by the code that built it when the model was trained: the stop words of DiaMED are removed, the question and the five answers of FrenchMedMCQA are joined, and so on. A task that reads several texts is given them in their order, which `predict.py` says when their number is wrong: two sentences for CLISTER, a question and its five answers for FrenchMedMCQA.
+
+**What is shown**: a sentence with the labels of its words, `word/LABEL`, or `[several words]/LABEL` for an entity of several words; the name of a class; the names of the labels of a multi-label task; a similarity score; the letters of the answers of FrenchMedMCQA. For instance, the same sentence for `cas-pos` and for `quaero-ner_medline`, by two models fine-tuned from `Dr-BERT/DrBERT-7GB`:
+
+```plain
+Une/DET:ART femme/NOM de/PRP 44/NUM ans/NOM était/VER:impf hospitalisée/VER:pper pour/PRP une/DET:ART toux/NOM sèche/ADJ ./SENT
+Une [femme de 44 ans]/LIVB était hospitalisée pour une [toux sèche]/DISO .
+```
+
+**Words**: for the tasks that read the words of a sentence, the sentence is split as most datasets of the benchmark are: the punctuation is apart, and `l'examen` gives `l'` and `examen`. With `--words`, the sentence is only split at its spaces: its words are given as they are.
+
+**What is kept with a model**: the names of its classes, in its `config.json`, a description for programs, `drbenchmark.json` (task, model that was fine-tuned, seed, hyper-parameters, scores, script that builds what the model reads), and the same as a model card, `README.md`. The directory is enough to predict (`--model-dir`), and can be published on the HuggingFace Hub as it is, e.g. with `huggingface-cli upload <your name>/<name of the model> <directory>`. Outside this repository a model is given the text as it is typed, without what the script of its task does to it (the stop words that DiaMED removes, the texts that other tasks join): `predict.py` is what gives a model what it was trained on.
+
+**Models kept before `predict.py` existed**: the ones of the tasks that label words, of the similarity tasks and of `frenchmedmcqa-mcqa` predict as the recent ones. The classification models were saved without the names of their classes: a class is shown as `LABEL_<number>`. A directory given with `--model-dir` needs its task (`--task`).
+
 ## Tasks
 
 |  **Dataset**           | Train | Validation | Test | Task                                       | Metrics             | HuggingFace                                                       |

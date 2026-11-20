@@ -245,6 +245,7 @@ def test_kept_model_is_described(run_recipe, tiny_bert, training):
         "token classification, on the dataset `DrBenchmark/QUAERO` (subset `emea`)", "with the seed 0", "the best `accuracy`",
         f"| overall_f1 | {result['metrics']['overall_f1']:.4f} |", "- learning_rate: ", "- at most 512 sub-word tokens per example",
         "The model reads `tokens` (the words of a sentence).", "`recipes/quaero/scripts/finetuning_bert_ner.py`",
+        'python predict.py --model-dir <this directory> "..."',
     ):
         assert expected in text, expected
 
