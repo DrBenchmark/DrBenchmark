@@ -94,22 +94,16 @@ def load_module(name, path):
 
 
 def tasks_of_run_py():
-    """The tasks of `run.py`, and the command of their launcher: {task: command}."""
+    """The tasks of `run.py`, and the script that it starts for each of them: {task: script}."""
     return load_module("drbenchmark_run", os.path.join(REPO_DIR, "run.py")).task2script
 
 
 def script_of(task):
-    """Path of the script that trains the models of a task of `run.py`: the one its launcher starts."""
+    """Path of the script that trains the models of a task of `run.py`."""
     tasks = tasks_of_run_py()
     if task not in tasks:
         raise PredictError(f"{task} is not a task of run.py. Its tasks are: {', '.join(sorted(tasks))}")
-    scripts_dir = os.path.join(RECIPES_DIR, task.split("-")[0], "scripts")
-    launcher = os.path.join(scripts_dir, tasks[task].split()[0])
-    with open(launcher, encoding="utf-8") as f:
-        started = re.search(r'^python "\$scripts_dir/(\S+\.py)"', f.read(), re.M)
-    if started is None:
-        raise PredictError(f"{launcher} does not start a script of its directory")
-    return os.path.join(scripts_dir, started.group(1))
+    return os.path.join(RECIPES_DIR, task.split("-")[0], "scripts", tasks[task].name)
 
 
 def script_for(description):

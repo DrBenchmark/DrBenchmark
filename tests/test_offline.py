@@ -5,7 +5,6 @@ recipe has to say which script saves these copies.
 """
 
 import argparse
-import shlex
 
 import pytest
 
@@ -105,8 +104,7 @@ def test_recipe_stops_with_what_to_do(task_name, tmp_path):
     """Every training script checks the copies before it loads anything, the one that does not use a shared module too."""
     task = Task(task_name)
     options = ["--offline", "true", "--seed", "0", "--data_dir", f"{tmp_path}/data/", "--run_dir", f"{tmp_path}/"]
-    command = task.command("Some-Org/Some-Model") + " " + " ".join(shlex.quote(option) for option in options)
-    completed = run_command(command, cwd=task.scripts_dir)
+    completed = run_command(task.command("Some-Org/Some-Model") + options, cwd=task.scripts_dir)
 
     assert completed.returncode == 1
     assert "Traceback" not in completed.stderr

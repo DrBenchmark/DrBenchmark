@@ -11,7 +11,6 @@ import json
 import math
 import os
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -900,7 +899,7 @@ def trained_repository(tmp_path_factory, synthetic_data, tiny_bert):
         sys.executable, repository / "run.py", "--tasks", "cas-pos", "cas-cls", "--models", tiny_bert, "--nb-run", "2",
         "--epochs", "1", "--offline", "true",
     ]
-    completed = run_command(" ".join(shlex.quote(str(argument)) for argument in command), cwd=repository)
+    completed = run_command(command, cwd=repository)
     assert completed.returncode == 0, (completed.stdout + completed.stderr)[-3000:]
     assert "INFO::4 run(s): 4 computed, 0 already computed, 0 failed" in completed.stderr
     return repository

@@ -1,8 +1,8 @@
+import collections
 import importlib.util
 import json
 import logging
 import os
-import shlex
 import subprocess
 import sys
 import tempfile
@@ -10,51 +10,74 @@ import tempfile
 # Root of the repository: `models.txt` and the recipes are found there, wherever `run.py` is run from
 REPO_DIR = os.path.dirname(os.path.realpath(__file__))
 
+# What `run.py` starts for a task: the script of its recipe, with its YAML file and, for a script that
+# reads several subsets of its dataset, the subset
+Script = collections.namedtuple('Script', 'name config subset', defaults=[None])
+
+# The tasks. `<recipe>-<task>`: the script is in recipes/<recipe>/scripts/ and the YAML file in recipes/<recipe>/yaml/
 task2script = {
-    'cas-pos': './run_task_1.sh {model_name}',
-    'cas-cls': './run_task_2.sh {model_name}',
-    'cas-ner_neg': './run_task_3.sh {model_name}',
-    'cas-ner_spec': './run_task_4.sh {model_name}',
+    'cas-pos': Script('task_1_finetuning_bert_pos.py', 'pos.yaml'),
+    'cas-cls': Script('task_2_finetuning_bert_cls.py', 'cls.yaml'),
+    'cas-ner_neg': Script('task_3_finetuning_bert_ner.py', 'ner_neg.yaml'),
+    'cas-ner_spec': Script('task_3_finetuning_bert_ner.py', 'ner_spec.yaml'),
 
-    'clister-regr': './run.sh {model_name}',
+    'clister-regr': Script('finetuning_bert_regr.py', 'regr.yaml'),
 
-    'diamed-cls': './run.sh {model_name}',
+    'diamed-cls': Script('task_1_finetuning_bert_cls.py', 'cls.yaml'),
 
-    'e3c-ner_clinical': './run.sh {model_name} French_clinical',
-    'e3c-ner_temporal': './run.sh {model_name} French_temporal',
+    'e3c-ner_clinical': Script('finetuning_bert_ner.py', 'ner.yaml', 'French_clinical'),
+    'e3c-ner_temporal': Script('finetuning_bert_ner.py', 'ner.yaml', 'French_temporal'),
 
-    'essai-pos': './run_task_1.sh {model_name}',
-    'essai-cls': './run_task_2.sh {model_name}',
-    'essai-ner_neg': './run_task_3.sh {model_name}',
-    'essai-ner_spec': './run_task_4.sh {model_name}',
+    'essai-pos': Script('task_1_finetuning_bert_pos.py', 'pos.yaml'),
+    'essai-cls': Script('task_2_finetuning_bert_cls.py', 'cls.yaml'),
+    'essai-ner_neg': Script('task_3_finetuning_bert_ner.py', 'ner_neg.yaml'),
+    'essai-ner_spec': Script('task_3_finetuning_bert_ner.py', 'ner_spec.yaml'),
 
-    'frenchmedmcqa-mcqa': './run_task_1.sh {model_name}',
-    'frenchmedmcqa-cls': './run_task_2.sh {model_name}',
+    'frenchmedmcqa-mcqa': Script('task_1_finetuning_bert_mcqa.py', 'mcqa.yaml'),
+    'frenchmedmcqa-cls': Script('task_2_finetuning_bert_cls.py', 'cls.yaml'),
 
-    'mantragsc-ner_emea': './run.sh {model_name} fr_emea',
-    'mantragsc-ner_medline': './run.sh {model_name} fr_medline',
-    'mantragsc-ner_patents': './run.sh {model_name} fr_patents',
+    'mantragsc-ner_emea': Script('finetuning_bert_ner.py', 'ner.yaml', 'fr_emea'),
+    'mantragsc-ner_medline': Script('finetuning_bert_ner.py', 'ner.yaml', 'fr_medline'),
+    'mantragsc-ner_patents': Script('finetuning_bert_ner.py', 'ner.yaml', 'fr_patents'),
 
-    'morfitt-cls': './run.sh {model_name}',
+    'morfitt-cls': Script('finetuning_bert_cls.py', 'cls.yaml'),
 
-    'deft2019-ner': './run.sh {model_name}',
+    'deft2019-ner': Script('finetuning_bert_ner.py', 'ner.yaml'),
 
-    'deft2020-regr': './run_task_1.sh {model_name}',
-    'deft2020-cls': './run_task_2.sh {model_name}',
+    'deft2020-regr': Script('task_1_finetuning_bert_regr.py', 'regr.yaml'),
+    'deft2020-cls': Script('task_2_finetuning_bert_cls.py', 'cls.yaml'),
 
-    'deft2021-ner': './run_task_1.sh {model_name}',
-    'deft2021-cls': './run_task_2.sh {model_name}',
+    'deft2021-ner': Script('task_1_finetuning_bert_ner.py', 'ner.yaml'),
+    'deft2021-cls': Script('task_2_finetuning_bert_cls.py', 'cls.yaml'),
 
-    'pxcorpus-ner': './run_task_1.sh {model_name}',
-    'pxcorpus-cls': './run_task_2.sh {model_name}',
+    'pxcorpus-ner': Script('task_1_finetuning_bert_ner.py', 'ner.yaml'),
+    'pxcorpus-cls': Script('task_2_finetuning_bert_cls.py', 'cls.yaml'),
 
-    'quaero-ner_emea': './run.sh {model_name} emea',
-    'quaero-ner_medline': './run.sh {model_name} medline',
+    'quaero-ner_emea': Script('finetuning_bert_ner.py', 'ner.yaml', 'emea'),
+    'quaero-ner_medline': Script('finetuning_bert_ner.py', 'ner.yaml', 'medline'),
 }
 
 # Options of the recipes that are not options of `run.py`: it sets the first four itself for
 # each run, and each recipe has its own directories
 NOT_OPTIONS_OF_RUN_PY = ('config', 'model_name', 'subset', 'seed', 'output_dir', 'run_dir', 'data_dir')
+
+
+def scripts_dir(task):
+    """Directory of the scripts of the recipe of a task: a run is started there."""
+    return os.path.join(REPO_DIR, 'recipes', task.split('-')[0].lower(), 'scripts')
+
+
+def command(task, model, options=()):
+    """The command of a run of a task for a model, to start in `scripts_dir(task)`: its program and its arguments.
+
+    The script is started by the Python that runs `run.py`, without a shell: nothing else is
+    needed, neither bash nor the launcher of the task. `options` are given to the script as they are.
+    """
+    script = task2script[task]
+    arguments = [sys.executable, script.name, '--config', os.path.join('..', 'yaml', script.config), '--model_name', model]
+    if script.subset is not None:
+        arguments += ['--subset', script.subset]
+    return arguments + list(options)
 
 
 def load_recipes_utils():
@@ -180,14 +203,11 @@ if __name__ == '__main__':
             logging.info('=============================')
             logging.info('')
 
-            command = task2script[task].format(model_name=shlex.quote(model))
-            # What follows the model and the subset is given to the script of the recipe
-            command += ' ' + shlex.join(['--seed', str(seed), *recipe_options])
-            scripts_dir = os.path.join(REPO_DIR, 'recipes', corpus.lower(), 'scripts')
             if os.path.exists(status_file):
                 os.remove(status_file)
             try:
-                returncode = subprocess.call(command, shell=True, cwd=scripts_dir, env=environ)
+                returncode = subprocess.call(
+                    command(task, model, ['--seed', str(seed), *recipe_options]), cwd=scripts_dir(task), env=environ)
             except KeyboardInterrupt:
                 logging.info('KeyboardInterrupt Exiting...')
                 sys.exit(130)

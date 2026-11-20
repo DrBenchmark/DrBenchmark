@@ -143,10 +143,11 @@ def test_task_of_run_one_jean_zay_is_one_of_run_py():
 
 
 def test_recipes_readme_lists_every_task():
-    """The table of `recipes/README.md` gives the name and the command of each task."""
+    """The table of `recipes/README.md` gives the name of each task of `run.py` and the command of its launcher."""
     rows = re.findall(r"\| `([a-z0-9]+-[a-z_]+)`\s*\| `(\./run[^`]*)`\s*\|$", (RECIPES / "README.md").read_text(), re.M)
-    documented = {name: command.replace("<model>", "{model_name}") for name, command in rows}
-    assert documented == TASKS
+    assert dict(rows) == {
+        task.name: " ".join([f"./{task.launcher}", "<model>"] + ([task.cli_subset] if task.cli_subset else [])) for task in ALL_TASKS
+    }
 
 
 @pytest.mark.parametrize("task", ALL_TASKS, ids=task_ids)

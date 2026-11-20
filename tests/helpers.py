@@ -32,9 +32,10 @@ def load_module(name, path):
     return module
 
 
-# {task name: command run from `recipes/<recipe>/scripts/`}, e.g.
-# {"e3c-ner_clinical": "./run.sh {model_name} French_clinical"}
-TASKS = load_module("drbenchmark_run", REPO / "run.py").task2script
+# {task name: what `run.py` starts in `recipes/<recipe>/scripts/`}: a script, its YAML file and maybe a subset, e.g.
+# {"e3c-ner_clinical": Script(name="finetuning_bert_ner.py", config="ner.yaml", subset="French_clinical")}
+RUN_PY = load_module("drbenchmark_run", REPO / "run.py")
+TASKS = RUN_PY.task2script
 
 # The directories of `recipes/` with scripts: every one but `common/`, the code they share
 RECIPE_NAMES = sorted(path.name for path in RECIPES.iterdir() if (path / "scripts").is_dir())
@@ -46,35 +47,35 @@ MODELS_OF_THE_FILE = ["first/model", "second/model"]
 
 
 class Task:
-    """Everything `run.py` and the launcher of a task say about it."""
+    """Everything `run.py` says about a task, and the launcher of its recipe that does the same."""
 
     def __init__(self, name):
         self.name = name
         self.recipe, detail = name.split("-")
         # pos, cls, ner, regr or mcqa
         self.kind = detail.split("_")[0]
-        launcher, model, *subset = TASKS[name].split()
-        assert model == "{model_name}", TASKS[name]
-        self.launcher = launcher[2:] if launcher.startswith("./") else launcher
-        self.cli_subset = subset[0] if subset else None
+        # Python script that `run.py` starts, and the subset it gives to a script that reads several
+        self.script, config, self.cli_subset = TASKS[name]
+        # Path of the YAML file that `run.py` gives, relative to `scripts/`
+        self.config_arg = f"../yaml/{config}"
         self.scripts_dir = RECIPES / self.recipe / "scripts"
 
     def __repr__(self):
         return f"Task({self.name})"
 
     @property
+    def launcher(self):
+        """The launcher of the task: the one of its recipe that starts its script with its YAML file."""
+        launchers = [
+            path.name for path in sorted(self.scripts_dir.glob("run*.sh"))
+            if re.search(rf'^python "\$scripts_dir/{re.escape(self.script)}" --config="\$scripts_dir/{re.escape(self.config_arg)}" ', path.read_text(), re.M)
+        ]
+        assert len(launchers) == 1, f"{len(launchers)} launchers for {self.name}"
+        return launchers[0]
+
+    @property
     def launcher_path(self):
         return self.scripts_dir / self.launcher
-
-    @property
-    def script(self):
-        """Python script called by the launcher, which looks for it in its own directory."""
-        return re.search(r'^python "\$scripts_dir/(\S+\.py)"', self.launcher_path.read_text(), re.M).group(1)
-
-    @property
-    def config_arg(self):
-        """Path of the YAML file given by the launcher, relative to `scripts/`."""
-        return re.search(r'--config="\$scripts_dir/([^"]+)"', self.launcher_path.read_text()).group(1)
 
     @property
     def config_path(self):
@@ -101,25 +102,28 @@ class Task:
             args.append(f"--subset={self.cli_subset}")
         return args
 
-    def command(self, model, cwd=None):
-        """Command of `run.py` for the task, written to be run from `cwd`: `scripts/` by default."""
-        command = TASKS[self.name].format(model_name=shlex.quote(str(model)))
-        if cwd is not None:
-            # ./run.sh <model> -> <path of scripts/ from cwd>/run.sh <model>
-            assert command.startswith("./")
-            command = shlex.quote(relative_path(self.scripts_dir, cwd)) + command[1:]
-        return command
+    def command(self, model):
+        """What `run.py` starts in `scripts/` for the task: the program and its arguments, without the seed and the options."""
+        return RUN_PY.command(self.name, str(model))
+
+    def launcher_command(self, model, cwd=None):
+        """The command of the launcher of the task for a shell, typed from `cwd`: `scripts/` by default."""
+        launcher = "./" + self.launcher if cwd is None else shlex.quote(os.path.join(relative_path(self.scripts_dir, cwd), self.launcher))
+        return " ".join([launcher, shlex.quote(str(model))] + ([shlex.quote(self.cli_subset)] if self.cli_subset else []))
 
 
 ALL_TASKS = [Task(name) for name in TASKS]
 
 
 def run_command(command, cwd, timeout=900):
-    """Run the command of a recipe from the directory `cwd`."""
+    """Run the command of a recipe from the directory `cwd`: a program and its arguments, or a text for a shell."""
     environ = dict(os.environ, TOKENIZERS_PARALLELISM="false")
     # The launchers call `python`: make it the interpreter running the tests
     environ["PATH"] = os.path.dirname(sys.executable) + os.pathsep + environ["PATH"]
-    return subprocess.run(command, shell=True, cwd=cwd, env=environ, capture_output=True, text=True, timeout=timeout)
+    shell = isinstance(command, str)
+    if not shell:
+        command = [str(argument) for argument in command]
+    return subprocess.run(command, shell=shell, cwd=cwd, env=environ, capture_output=True, text=True, timeout=timeout)
 
 
 def copy_tools(repository):

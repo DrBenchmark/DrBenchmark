@@ -53,13 +53,19 @@ python run.py --tasks cas-pos --models "Dr-BERT/DrBERT-7GB"
 
 `run.py` gives each run its seed (0, then 1...) and the options of the recipes it is given, e.g. `--epochs 5` (see the [main README](../README.md)).
 
-Or directly with the launcher of the task, which is in the `scripts/` directory of its recipe. The launchers find their files from their own location: they can be run from any directory.
+Or directly, with the Python script of the task and its YAML file: this is what `run.py` starts for the task, without bash.
+
+```bash
+python recipes/cas/scripts/task_1_finetuning_bert_pos.py --config recipes/cas/yaml/pos.yaml --model_name "Dr-BERT/DrBERT-7GB"
+```
+
+The launcher of the task, in the `scripts/` directory of its recipe, is a shortcut for a shell: it starts the same script with the same YAML file. The scripts and the launchers find their files from their own location: they can be run from any directory.
 
 ```bash
 bash recipes/cas/scripts/run_task_1.sh "Dr-BERT/DrBERT-7GB"
 ```
 
-The arguments given after the model (and after the subset, for the launchers that take one) are passed to the Python script and override the values of the YAML file, e.g. `bash recipes/cas/scripts/run_task_1.sh "Dr-BERT/DrBERT-7GB" --seed 42 --epochs 5`. A relative path given on the command line (`--data_dir`, `--run_dir`, `--output_dir` or a local model) is relative to the current directory. In the results of the run, it is written from the `scripts/` directory, as the paths of the YAML file are: the name of a run does not depend on the directory it is started from.
+The other arguments override the values of the YAML file: they follow the model for a launcher (and the subset, for the launchers that take one), e.g. `bash recipes/cas/scripts/run_task_1.sh "Dr-BERT/DrBERT-7GB" --seed 42 --epochs 5`. A relative path given on the command line (`--data_dir`, `--run_dir`, `--output_dir` or a local model) is relative to the current directory. In the results of the run, it is written from the `scripts/` directory, as the paths of the YAML file are: the name of a run does not depend on the directory it is started from.
 
 Each run writes its metrics, its hyper-parameters, its predictions on the test set and the versions that computed it (Python, the libraries and the commit of the repository) in `runs/DrBenchmark-<task name>-<hash>.json`, and saves its best model in `save_models/DrBenchmark-<task name>-<hash>_best_model/`. The hash is the one of the arguments of the run, among which its seed. With `--seed`, a run whose results exist is not computed again; without it, a seed that was not used yet is drawn.
 

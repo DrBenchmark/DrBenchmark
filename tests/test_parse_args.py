@@ -316,6 +316,21 @@ def test_what_is_kept_of_a_run_is_not_part_of_its_name(parse, utils, tmp_path):
     assert exit_info.value.code == 0
 
 
+@pytest.mark.parametrize("task", ALL_TASKS, ids=task_ids)
+def test_run_of_run_py_is_the_one_of_the_launcher(task, parse, utils, monkeypatch):
+    """`run.py` starts the script of a task itself: its run has the arguments, hence the name, of the one of the launcher.
+
+    The runs that the launchers computed are the ones that `run.py` asks for: they are not computed again.
+    """
+    by_the_launcher = parse(task, "--seed", "3")
+    monkeypatch.chdir(task.scripts_dir)
+    # The command of `run.py`, without its program
+    monkeypatch.setattr(sys, "argv", [*task.command(MODEL)[1:], "--seed", "3"])
+    by_run_py = utils.parse_args()
+    assert by_run_py == by_the_launcher
+    assert utils.get_run_path(by_run_py) == utils.get_run_path(by_the_launcher)
+
+
 def test_name_of_a_run_is_stable(parse, utils):
     """An unchanged configuration keeps the name of its run from one version of the code to the next.
 

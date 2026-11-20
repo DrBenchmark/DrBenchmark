@@ -8,7 +8,6 @@ import importlib
 import importlib.util
 import json
 import os
-import shlex
 import sys
 
 import pytest
@@ -251,8 +250,8 @@ class RecipeRun:
 def run_recipe(tmp_path_factory, synthetic_data):
     """Run a task as `run.py` does, on the synthetic data, and return a `RecipeRun`.
 
-    The launcher of the task is called from its `scripts/` directory, with one epoch
-    and a fixed seed. The models and the results are written in a temporary directory.
+    The script of the task is started as `run.py` starts it, in its `scripts/` directory,
+    with one epoch and a fixed seed. The models and the results are written in a temporary directory.
     The offline mode is forced, whatever `config.yaml` says, so that the recipe reads
     the synthetic data instead of downloading the real ones.
     Identical runs are only executed once per test session.
@@ -275,8 +274,7 @@ def run_recipe(tmp_path_factory, synthetic_data):
                 "--epochs", "1",
                 *extra_args,
             ]
-            command = task.command(model) + " " + " ".join(shlex.quote(str(argument)) for argument in arguments)
-            completed = run_command(command, cwd=task.scripts_dir)
+            completed = run_command(task.command(model) + arguments, cwd=task.scripts_dir)
             cache[key] = RecipeRun(task, completed, directory)
         return cache[key]
 

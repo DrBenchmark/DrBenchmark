@@ -1,6 +1,6 @@
 """End-to-end tests: each task of `run.py` is trained and evaluated on synthetic data.
 
-The launchers are called exactly as `run.py` calls them, with a tiny model and one
+The script of each task is started as `run.py` starts it, with a tiny model and one
 epoch. The scores are meaningless: the tests only check that every recipe runs and
 writes the results the tools of `tools/` expect.
 """
@@ -9,6 +9,7 @@ import importlib.metadata
 import math
 import os
 import platform
+import sys
 from pathlib import Path
 
 import pytest
@@ -81,10 +82,11 @@ def names(directory):
     return sorted(path.name for path in directory.iterdir() if path.name != "__pycache__")
 
 
-# A launcher without subset, and one with a subset
+# A task without subset, and one with a subset: by their launcher, and by their script as `run.py` starts it
 @pytest.mark.parametrize("task_name", ["cas-pos", "e3c-ner_clinical"])
-def test_recipe_started_from_another_directory(task_name, run_recipe, tiny_bert, synthetic_data, tmp_path):
-    """The launcher is run from a directory out of the repository, with paths relative to that directory."""
+@pytest.mark.parametrize("with_launcher", [True, False], ids=["launcher", "script"])
+def test_recipe_started_from_another_directory(task_name, with_launcher, run_recipe, tiny_bert, synthetic_data, tmp_path):
+    """A recipe is started by hand from a directory out of the repository, with paths relative to that directory."""
     task = Task(task_name)
     os.symlink(tiny_bert, tmp_path / "model")
     os.symlink(synthetic_data / task.recipe, tmp_path / "data")
@@ -93,7 +95,12 @@ def test_recipe_started_from_another_directory(task_name, run_recipe, tiny_bert,
     before = {name: names(recipe / name) for name in ("runs", "save_models", "scripts")}
 
     arguments = "--data_dir data/ --run_dir runs/ --output_dir models/ --offline True --seed 0 --epochs 1"
-    completed = run_command(f"{task.command('model', cwd=tmp_path)} {arguments}", cwd=tmp_path)
+    if with_launcher:
+        command = f"{task.launcher_command('model', cwd=tmp_path)} {arguments}"
+    else:
+        script = os.path.relpath(task.scripts_dir / task.script, tmp_path)
+        command = [sys.executable, script, *task.script_args("model", cwd=tmp_path), *arguments.split()]
+    completed = run_command(command, cwd=tmp_path)
     assert completed.returncode == 0, completed.stderr[-3000:]
     assert f"Working directory: {task.scripts_dir}" in completed.stderr
 
@@ -102,7 +109,7 @@ def test_recipe_started_from_another_directory(task_name, run_recipe, tiny_bert,
     result = read_json(run_file)
     assert {name: names(recipe / name) for name in before} == before
 
-    # The paths are written from `scripts/`, whatever the directory the launcher is run from
+    # The paths are written from `scripts/`, whatever the directory the recipe is started from
     hyperparameters = result["hyperparameters"]
     assert hyperparameters["config"] == task.config_arg
     for argument, typed in (("model_name", "model"), ("data_dir", "data"), ("run_dir", "runs"), ("output_dir", "models")):
@@ -114,7 +121,7 @@ def test_recipe_started_from_another_directory(task_name, run_recipe, tiny_bert,
     assert os.path.realpath(best_model).startswith(str(tmp_path / "models"))
     assert (best_model / "config.json").is_file()
 
-    # The run is the one the launcher does from `scripts/`
+    # The run is the one that `run.py` does, from `scripts/`
     reference = run_recipe(task_name, tiny_bert).result
     assert result["predictions"]["identifiers"] == reference["predictions"]["identifiers"]
     assert result["predictions"]["real_labels"] == reference["predictions"]["real_labels"]

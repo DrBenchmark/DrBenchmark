@@ -1,10 +1,10 @@
-"""Tests of `run.py`, with fake launchers instead of the real recipes, but for one test."""
+"""Tests of `run.py`, with fake scripts instead of the ones of the recipes, but for one test."""
 
 import argparse
 import collections
+import json
 import os
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -17,8 +17,28 @@ from helpers import (
 
 MODEL = "some org/a model"  # with a space, to check that it is given as one argument
 
-# What a launcher was given: the model, the subset if the launcher takes one, then the options
+# A run that `run.py` started: its task, then the model, the subset when the script reads several,
+# and the options, in the directory of the script
 Call = collections.namedtuple("Call", "task arguments directory")
+
+# A script that only records how it is started. It finds what it has to do for its task in a file:
+# several tasks of a recipe have the same script, with another YAML file or another subset.
+FAKE_SCRIPT = """
+import json, os, sys
+
+arguments = sys.argv[1:]
+given = {name: arguments[arguments.index(name) + 1] if name in arguments else None for name in ("--config", "--subset")}
+with open(%(tasks)r) as f:
+    task = json.load(f)["|".join([os.path.basename(os.path.dirname(os.getcwd())), os.path.basename(sys.argv[0]), str(given["--config"]), str(given["--subset"])])]
+# One line per call: the task, the program, the current directory, then each argument, all followed by a tab
+with open(%(calls)r, "a") as f:
+    f.write("\\t".join([task["name"], sys.executable, os.path.realpath(os.getcwd()), *arguments]) + "\\t\\n")
+if task["already_computed"]:
+    # As a recipe does when the results of its run exist
+    with open(os.environ["DRBENCHMARK_RUN_STATUS"], "w") as f:
+        json.dump({"status": "already computed"}, f)
+sys.exit(task["exit_code"])
+"""
 
 
 def run_py(*arguments, cwd=REPO, script=REPO / "run.py"):
@@ -28,7 +48,7 @@ def run_py(*arguments, cwd=REPO, script=REPO / "run.py"):
 
 
 class FakeRepository:
-    """A directory with a copy of `run.py` and launchers that only record how they are called.
+    """A directory with a copy of `run.py` and scripts that only record how they are started.
 
     `run.py` finds the recipes and `models.txt` from its own location: its copy uses the fake ones.
     """
@@ -36,6 +56,7 @@ class FakeRepository:
     def __init__(self, directory):
         self.directory = directory
         self.calls = directory / "calls.txt"
+        self.tasks = directory / "tasks.json"
         directory.mkdir()
         shutil.copy(REPO / "run.py", directory)
         # `run.py` reads the options of the recipes in the code they share
@@ -45,38 +66,47 @@ class FakeRepository:
     def scripts_dir(self, task_name):
         return self.directory / "recipes" / Task(task_name).recipe / "scripts"
 
-    def create_launchers(self, exit_codes, already_computed=()):
-        """Create the launcher of each task of `exit_codes`, with the exit code given for it.
+    def create_scripts(self, exit_codes, already_computed=()):
+        """Create the script of each task of `exit_codes`, which ends with the exit code given for the task.
 
-        The launchers of the tasks of `already_computed` say, as a recipe does, that the
+        The scripts of the tasks of `already_computed` say, as a recipe does, that the
         results of their run exist.
         """
+        tasks = read_json(self.tasks) if self.tasks.exists() else {}
         for task_name, exit_code in exit_codes.items():
+            task = Task(task_name)
             scripts_dir = self.scripts_dir(task_name)
             scripts_dir.mkdir(parents=True, exist_ok=True)
-            launcher = scripts_dir / Task(task_name).launcher
-            status = ""
-            if task_name in already_computed:
-                status = """printf '{"status": "already computed"}' > "$DRBENCHMARK_RUN_STATUS"\n"""
-            launcher.write_text(
-                "#!/bin/sh\n"
-                # One line per call: the task, the current directory, then each argument, all followed by a tab
-                f"{{ printf '%s\\t' '{task_name}' \"$(pwd -P)\" \"$@\"; echo; }} >> '{self.calls}'\n"
-                f"{status}"
-                f"exit {exit_code}\n"
-            )
-            launcher.chmod(0o755)
+            (scripts_dir / task.script).write_text(FAKE_SCRIPT % {"tasks": str(self.tasks), "calls": str(self.calls)})
+            # What `run.py` gives to the script says which task it is
+            tasks["|".join([task.recipe, task.script, task.config_arg, str(task.cli_subset)])] = {
+                "name": task_name, "exit_code": exit_code, "already_computed": task_name in already_computed,
+            }
+        self.tasks.write_text(json.dumps(tasks))
 
     def run(self, *arguments, cwd=None):
         """Run the copy of `run.py`, from the root of the fake repository or from `cwd`."""
         return run_py(*arguments, cwd=self.directory if cwd is None else cwd, script=self.directory / "run.py")
 
+    def started(self):
+        """How the scripts were started, in the order they were: [(task, program, directory, arguments)]."""
+        lines = [line.split("\t")[:-1] for line in self.calls.read_text().splitlines()]
+        return [(task, program, directory, arguments) for task, program, directory, *arguments in lines]
+
     def recorded_calls(self):
-        """The calls of the launchers, in the order they were made."""
+        """The runs that were started, in the order they were.
+
+        A script is given its YAML file, the model, then its subset when it reads several:
+        a call has the model, the subset and what follows them, the seed and the options.
+        """
         calls = []
-        for line in self.calls.read_text().splitlines():
-            task, directory, *arguments = line.split("\t")[:-1]
-            calls.append(Call(task, arguments, directory))
+        for task_name, _, directory, arguments in self.started():
+            task = Task(task_name)
+            subset = ["--subset", task.cli_subset] if task.cli_subset else []
+            config, model, rest = arguments[:2], arguments[2:4], arguments[4:]
+            assert config == ["--config", os.path.join("..", "yaml", os.path.basename(task.config_arg))], arguments
+            assert model[0] == "--model_name" and rest[:len(subset)] == subset, arguments
+            calls.append(Call(task_name, [model[1], *subset[1:], *rest[len(subset):]], directory))
         return calls
 
     def models(self):
@@ -110,9 +140,29 @@ def test_unknown_task_is_refused():
     assert "invalid choice" in unknown.stderr
 
 
+def test_script_of_a_task_is_started_by_python_itself(fake_repository):
+    """`run.py` starts the script of a task with the Python that runs it: neither a shell nor a launcher is needed."""
+    fake_repository.create_scripts({"cas-pos": 0, "e3c-ner_clinical": 0})
+    completed = fake_repository.run("--tasks", "cas-pos", "e3c-ner_clinical", "--models", MODEL, "--epochs", "2")
+    assert completed.returncode == 0, completed.stderr
+
+    # The program, its directory and its arguments: the YAML file of the task, the model, the subset, the seed and the options
+    assert fake_repository.started() == [
+        ("cas-pos", sys.executable, os.path.realpath(fake_repository.scripts_dir("cas-pos")),
+         ["--config", os.path.join("..", "yaml", "pos.yaml"), "--model_name", MODEL, "--seed", "0", "--epochs", "2"]),
+        ("e3c-ner_clinical", sys.executable, os.path.realpath(fake_repository.scripts_dir("e3c-ner_clinical")),
+         ["--config", os.path.join("..", "yaml", "ner.yaml"), "--model_name", MODEL, "--subset", "French_clinical", "--seed", "0", "--epochs", "2"]),
+    ]
+    # The fake recipes have nothing but these scripts
+    recipes = fake_repository.directory / "recipes"
+    assert sorted(str(path.relative_to(recipes)) for path in recipes.rglob("*") if path.is_file() and path.parent.name != "common") == [
+        os.path.join("cas", "scripts", "task_1_finetuning_bert_pos.py"), os.path.join("e3c", "scripts", "finetuning_bert_ner.py"),
+    ]
+
+
 def test_runs_every_task_model_and_iteration(fake_repository):
     """Each run of a task for a model has its seed: 0 for the first one, then 1..."""
-    fake_repository.create_launchers({"cas-pos": 0, "e3c-ner_clinical": 0})
+    fake_repository.create_scripts({"cas-pos": 0, "e3c-ner_clinical": 0})
     completed = fake_repository.run(
         "--tasks", "cas-pos", "e3c-ner_clinical", "--models", MODEL, "other/model", "--nb-run", "2",
     )
@@ -132,7 +182,7 @@ def test_runs_every_task_model_and_iteration(fake_repository):
 
 def test_runs_are_the_same_ones_each_time(fake_repository):
     """`run.py` asks for the same runs when it is started again: the recipes skip the ones they already computed."""
-    fake_repository.create_launchers({"cas-pos": 0})
+    fake_repository.create_scripts({"cas-pos": 0})
     for _ in range(2):
         assert fake_repository.run("--tasks", "cas-pos", "--models", MODEL, "--nb-run", "2").returncode == 0
     twice = [call.arguments for call in fake_repository.recorded_calls()]
@@ -140,7 +190,7 @@ def test_runs_are_the_same_ones_each_time(fake_repository):
 
 
 def test_seed_of_the_first_run_can_be_chosen(fake_repository):
-    fake_repository.create_launchers({"cas-pos": 0})
+    fake_repository.create_scripts({"cas-pos": 0})
     completed = fake_repository.run("--tasks", "cas-pos", "--models", MODEL, "--nb-run", "3", "--seed", "40")
     assert completed.returncode == 0, completed.stderr
     assert [call.arguments for call in fake_repository.recorded_calls()] == [
@@ -152,7 +202,7 @@ def test_seed_of_the_first_run_can_be_chosen(fake_repository):
 
 def test_job_is_one_of_the_runs(fake_repository):
     """With `--job`, `run.py` only does the run that has this number, among the ones it does without it."""
-    fake_repository.create_launchers({"cas-pos": 0, "e3c-ner_clinical": 0})
+    fake_repository.create_scripts({"cas-pos": 0, "e3c-ner_clinical": 0})
     asked = ("--tasks", "cas-pos", "e3c-ner_clinical", "--models", MODEL, "other/model", "--nb-run", "2", "--epochs", "3")
 
     assert fake_repository.run(*asked).returncode == 0
@@ -179,7 +229,7 @@ def test_job_is_one_of_the_runs(fake_repository):
 
 
 def test_failure_of_a_job_is_the_one_of_its_run(fake_repository):
-    fake_repository.create_launchers({"cas-pos": 0, "cas-cls": 3})
+    fake_repository.create_scripts({"cas-pos": 0, "cas-cls": 3})
     asked = ("--tasks", "cas-pos", "cas-cls", "--models", MODEL)
     assert fake_repository.run(*asked, "--job", "0").returncode == 0
     assert fake_repository.run(*asked, "--job", "1").returncode == 1
@@ -188,7 +238,7 @@ def test_failure_of_a_job_is_the_one_of_its_run(fake_repository):
 @pytest.mark.parametrize("script", ["run_all_slurm.sh", "run_all_jean_zay.sh"])
 def test_job_of_a_script_for_slurm_does_its_run(script, fake_repository, tmp_path):
     """The scripts for SLURM run `run.py` for real: each job does one run of a task for a model of `models.txt`."""
-    fake_repository.create_launchers(dict.fromkeys(TASKS, 0))
+    fake_repository.create_scripts(dict.fromkeys(TASKS, 0))
     (fake_repository.directory / "models.txt").write_text(MODELS_FILE)
     nb_runs = int(re.search(r"^NBR_RUNS=(\d+)$", (REPO / script).read_text(), re.M).group(1))
     # Task by task, then model by model: `run.py` does the tasks in the order of their names
@@ -223,14 +273,14 @@ def test_job_of_a_script_for_slurm_does_its_run(script, fake_repository, tmp_pat
 
 
 def test_options_of_the_recipes_are_given_to_every_run(fake_repository, utils):
-    fake_repository.create_launchers({"cas-pos": 0, "e3c-ner_clinical": 0})
+    fake_repository.create_scripts({"cas-pos": 0, "e3c-ner_clinical": 0})
     completed = fake_repository.run(
         "--tasks", "cas-pos", "e3c-ner_clinical", "--models", MODEL, "--nb-run", "2",
         "--offline", "false", "--max_train_samples", "10", "--epochs", "2", "--fewshot", "0.25", "--learning_rate", "2e-5",
     )
     assert completed.returncode == 0, completed.stderr
 
-    # The seed and the five options, with their values: what the launchers are given after
+    # The seed and the five options, with their values: what the scripts are given after
     # the model and the subset, and give to the script of the recipe
     calls = fake_repository.recorded_calls()
     assert [(call.task, call.arguments[:-12]) for call in calls] == [
@@ -258,7 +308,7 @@ def test_options_of_the_recipes_are_given_to_every_run(fake_repository, utils):
 ], ids=lambda value: " ".join(value) if isinstance(value, list) else None)
 def test_wrong_option_is_refused_before_any_run(options, message, fake_repository):
     """An option that the recipes would refuse is not given to each run, to fail each time."""
-    fake_repository.create_launchers({"cas-pos": 0})
+    fake_repository.create_scripts({"cas-pos": 0})
     completed = fake_repository.run("--tasks", "cas-pos", "--models", MODEL, *options)
     assert completed.returncode == 2
     assert message in completed.stderr
@@ -292,7 +342,7 @@ def test_run_py_loads_neither_torch_nor_transformers():
 
 def test_failed_runs_are_reported(fake_repository):
     """A failed run does not stop the next ones, but `run.py` lists it and exits with an error."""
-    fake_repository.create_launchers({"cas-pos": 0, "cas-cls": 3, "clister-regr": 0})
+    fake_repository.create_scripts({"cas-pos": 0, "cas-cls": 3, "clister-regr": 0})
     completed = fake_repository.run(
         "--tasks", "cas-pos", "cas-cls", "clister-regr", "--models", MODEL, "--nb-run", "2",
     )
@@ -309,7 +359,7 @@ def test_failed_runs_are_reported(fake_repository):
 
 def test_runs_are_counted(fake_repository):
     """At its end, `run.py` says how many runs were computed, were already computed and failed."""
-    fake_repository.create_launchers({"cas-pos": 0, "cas-cls": 0, "deft2020-cls": 0, "clister-regr": 3}, already_computed=["cas-cls"])
+    fake_repository.create_scripts({"cas-pos": 0, "cas-cls": 0, "deft2020-cls": 0, "clister-regr": 3}, already_computed=["cas-cls"])
 
     # The runs that follow the ones that were already computed are not taken for such runs
     completed = fake_repository.run(
@@ -340,7 +390,7 @@ def test_run_says_what_it_did_to_run_py(utils, monkeypatch, tmp_path):
 
 def test_models_file_is_only_needed_without_models(fake_repository):
     """`run.py` does not warn about a missing `models.txt` when the models are given, and shows its messages in both cases."""
-    fake_repository.create_launchers({"cas-pos": 0})
+    fake_repository.create_scripts({"cas-pos": 0})
     assert not (fake_repository.directory / "models.txt").exists()
 
     completed = fake_repository.run("--tasks", "cas-pos", "--models", MODEL)
@@ -356,9 +406,9 @@ def test_models_file_is_only_needed_without_models(fake_repository):
 
 
 def test_runs_from_any_directory(fake_repository, elsewhere):
-    """Each launcher is run in its `scripts/` directory, wherever `run.py` is run from."""
+    """Each script is started in its `scripts/` directory, wherever `run.py` is run from."""
     tasks = ["cas-pos", "e3c-ner_clinical"]
-    fake_repository.create_launchers(dict.fromkeys(tasks, 0))
+    fake_repository.create_scripts(dict.fromkeys(tasks, 0))
     expected = [
         Call("cas-pos", [MODEL, "--seed", "0"], os.path.realpath(fake_repository.scripts_dir("cas-pos"))),
         Call(
@@ -379,7 +429,7 @@ def test_models_file_of_the_repository_is_read(fake_repository, elsewhere):
 
     Neither its empty lines nor its comments are models.
     """
-    fake_repository.create_launchers({"cas-pos": 0})
+    fake_repository.create_scripts({"cas-pos": 0})
     (fake_repository.directory / "models.txt").write_text(MODELS_FILE)
     (elsewhere / "models.txt").write_text("another/model\n")
 
@@ -392,7 +442,7 @@ def test_models_file_of_the_repository_is_read(fake_repository, elsewhere):
 
 def test_local_model_typed_from_another_directory(fake_repository, elsewhere):
     """A relative path is relative to the current directory: the recipes get it from the root of the repository."""
-    fake_repository.create_launchers({"cas-pos": 0})
+    fake_repository.create_scripts({"cas-pos": 0})
     (elsewhere / "my_model").mkdir()
 
     completed = fake_repository.run(
@@ -412,7 +462,7 @@ def test_local_model_typed_from_another_directory(fake_repository, elsewhere):
 
 def test_local_model_typed_from_the_root_of_the_repository(fake_repository):
     """From the root of the repository, the models are given as they are typed, as before."""
-    fake_repository.create_launchers({"cas-pos": 0})
+    fake_repository.create_scripts({"cas-pos": 0})
     (fake_repository.directory / "my_model").mkdir()
 
     completed = fake_repository.run("--tasks", "cas-pos", "--models", "./my_model/", "my_model")
@@ -449,7 +499,7 @@ def test_run_already_computed_is_not_computed_again(small_repository, tiny_bert,
     """Started again, `run.py` only computes the runs that are missing: here, the third one."""
     def run(*arguments):
         command = [sys.executable, small_repository / "run.py", "--tasks", "cas-pos", "--models", tiny_bert, *arguments]
-        completed = run_command(" ".join(shlex.quote(str(argument)) for argument in command), cwd=elsewhere)
+        completed = run_command(command, cwd=elsewhere)
         assert completed.returncode == 0, (completed.stdout + completed.stderr)[-3000:]
         results = {}
         for path in (small_repository / "recipes" / "cas" / "runs").glob("*.json"):
