@@ -434,6 +434,28 @@ def words_with_labels(words, labels):
     return " ".join(shown)
 
 
+def highlight(words, labels):
+    """A sentence with its entities highlighted, in HTML: for a notebook."""
+    import html
+
+    colours = ["#ffd54f", "#81d4fa", "#a5d6a7", "#f48fb1", "#ce93d8", "#ffab91", "#b0bec5", "#e6ee9c"]
+    kinds = []
+    shown, position = [], 0
+    for first, after, kind in spans(labels):
+        if kind not in kinds:
+            kinds.append(kind)
+        colour = colours[kinds.index(kind) % len(colours)]
+        shown.extend(html.escape(word) for word in words[position:first])
+        shown.append(
+            f'<mark style="background: {colour}; padding: 0.1em 0.3em; border-radius: 0.3em;">'
+            f'{html.escape(" ".join(words[first:after]))} '
+            f'<small style="font-weight: bold;">{html.escape(kind)}</small></mark>'
+        )
+        position = after
+    shown.extend(html.escape(word) for word in words[position:])
+    return '<div style="line-height: 2;">' + " ".join(shown) + "</div>"
+
+
 def as_text(prediction, separator="|"):
     """A prediction, or what a column of an example has, as it is written in a file."""
     if isinstance(prediction, (list, tuple)):
@@ -452,6 +474,15 @@ def shown(model, example, prediction):
     if isinstance(prediction, float):
         return f"{prediction:.2f}"
     return str(prediction)
+
+
+def as_html(model, example, prediction):
+    """A prediction as it is shown in a notebook: the entities are highlighted in their sentence."""
+    import html
+
+    if model.task.word_labels:
+        return highlight(example["tokens"], prediction)
+    return f"<div><b>{html.escape(shown(model, example, prediction))}</b></div>"
 
 
 @dataclasses.dataclass

@@ -124,6 +124,8 @@ The predictions of `--input` are written on the standard output, or in the file 
 
 **Models kept before `predict.py` existed**: the ones of the tasks that label words, of the similarity tasks and of `frenchmedmcqa-mcqa` predict as the recent ones. The classification models were saved without the names of their classes: a class is shown as `LABEL_<number>`. A directory given with `--model-dir` needs its task (`--task`).
 
+**In a notebook**: [predict_demo.ipynb](./predict_demo.ipynb) does the same with the functions of `predict.py`: choose a task and a model, type a sentence, and see its entities highlighted (`pip install notebook`).
+
 ## Tasks
 
 |  **Dataset**           | Train | Validation | Test | Task                                       | Metrics             | HuggingFace                                                       |

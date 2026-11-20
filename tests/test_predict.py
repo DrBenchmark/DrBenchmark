@@ -79,6 +79,16 @@ def test_sentence_is_shown_with_its_entities(predict):
     assert predict.words_with_labels(["rien"], ["O"]) == "rien"
 
 
+def test_entities_are_highlighted_for_a_notebook(predict):
+    html = predict.highlight(["une", "toux", "sèche", "<", "aspirine"], ["O", "B-DISO", "I-DISO", "O", "B-CHEM"])
+    marks = re.findall(r"<mark style=\"background: (#\w+);[^>]*>(.*?) <small[^>]*>(.*?)</small></mark>", html)
+    assert [(text, kind) for _, text, kind in marks] == [("toux sèche", "DISO"), ("aspirine", "CHEM")]
+    # One colour per type of entity
+    assert marks[0][0] != marks[1][0]
+    # What is typed is not read as HTML
+    assert "une" in html and "&lt;" in html and " < " not in html
+
+
 @pytest.mark.parametrize("prediction, text", [
     ("negation", "negation"), (["microbiology", "virology"], "microbiology|virology"), ([], ""), (3.14159, "3.1416"), ("ab", "ab"),
 ])
@@ -916,7 +926,7 @@ def trained_repository(tmp_path_factory, synthetic_data, tiny_bert):
     repository = tmp_path_factory.mktemp("trained") / "repository"
     recipe = repository / "recipes" / "cas"
     recipe.mkdir(parents=True)
-    for name in ("run.py", "predict.py", "config.yaml"):
+    for name in ("run.py", "predict.py", "config.yaml", "predict_demo.ipynb"):
         shutil.copy(REPO / name, repository)
     not_copied = shutil.ignore_patterns("__pycache__", "logs")
     # The recipes load their metrics from the root of the repository
@@ -1163,6 +1173,74 @@ def test_directory_of_a_kept_model_is_enough(trained_repository, tiny_bert, tmp_
     completed = run_predict(trained_repository, "--model-dir", moved, "--task", "cas-cls", "le patient présente une douleur", cwd=tmp_path)
     assert completed.returncode == 0, completed.stderr[-3000:]
     assert completed.stdout.strip() in synthetic.NEGATION_CLASSES
+
+
+# ---------------------------------------------------------------------------------------------
+# The notebook
+# ---------------------------------------------------------------------------------------------
+
+NOTEBOOK_RUNNER = """
+import json, sys, types
+
+repository, task, model = sys.argv[1:4]
+sys.path.insert(0, repository)
+shown = []
+display = types.ModuleType("IPython.display")
+display.HTML = lambda html: html
+display.display = shown.append
+sys.modules["IPython"] = types.ModuleType("IPython")
+sys.modules["IPython.display"] = display
+
+typed = iter(["le patient présente une douleur", "pas de fièvre", ""])
+names = {"input": lambda prompt="": next(typed)}
+for cell in json.load(open(repository + "/predict_demo.ipynb", encoding="utf-8"))["cells"]:
+    if cell["cell_type"] == "code":
+        source = "".join(cell["source"])
+        source = source.replace('TASK = "cas-pos"', "TASK = " + repr(task)).replace('MODEL = "Dr-BERT/DrBERT-7GB"', "MODEL = " + repr(model))
+        source = source.replace("Le patient présente une toux sèche depuis trois jours, sans fièvre.", "une douleur thoracique")
+        exec(compile(source, "cell", "exec"), names)
+print(json.dumps(shown))
+"""
+
+
+@pytest.mark.e2e
+@pytest.mark.parametrize("task_name", ["cas-pos", "cas-cls"])
+def test_notebook_shows_the_prediction_for_what_is_typed(task_name, trained_repository, tiny_bert, tmp_path):
+    """The code of the notebook, without Jupyter: one sentence of its own, then the two that are typed."""
+    completed = subprocess.run(
+        [sys.executable, "-c", NOTEBOOK_RUNNER, str(trained_repository), task_name, str(tiny_bert)],
+        cwd=tmp_path, capture_output=True, text=True, timeout=300,
+    )
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    lines = completed.stdout.splitlines()
+    # The list of the runs, then the model that is loaded
+    assert lines[0].split() == ["task", "model", "seed", "validation", "test", "kept", "model"]
+    assert f"Model: tiny-bert fine-tuned on {task_name}, seed " in completed.stdout
+    assert "The task reads: tokens" in lines
+
+    shown = json.loads(lines[-1])
+    assert len(shown) == 3
+    if task_name == "cas-pos":
+        # Every word has a part of speech: it is highlighted
+        assert [re.findall(r">([^<>]+) <small", html) for html in shown] == [
+            ["une", "douleur", "thoracique"], ["le", "patient", "présente", "une", "douleur"], ["pas", "de", "fièvre"]]
+    else:
+        assert all(re.fullmatch(r"<div><b>(\w+)</b></div>", html).group(1) in synthetic.NEGATION_CLASSES for html in shown)
+
+
+def test_notebook_is_one(predict):
+    """The notebook is a file that Jupyter opens, without the outputs of someone's models."""
+    notebook = read_json(REPO / "predict_demo.ipynb")
+    assert (notebook["nbformat"], notebook["nbformat_minor"]) == (4, 5)
+    cells = notebook["cells"]
+    assert len({cell["id"] for cell in cells}) == len(cells)
+    code = [cell for cell in cells if cell["cell_type"] == "code"]
+    assert all(cell["outputs"] == [] and cell["execution_count"] is None for cell in code)
+    # It uses the functions of `predict.py`
+    used = set(re.findall(r"predict\.(\w+)", "".join("".join(cell["source"]) for cell in code)))
+    assert used and all(hasattr(predict, name) for name in used)
+    for name in re.findall(r"model\.(\w+)", "".join("".join(cell["source"]) for cell in code)):
+        assert name == "task" or hasattr(predict.Model, name)
 
 
 # ---------------------------------------------------------------------------------------------
