@@ -104,7 +104,7 @@ class Task(training.Task):
         return {"inputs": dict(tokenizer(text, truncation=True, max_length=max_length, padding="do_not_pad")), "text": text}
 
     def train(self):
-        run = training.start(self.dataset)
+        run = training.start(self.dataset, task=self)
         args, dataset = run.args, run.dataset
         model_name = training.model_of(args)
 

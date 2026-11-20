@@ -79,12 +79,13 @@ class Task(training.Task):
         return scores(references, predictions), references.tolist(), predictions.tolist()
 
     def train(self):
-        run = training.start(self.dataset)
+        run = training.start(self.dataset, task=self)
         args, dataset = run.args, run.dataset
         features = dataset["train"].features
         model_name = training.model_of(args)
 
         labels_list = self.label_names(dataset)
+        run.labels = labels_list
 
         tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
         model = AutoModelForSequenceClassification.from_pretrained(args.model_name, num_labels=len(labels_list))

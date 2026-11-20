@@ -202,3 +202,60 @@ def test_names_of_the_classes_are_saved_with_the_model(task, run_recipe, tiny_be
     else:
         assert names == expected_labels(task)
     assert config["label2id"] == {name: index for index, name in enumerate(names)}
+
+
+def test_kept_model_is_described(run_recipe, tiny_bert, training):
+    """What a run writes next to its model: the directory is enough to know what the model is."""
+    result = run_recipe("quaero-ner_emea", tiny_bert).result
+    directory = result["model_name"]
+    description = read_json(os.path.join(directory, training.DESCRIPTION))
+    assert training.DESCRIPTION == "drbenchmark.json"
+
+    hyperparameters = result["hyperparameters"]
+    assert description == {
+        "task": "quaero-ner_emea",
+        "kind": "token classification",
+        "dataset": "DrBenchmark/QUAERO",
+        "subset": "emea",
+        "model": str(tiny_bert),
+        "seed": 0,
+        "script": "recipes/quaero/scripts/finetuning_bert_ner.py",
+        "inputs": {"tokens": "words"},
+        "labels": synthetic.UMLS_TAGS,
+        "max_length": hyperparameters["max_position_embeddings"],
+        "hyperparameters": {
+            name: hyperparameters[name]
+            for name in ("epochs", "batch_size", "gradient_accumulation_steps", "learning_rate", "weight_decay", "fewshot")
+        },
+        "validation": {"metric": "accuracy", "score": result["trainer_state"]["best_metric"]},
+        "metrics": result["metrics"],
+        "environment": result["environment"],
+    }
+    # The results say which score chose the checkpoint too
+    assert result["validation"] == description["validation"]
+
+    card = open(os.path.join(directory, "README.md"), encoding="utf-8").read()
+    header, text = card.split("---\n")[1:3]
+    assert header.splitlines() == [
+        "language: fr", "library_name: transformers", "tags:", "- drbenchmark", "- biomedical",
+        "pipeline_tag: token-classification", "datasets:", "- DrBenchmark/QUAERO",
+    ]
+    assert text.startswith("\n# tiny-bert fine-tuned on quaero-ner_emea\n")
+    for expected in (
+        "token classification, on the dataset `DrBenchmark/QUAERO` (subset `emea`)", "with the seed 0", "the best `accuracy`",
+        f"| overall_f1 | {result['metrics']['overall_f1']:.4f} |", "- learning_rate: ", "- at most 512 sub-word tokens per example",
+        "The model reads `tokens` (the words of a sentence).", "`recipes/quaero/scripts/finetuning_bert_ner.py`",
+    ):
+        assert expected in text, expected
+
+
+@pytest.mark.parametrize("task_name, pipeline, dataset", [
+    ("cas-cls", "text-classification", ["datasets:", "- DrBenchmark/CAS"]),
+    # A dataset that is not on the HuggingFace Hub
+    ("deft2019-ner", "token-classification", []),
+    ("clister-regr", "text-classification", ["datasets:", "- DrBenchmark/CLISTER"]),
+])
+def test_card_of_a_kept_model(task_name, pipeline, dataset, run_recipe, tiny_bert):
+    directory = run_recipe(task_name, tiny_bert).result["model_name"]
+    header = open(os.path.join(directory, "README.md"), encoding="utf-8").read().split("---\n")[1].splitlines()
+    assert header[5:] == [f"pipeline_tag: {pipeline}", *dataset]

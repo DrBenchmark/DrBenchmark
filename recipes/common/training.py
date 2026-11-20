@@ -30,6 +30,9 @@ transformers_version = parse_version(transformers_version)
 # The libraries whose version is written in the results of a run: the ones that train and evaluate
 LIBRARIES = ("torch", "transformers", "tokenizers", "datasets", "accelerate", "evaluate", "numpy", "scipy", "scikit-learn", "seqeval")
 
+# The file, next to a model that a run kept, which says what the model is
+DESCRIPTION = "drbenchmark.json"
+
 
 class Task:
     """A task of the benchmark, as the script of its recipe defines it.
@@ -81,6 +84,9 @@ class Run:
     path: str
     # Directory of the checkpoints; the best model is saved in `<model_path>_best_model`
     model_path: str
+    # The task that is trained, and the names of the outputs of its model
+    task: object = None
+    labels: object = None
 
 
 def local_dataset(args):
@@ -129,8 +135,8 @@ def check_local_copies(args, needs_data_dir=False):
     sys.exit("\n\n".join(missing))
 
 
-def start(dataset_name, needs_data_dir=False):
-    """Parse the command line, fix the seed and load the dataset.
+def start(dataset_name, needs_data_dir=False, task=None):
+    """Parse the command line, fix the seed and load the dataset, for the run of a `task`.
 
     In offline mode, the dataset is read from `<data_dir>/local_hf_<subset>/`: the script stops,
     and says which script saves them, when this copy or the one of the model is missing.
@@ -160,7 +166,7 @@ def start(dataset_name, needs_data_dir=False):
         kwargs = {"data_dir": args.data_dir} if needs_data_dir else {}
         dataset = load_dataset(dataset_name, name=args.subset, **kwargs)
 
-    return Run(args=args, dataset=dataset, name=name, path=path, model_path=model_path)
+    return Run(args=args, dataset=dataset, name=name, path=path, model_path=model_path, task=task)
 
 
 def prepare_splits(run, function, **map_kwargs):
@@ -280,13 +286,119 @@ def np_encoder(object):
         return object.item()
 
 
+def main_scores(metrics):
+    """The scores of a run that are numbers, and the averaged F1 of a classification: {name: score}."""
+    scores = {}
+    for name, value in metrics.items():
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            scores[name] = value
+        elif isinstance(value, dict) and name in ("macro avg", "weighted avg") and "f1-score" in value:
+            scores[f"{name} f1-score"] = value["f1-score"]
+    return scores
+
+
+def validation_score(trainer):
+    """The score that chose the checkpoint which is kept: it is computed on the validation set."""
+    return {"metric": trainer.args.metric_for_best_model, "score": trainer.state.best_metric}
+
+
+def describe_model(run, trainer, metrics, directory):
+    """Write, next to the model that the run keeps, what it is: for programs and for the reader.
+
+    - `drbenchmark.json`: the task, the script that builds what the model reads, the names of
+      its outputs and the scores of the run.
+    - `README.md`: the same as a model card, which the HuggingFace Hub shows when the
+      directory is published there.
+    """
+    args, task = run.args, run.task
+    script = os.path.realpath(sys.argv[0])
+    if utils.is_in_repository(script):
+        script = os.path.relpath(script, utils.REPO_DIR)
+    model = model_of(args)
+    # A model that is not one of the HuggingFace Hub is a directory: its name is enough for a reader
+    shown_model = args.hub_model_name or os.path.basename(os.path.normpath(args.model_name))
+    validation = validation_score(trainer)
+    description = {
+        "task": args.task,
+        "kind": task.kind,
+        "dataset": args.dataset,
+        "subset": args.subset,
+        "model": model,
+        "seed": args.seed,
+        "script": script,
+        "inputs": task.inputs,
+        "labels": run.labels,
+        "max_length": args.max_position_embeddings,
+        "hyperparameters": {
+            name: getattr(args, name)
+            for name in ("epochs", "batch_size", "gradient_accumulation_steps", "learning_rate", "weight_decay", "fewshot")
+        },
+        "validation": validation,
+        "metrics": metrics,
+        "environment": environment(),
+    }
+    with open(os.path.join(directory, DESCRIPTION), "w", encoding="utf-8") as f:
+        json.dump(description, f, ensure_ascii=False, indent=4, default=np_encoder)
+
+    header = ["language: fr", "library_name: transformers", "tags:", "- drbenchmark", "- biomedical"]
+    tagging = task.model_class.__name__.endswith("TokenClassification")
+    header.append(f"pipeline_tag: {'token-classification' if tagging else 'text-classification'}")
+    if args.hub_model_name:
+        header.append(f"base_model: {args.hub_model_name}")
+    if str(args.dataset).startswith("DrBenchmark/") and not getattr(task, "needs_data_dir", False):
+        # A dataset of the HuggingFace Hub
+        header += ["datasets:", f"- {args.dataset}"]
+    scores = "\n".join(f"| {name} | {score:.4f} |" for name, score in main_scores(metrics).items())
+    hyperparameters = "\n".join(f"- {name}: {value}" for name, value in description["hyperparameters"].items())
+    inputs = ", ".join(f"`{name}` ({'the words of a sentence' if kind == 'words' else 'a text'})" for name, kind in task.inputs.items())
+    newline = "\n"
+    card = f"""---
+{newline.join(header)}
+---
+
+# {shown_model} fine-tuned on {args.task}
+
+This model is `{shown_model}` fine-tuned on the task `{args.task}` of [DrBenchmark](https://github.com/DrBenchmark/DrBenchmark),
+a benchmark of French biomedical language understanding: {task.kind}, on the dataset `{args.dataset}`{f" (subset `{args.subset}`)" if args.subset else ""}.
+
+It is the checkpoint that one run kept, with the seed {args.seed}: the one that has the best `{validation['metric']}`
+on the validation set ({validation['score']:.4f}).
+
+## Scores on the test set
+
+| Metric | Score |
+|:-------|------:|
+{scores}
+
+## Training
+
+{hyperparameters}
+- at most {args.max_position_embeddings} sub-word tokens per example
+
+## What the model reads
+
+The model reads {inputs}. The script that says how they are given to it is `{script}`:
+another tool, such as a `pipeline` of `transformers` or the widget of the HuggingFace Hub, gives
+the model the text as it is typed. `{DESCRIPTION}` has what is written here for programs.
+"""
+    with open(os.path.join(directory, "README.md"), "w", encoding="utf-8") as f:
+        f.write(card)
+
+
 def save_results(run, trainer, metrics, identifiers, real_labels, system_predictions):
-    """Write the results of the run: they are read by `tools/CollectAndAverageScores.py`."""
+    """Write the results of the run: they are read by `tools/CollectAndAverageScores.py`.
+
+    The best model is kept with what describes it.
+    """
+    best_model = run.model_path + "_best_model"
+    if run.task is not None:
+        describe_model(run, trainer, metrics, best_model)
     with open(run.path, 'w', encoding='utf-8') as f:
         json.dump({
-            "model_name": run.model_path + "_best_model",
+            "model_name": best_model,
             "metrics": metrics,
             "hyperparameters": vars(run.args),
+            "validation": validation_score(trainer),
             "environment": environment(),
             "predictions": {
                 "identifiers": identifiers,

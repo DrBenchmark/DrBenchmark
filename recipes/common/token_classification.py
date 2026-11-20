@@ -124,7 +124,7 @@ class Task(training.Task):
 
     def train(self):
         tag_column = self.tag_column
-        run = training.start(self.dataset, needs_data_dir=self.needs_data_dir)
+        run = training.start(self.dataset, needs_data_dir=self.needs_data_dir, task=self)
         args, dataset = run.args, run.dataset
         model_name = training.model_of(args)
 
@@ -133,6 +133,7 @@ class Task(training.Task):
         except AttributeError:
             # For datasets<4
             label_list = dataset["train"].features[tag_column][0].names
+        run.labels = label_list
 
         tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 

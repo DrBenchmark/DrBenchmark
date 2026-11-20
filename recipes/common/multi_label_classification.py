@@ -84,11 +84,12 @@ class Task(training.Task):
 
     def train(self):
         text_column = self.text_column
-        run = training.start(self.dataset)
+        run = training.start(self.dataset, task=self)
         args, dataset = run.args, run.dataset
         model_name = training.model_of(args)
 
         labels_list = dataset["train"].features["specialities"].feature.names
+        run.labels = labels_list
 
         tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
         model = AutoModelForSequenceClassification.from_pretrained(args.model_name, num_labels=len(labels_list), problem_type="multi_label_classification")
