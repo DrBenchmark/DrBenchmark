@@ -165,3 +165,21 @@ def test_conda_environment_installs_the_requirements():
     from_conda = [dependency for dependency in dependencies if isinstance(dependency, str)]
     assert [re.split(r"[<>=!~ ]", dependency)[0] for dependency in from_conda] == ["python", "pip"]
     assert [dependency for dependency in dependencies if not isinstance(dependency, str)] == [{"pip": ["-r requirements.txt"]}]
+
+
+def test_lowest_versions_of_the_requirements():
+    """`tests/minimum_versions.py` gives the lowest versions of `requirements.txt` to a job of the continuous integration."""
+    module = load_module("minimum_versions", REPO / "tests" / "minimum_versions.py")
+    requirements = "# a comment\n\nfirst>=1.2,<2  # why\nsecond<3\nthird >= 0.4.1 , < 1\nfourth\n"
+    assert module.minimum_versions(requirements) == {"first": "1.2", "third": "0.4.1"}
+    # The version just above 1.4 is not known
+    with pytest.raises(ValueError, match="other>1.4"):
+        module.minimum_versions("other>1.4,<2\n")
+
+    lowest = module.minimum_versions((REPO / "requirements.txt").read_text())
+    assert {"transformers", "datasets", "scikit-learn"} <= set(lowest)
+
+    workflow = yaml.safe_load((REPO / ".github" / "workflows" / "tests.yml").read_text())["jobs"]["tests"]
+    assert {"python-version": "3.12", "dependencies": "minimum"} in workflow["strategy"]["matrix"]["include"]
+    (install,) = [step["run"] for step in workflow["steps"] if step.get("name") == "Install the dependencies"]
+    assert "minimum) python tests/minimum_versions.py > minimum.txt" in install

@@ -30,7 +30,7 @@ python run.py --tasks all --nb-run 4
 
 **Note**: `offline` is set to `True` by default in `./config.yaml`: the datasets and the models are read from local copies, which have to be built first with `python ./download_datasets_locally.py` and `python ./download_models_locally.py`. This is the mode to use on an **offline machine / cluster**. To download the datasets and the models directly from the HuggingFace Hub instead, set `offline` to `False` in `./config.yaml`, or give `--offline false` to `run.py`.
 
-**Note**: `requirements.txt` bounds each dependency below the next major release after the one the tests were run with. To install exactly the versions of a tested environment, which are listed in `constraints.txt`, use `pip install -r requirements.txt -c constraints.txt` (Python >= 3.12 is needed).
+**Note**: `requirements.txt` bounds each dependency below the next major release after the one the tests were run with, and the tests are also run with the lowest versions it allows. To install exactly the versions of a tested environment, which are listed in `constraints.txt`, use `pip install -r requirements.txt -c constraints.txt` (Python >= 3.12 is needed).
 
 **Note**: `run.py`, the two download scripts, the launchers of the recipes and the tools of `tools/` find the files of the repository from their own location: they can be run from any directory, e.g. `python ~/DrBenchmark/run.py --tasks cas-pos`. A relative path given on their command line, such as the one of a local model, is relative to the current directory.
 
@@ -150,7 +150,7 @@ The tests need neither the data nor a network access: each task of `run.py` is r
 
 The known bugs are kept as expected failures (`xfail`): they are listed at the end of the output of `pytest`, and the corresponding test has to be unmarked once a bug is fixed.
 
-The tests are run by GitHub Actions on every push to `master` and on every pull request (see [.github/workflows/tests.yml](./.github/workflows/tests.yml)), with the latest versions of the dependencies allowed by `requirements.txt` and with the versions of `constraints.txt`.
+The tests are run by GitHub Actions on every push to `master` and on every pull request (see [.github/workflows/tests.yml](./.github/workflows/tests.yml)), with the latest versions of the dependencies allowed by `requirements.txt`, with the versions of `constraints.txt`, and with the lowest versions that `requirements.txt` allows (the ones that `python tests/minimum_versions.py` prints).
 
 To support a new major release of a dependency, raise its bound in `requirements.txt`, check that the tests pass, then update `constraints.txt` (the command is given at the top of that file).
 

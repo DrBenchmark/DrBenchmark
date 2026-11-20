@@ -28,6 +28,9 @@ jobs:
           # tested: the exact versions of constraints.txt
           - python-version: "3.12"
             dependencies: tested
+          # minimum: the lowest versions allowed by requirements.txt, for the dependencies that have one
+          - python-version: "3.12"
+            dependencies: minimum
     steps:
       - uses: actions/checkout@v7
 
@@ -41,8 +44,13 @@ jobs:
 
       - name: Install the dependencies
         run: |
+          case "${{ matrix.dependencies }}" in
+            tested) constraints="-c constraints.txt" ;;
+            minimum) python tests/minimum_versions.py > minimum.txt && cat minimum.txt && constraints="-c minimum.txt" ;;
+            *) constraints="" ;;
+          esac
           # The extra index provides the CPU build of PyTorch: the default one bundles CUDA and is much bigger
-          pip install -r requirements.txt pytest --extra-index-url https://download.pytorch.org/whl/cpu ${{ matrix.dependencies == 'tested' && '-c constraints.txt' || '' }}
+          pip install -r requirements.txt pytest --extra-index-url https://download.pytorch.org/whl/cpu $constraints
           # The versions are printed to know with which ones the tests passed, or failed
           pip freeze
 

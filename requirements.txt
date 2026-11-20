@@ -1,6 +1,8 @@
 # Each dependency is bounded below the next major release after the one the tests were run with:
 # a new major release is only installed once the tests pass with it and its bound is raised.
 # The exact versions of a tested environment are in constraints.txt.
+# The lowest version of a dependency is written `>=`: the tests are also run with these versions
+# (see tests/minimum_versions.py), and with the newest ones of the dependencies that have none.
 
 # Older versions of transformers can be used but some package tweaking will be necessary.
 # transformers 5 cannot be used: its AutoTokenizer fails on the DrBERT models, whose tokenizer is a
@@ -12,7 +14,7 @@ torch<3
 dill<0.4.1  # <0.4.1 because unsupported by datasets (and somehow I ended up with 0.4.1 which disabled dataset's caching) this dependency will need be be removed at some point
 datasets>=2.21,<6  # >2.21 for HF_HUB_OFFLINE
 evaluate>=0.4.1,<1
-scikit-learn>1.4,<2  # >1.4 for root_mean_square_error
+scikit-learn>=1.4.2,<2  # 1.4 for root_mean_squared_error, 1.4.2 for NumPy 2, which pyarrow needs
 seqeval<2  # for metrics/seqeval.py
 accelerate>=0.26,<2  # why ?
 tensorboardX<3
