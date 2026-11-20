@@ -52,7 +52,7 @@ The scores that are kept depend on the kind of task:
 | Multiple-choice question answering       | `hamming_score`, `exact_match`      |
 | Semantic textual similarity (regression) | `edrm`, `spearman_correlation_coef` |
 
-Two things are checked on the way.
+Two things are checked on the way, and a third one is reported.
 
 **The runs that are averaged were trained in the same way.** The runs of a task for a model have to share their hyper-parameters. When they do not, nothing is written: the tool lists the hyper-parameters that differ, their values and the runs that have them. Either move the runs that should not be averaged out of the `runs/` directories, or accept a difference with `--ignore`:
 
@@ -63,6 +63,8 @@ python tools/CollectAndAverageScores.py --ignore max_position_embeddings
 The seed, the paths and the names of the model and of the task are not compared. Two computed values are: `effective_batch_size` (`batch_size` x `gradient_accumulation_steps`, so that 12 examples per batch and 12 accumulated batches of one example are the same training), and `updates_per_epoch`, the number of updates of the weights per epoch that the run really did, read in the state of its trainer when it has it.
 
 **A model has one name.** In offline mode a run only knows the local copy of its model, `../../../models/dr-bert_drbert-7gb`. The recent runs also have its name on the HuggingFace Hub (`hub_model_name`); for the other ones, it is looked for in `models.txt`, then in the recent runs. When it is not found, the name is rebuilt from the directory, in lower case.
+
+**The versions that computed the runs.** A run writes the versions of Python and of the libraries it was computed with, the commit of the repository, and whether the scripts were changed since that commit. The versions that are not the same for every run are listed, with the number of runs of each one: the runs are averaged all the same. The first runs did not write them: their versions are `unknown`.
 
 ### CheckNumberOfRuns.py
 

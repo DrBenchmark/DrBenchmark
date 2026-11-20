@@ -8,6 +8,9 @@ way. When they are not, nothing is written and the runs that differ are listed.
 
 A model is named as on the HuggingFace Hub when this name is known: it is written in
 the recent runs, and looked for in `models.txt` for the other ones.
+
+The recent runs also say which versions of the code and of the libraries computed them:
+the versions that are not the same for every run are listed.
 """
 
 import os
@@ -41,6 +44,8 @@ DESCRIPTIONS = {
     EFFECTIVE_BATCH_SIZE: "batch_size x gradient_accumulation_steps",
     UPDATES_PER_EPOCH: "measured: updates of the weights during the training / epochs",
 }
+# A version that a run did not write
+UNKNOWN = "unknown"
 
 
 def local_copy(hub_name):
@@ -186,6 +191,34 @@ def report(problems):
     return "\n".join(lines)
 
 
+def version_of_the_code(environment):
+    """Commit of the repository that computed a run, as it is displayed."""
+    if not environment.get("commit"):
+        return UNKNOWN
+    return environment["commit"][:7] + (" with changes" if environment.get("modified") else "")
+
+
+def different_versions(environments):
+    """The versions of the code and of the libraries that are not the same for every run, as a text.
+
+    `environments` is what each run wrote about them: nothing for the first runs, whose versions
+    are unknown. The text is empty when every run was computed with the same versions.
+    """
+    versions = {"code of the repository": Counter(version_of_the_code(environment) for environment in environments)}
+    for name in sorted({name for environment in environments for name in environment} - {"commit", "modified"}):
+        versions[name] = Counter(environment.get(name) or UNKNOWN for environment in environments)
+
+    lines = []
+    for name, counts in versions.items():
+        if len(counts) > 1:
+            # The versions of the most runs first
+            values = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+            lines.append(f"  {name}: " + ", ".join(f"{value} ({count} run{'s' if count > 1 else ''})" for value, count in values))
+    if not lines:
+        return ""
+    return "\n".join(["The runs were not all computed with the same versions:", *lines])
+
+
 def arguments():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
@@ -209,6 +242,8 @@ if __name__ == '__main__':
     print("Reading run results...")
     # What is kept of each run: (path, hyper-parameters, scores, configuration)
     read = []
+    # What each run says about the versions that computed it
+    environments = []
     for file_path in tqdm(file_paths):
 
         with open(file_path) as f_json:
@@ -217,6 +252,11 @@ if __name__ == '__main__':
         hyperparameters = data['hyperparameters']
         scores = scores_of(hyperparameters['task'].split('-')[1], data["metrics"])
         read.append((file_path, hyperparameters, scores, configuration(data)))
+        environments.append(data.get("environment") or {})
+
+    versions = different_versions(environments)
+    if versions:
+        print(versions)
 
     # The name of a model may be written in other runs than the one that is read
     hub_names = names_on_the_hub(hyperparameters for _, hyperparameters, _, _ in read)

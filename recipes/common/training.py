@@ -11,7 +11,10 @@ import sys
 import json
 import shutil
 import logging
+import platform
+import subprocess
 import dataclasses
+import importlib.metadata
 
 import numpy as np
 from transformers import set_seed
@@ -23,6 +26,9 @@ from transformers import __version__ as transformers_version
 from . import utils
 
 transformers_version = parse_version(transformers_version)
+
+# The libraries whose version is written in the results of a run: the ones that train and evaluate
+LIBRARIES = ("torch", "transformers", "tokenizers", "datasets", "accelerate", "evaluate", "numpy", "scipy", "scikit-learn", "seqeval")
 
 
 @dataclasses.dataclass
@@ -194,6 +200,43 @@ def train(run, trainer):
     shutil.rmtree(run.model_path)
 
 
+def code_version():
+    """Commit of the repository, and whether its files were changed since: None when they are not known.
+
+    They are not known when the repository was not cloned with git, or when git is not installed.
+    """
+    def git(*arguments):
+        completed = subprocess.run(["git", "-C", utils.REPO_DIR, *arguments], capture_output=True, text=True, timeout=60)
+        return completed.stdout.strip() if completed.returncode == 0 else None
+
+    commit, modified = None, None
+    try:
+        top_level = git("rev-parse", "--show-toplevel")
+        # A copy of the scripts in the repository of something else has no commit of its own
+        if top_level is not None and os.path.realpath(top_level) == utils.REPO_DIR:
+            commit = git("rev-parse", "HEAD")
+            changes = git("status", "--porcelain", "--untracked-files=no")
+            modified = None if changes is None else bool(changes)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return {"commit": commit, "modified": modified}
+
+
+def environment():
+    """What the run is computed with: the versions of Python, of the libraries and of the code of the repository.
+
+    It is written in the results of the run. Two runs that have the same arguments may not have
+    been computed in the same way: by other versions of the libraries, or of the scripts.
+    """
+    versions = {"python": platform.python_version()}
+    for library in LIBRARIES:
+        try:
+            versions[library] = importlib.metadata.version(library)
+        except importlib.metadata.PackageNotFoundError:
+            versions[library] = None
+    return {**versions, **code_version()}
+
+
 def np_encoder(object):
     if isinstance(object, np.generic):
         return object.item()
@@ -206,6 +249,7 @@ def save_results(run, trainer, metrics, identifiers, real_labels, system_predict
             "model_name": run.model_path + "_best_model",
             "metrics": metrics,
             "hyperparameters": vars(run.args),
+            "environment": environment(),
             "predictions": {
                 "identifiers": identifiers,
                 "real_labels": real_labels,

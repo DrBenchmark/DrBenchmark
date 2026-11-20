@@ -135,12 +135,14 @@ class RunsRepository:
         self.elsewhere.mkdir()
         self.stats = self.repository / "stats"
 
-    def write_run(self, name, *, task="morfitt-cls", updates_per_epoch=None, scores=(0.5, 0.25), **hyperparameters):
+    def write_run(self, name, *, task="morfitt-cls", updates_per_epoch=None, scores=(0.5, 0.25), environment=None,
+                  **hyperparameters):
         """Write the results of a run of a classification task, as its training script does.
 
         The hyper-parameters are the ones the first scripts wrote: `hyperparameters`
-        replaces them or adds the ones of the later scripts. The state of the trainer,
-        which the first scripts did not write either, is given by `updates_per_epoch`.
+        replaces them or adds the ones of the later scripts. The state of the trainer
+        and the versions that computed the run, which the first scripts did not write
+        either, are given by `updates_per_epoch` and by `environment`.
         """
         run = {
             "hyperparameters": {
@@ -153,6 +155,8 @@ class RunsRepository:
         if updates_per_epoch is not None:
             epochs = run["hyperparameters"]["epochs"]
             run["trainer_state"] = {"epoch": float(epochs), "global_step": updates_per_epoch * epochs}
+        if environment is not None:
+            run["environment"] = environment
         runs_directory = self.repository / "recipes" / task.split("-")[0] / "runs"
         runs_directory.mkdir(parents=True, exist_ok=True)
         (runs_directory / f"{name}.json").write_text(json.dumps(run))
@@ -181,6 +185,33 @@ def test_runs_trained_in_the_same_way_are_averaged(runs):
     }
     averages = read_json(runs.stats / "overall_averaged_metrics.json")
     assert averages["some/model"]["morfitt|cls|1.0"] == {"macro_f1": 0.75, "weighted_f1": 0.5}
+
+
+def test_versions_that_differ_between_the_runs_are_listed(runs):
+    """The runs say which versions of the code and of the libraries computed them: the tool lists the ones that differ."""
+    recent = {"python": "3.12.1", "transformers": "4.57.6", "torch": "2.15.0", "commit": "a" * 40, "modified": False}
+    runs.write_run("first", seed=0, environment=recent)
+    runs.write_run("second", seed=1, environment=recent)
+
+    completed = runs.collect_and_average_scores()
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    assert "not all computed with the same versions" not in completed.stdout
+
+    # Another version of transformers, and scripts that were changed after another commit
+    runs.write_run("third", seed=2, environment={**recent, "transformers": "4.40.0", "commit": "b" * 40, "modified": True})
+    # A run of the first scripts, which did not write their versions
+    runs.write_run("fourth", seed=3)
+    completed = runs.collect_and_average_scores()
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    assert "\n".join([
+        "The runs were not all computed with the same versions:",
+        "  code of the repository: aaaaaaa (2 runs), bbbbbbb with changes (1 run), unknown (1 run)",
+        "  python: 3.12.1 (3 runs), unknown (1 run)",
+        "  torch: 2.15.0 (3 runs), unknown (1 run)",
+        "  transformers: 4.57.6 (2 runs), 4.40.0 (1 run), unknown (1 run)",
+    ]) in completed.stdout
+    # The versions do not prevent the runs from being averaged
+    assert len(runs.results()["some/model"]["morfitt|cls|1.0"]["macro_f1"]) == 4
 
 
 def test_runs_with_different_hyperparameters_are_not_averaged(runs):

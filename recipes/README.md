@@ -61,7 +61,7 @@ bash recipes/cas/scripts/run_task_1.sh "Dr-BERT/DrBERT-7GB"
 
 The arguments given after the model (and after the subset, for the launchers that take one) are passed to the Python script and override the values of the YAML file, e.g. `bash recipes/cas/scripts/run_task_1.sh "Dr-BERT/DrBERT-7GB" --seed 42 --epochs 5`. A relative path given on the command line (`--data_dir`, `--run_dir`, `--output_dir` or a local model) is relative to the current directory. In the results of the run, it is written from the `scripts/` directory, as the paths of the YAML file are: the name of a run does not depend on the directory it is started from.
 
-Each run writes its metrics, hyper-parameters and predictions on the test set in `runs/DrBenchmark-<task name>-<hash>.json`, and saves its best model in `save_models/DrBenchmark-<task name>-<hash>_best_model/`. The hash is the one of the arguments of the run, among which its seed. With `--seed`, a run whose results exist is not computed again; without it, a seed that was not used yet is drawn.
+Each run writes its metrics, its hyper-parameters, its predictions on the test set and the versions that computed it (Python, the libraries and the commit of the repository) in `runs/DrBenchmark-<task name>-<hash>.json`, and saves its best model in `save_models/DrBenchmark-<task name>-<hash>_best_model/`. The hash is the one of the arguments of the run, among which its seed. With `--seed`, a run whose results exist is not computed again; without it, a seed that was not used yet is drawn.
 
 ## Data
 

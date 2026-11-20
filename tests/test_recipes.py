@@ -5,8 +5,10 @@ epoch. The scores are meaningless: the tests only check that every recipe runs a
 writes the results the tools of `tools/` expect.
 """
 
+import importlib.metadata
 import math
 import os
+import platform
 from pathlib import Path
 
 import pytest
@@ -39,6 +41,13 @@ def test_recipe(task, run_recipe, tiny_bert):
 
     # The best model is saved next to the results
     assert (Path(result["model_name"]) / "config.json").is_file()
+
+    # The versions that computed the run
+    environment = result["environment"]
+    assert environment["python"] == platform.python_version()
+    for library in ("torch", "transformers", "datasets", "numpy"):
+        assert environment[library] == importlib.metadata.version(library)
+    assert {"commit", "modified"} <= set(environment)
 
     # One prediction per example of the test set
     predictions = result["predictions"]

@@ -5,31 +5,15 @@ recipe has to say which script saves these copies.
 """
 
 import argparse
-import importlib
-import importlib.util
 import shlex
-import sys
 
 import pytest
 
-from helpers import RECIPES, REPO, Task, run_command
+from helpers import REPO, Task, run_command
 
 DATASETS_SCRIPT = f"`python {REPO / 'download_datasets_locally.py'}`"
 MODELS_SCRIPT = f"`python {REPO / 'download_models_locally.py'}`"
 HUB = "on a machine that has access to the HuggingFace Hub"
-
-
-@pytest.fixture(scope="module")
-def training():
-    """The module `recipes/common/training.py`, imported in its package as the recipes import it."""
-    name = "drbenchmark_common"
-    spec = importlib.util.spec_from_file_location(
-        name, RECIPES / "common" / "__init__.py", submodule_search_locations=[str(RECIPES / "common")],
-    )
-    package = importlib.util.module_from_spec(spec)
-    sys.modules[name] = package
-    spec.loader.exec_module(package)
-    return importlib.import_module(f"{name}.training")
 
 
 @pytest.fixture
