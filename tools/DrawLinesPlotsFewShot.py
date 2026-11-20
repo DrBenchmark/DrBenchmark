@@ -1,80 +1,19 @@
+"""Draw the score of the models on each task, for the proportions of the training set they were trained on.
+
+The scores are read in `stats/results.json`, which `ComputeMetrics.py` writes, and
+averaged over the runs. One figure per task is written in `stats/fewshot/`, with one
+line per model that has a name below. The proportions are 0.25, 0.5, 0.75 and 1.0.
+"""
+
 import os
 import json
+import argparse
 
 import matplotlib.pyplot as plt
 
 from paths import STATS_DIR
 
-
-with open(os.path.join(STATS_DIR, "results.json")) as f:
-    results = json.load(f)
-
-avg_results = {}
-
-for model in results:
-
-    # print(model)
-
-    if model not in avg_results:
-        avg_results[model] = {}
-
-    for task in results[model]:
-
-        if task not in avg_results[model]:
-            avg_results[model][task] = {}
-
-        # print(task)
-
-        for metric in results[model][task].keys():
-
-            avg = sum(results[model][task][metric]) / len(results[model][task][metric])
-            # print(">> ", metric , "-", avg)
-
-            if metric not in avg_results[model][task]:
-                avg_results[model][task][metric] = -1
-
-            avg_results[model][task][metric] = avg
-
-bottom = [0.25, 0.50, 0.75, 1.0]
-# bottom = [0.0, 0.25, 0.50, 0.75, 1.0]
-
-models_names = list(avg_results.keys())
-results_fewshot = {}
-
-for model in avg_results:
-
-    for taskf in avg_results[model]:
-
-        corpus, task, fewshot = taskf.split("|")
-        idx_fewshot = bottom.index(float(fewshot))
-
-        key = f"{corpus}|{task}"
-
-        if key not in results_fewshot:
-            results_fewshot[key] = {}
-
-        if model not in results_fewshot[key]:
-            results_fewshot[key][model] = [0.0] * len(bottom)
-            # results_fewshot[key][model] = [0.0] * len(bottom)
-
-        if task.find("regr") != -1 or task.find("regr") != -1:
-            metric = float(f"{round(avg_results[model][taskf]['edrm'] * 100, 2)}")
-            # metric = f"{round(avg_results[model][taskf]['edrm'], 2)}" + " / " + f"{round(avg_results[model][taskf]['spearman_correlation_coef'], 2)}"
-
-        elif task.find("mcqa") != -1:
-            metric = float(f"{round(avg_results[model][taskf]['hamming_score'] * 100, 2)}")
-            # metric = f"{round(avg_results[model][taskf]['hamming_score'], 2)} / {round(avg_results[model][taskf]['exact_match'], 2)}"
-
-        elif task.find("pos") != -1 or task.find("ner") != -1:
-            metric = float(f"{round(avg_results[model][taskf]['overall_f1'] * 100, 2)}")
-            # metric = f"{round(avg_results[model][taskf]['overall_f1'], 2)}"
-
-        else:
-            metric = float(f"{round(avg_results[model][taskf]['weighted_f1'] * 100, 2)}")
-            # metric = f"{round(avg_results[model][taskf]['weighted_f1'] * 100, 2)}"
-
-        results_fewshot[key][model][idx_fewshot] = metric
-
+# Names of the models in the figures: the other models are not drawn
 mapping = {
     "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext": "PubMedBERT",
     "microsoft/Biomednlp-PubmedBERT-base-uncased-abstract": "OLD-PubMedBERT",
@@ -103,43 +42,127 @@ mapping_line = {
     "XLM-RoBERTa": "-",
 }
 
-os.makedirs(os.path.join(STATS_DIR, "fewshot"), exist_ok=True)
 
-for key in results_fewshot:
+def arguments():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--results", type=str, required=False, default=os.path.join(STATS_DIR, "results.json"),
+                        help="Path to the scores of the runs (default: stats/results.json).")
+    return parser.parse_args()
 
-    corpus, task = key.split("|")
 
-    min_val = 100
-    max_val = 0
+def main():
+    args = arguments()
 
-    for model in results_fewshot[key]:
-        if model not in mapping:
-            continue
-        values = [float(v) for v in results_fewshot[key][model]]
-        model_name = mapping[model]
-        model_linestyle = mapping_line[model_name]
+    with open(args.results) as f:
+        results = json.load(f)
 
-        if min(values) < min_val:
-            min_val = min(values)
+    avg_results = {}
 
-        if max(values) > max_val:
-            max_val = max(values)
+    for model in results:
 
-        plt.plot(bottom, values, label=model_name, linestyle=model_linestyle)
+        # print(model)
 
-    plt.legend(loc="lower right", prop={'size': 15})
+        if model not in avg_results:
+            avg_results[model] = {}
 
-    if max_val + 5 > 100:
-        max_val = 100
-    else:
-        max_val = max_val + 5
+        for task in results[model]:
 
-    plt.ylim(min_val - 5, max_val)
-    plt.xticks(bottom, [0.25, 0.50, 0.75, 1.0])
+            if task not in avg_results[model]:
+                avg_results[model][task] = {}
 
-    plt.tight_layout()
+            # print(task)
 
-    output_name = os.path.join(STATS_DIR, "fewshot", f"{corpus}@{task}.pdf")
-    print(output_name)
-    plt.savefig(output_name, bbox_inches='tight', pad_inches=0)
-    plt.clf()
+            for metric in results[model][task].keys():
+
+                avg = sum(results[model][task][metric]) / len(results[model][task][metric])
+                # print(">> ", metric , "-", avg)
+
+                if metric not in avg_results[model][task]:
+                    avg_results[model][task][metric] = -1
+
+                avg_results[model][task][metric] = avg
+
+    bottom = [0.25, 0.50, 0.75, 1.0]
+    # bottom = [0.0, 0.25, 0.50, 0.75, 1.0]
+
+    results_fewshot = {}
+
+    for model in avg_results:
+
+        for taskf in avg_results[model]:
+
+            corpus, task, fewshot = taskf.split("|")
+            idx_fewshot = bottom.index(float(fewshot))
+
+            key = f"{corpus}|{task}"
+
+            if key not in results_fewshot:
+                results_fewshot[key] = {}
+
+            if model not in results_fewshot[key]:
+                results_fewshot[key][model] = [0.0] * len(bottom)
+                # results_fewshot[key][model] = [0.0] * len(bottom)
+
+            if task.find("regr") != -1 or task.find("regr") != -1:
+                metric = float(f"{round(avg_results[model][taskf]['edrm'] * 100, 2)}")
+                # metric = f"{round(avg_results[model][taskf]['edrm'], 2)}" + " / " + f"{round(avg_results[model][taskf]['spearman_correlation_coef'], 2)}"
+
+            elif task.find("mcqa") != -1:
+                metric = float(f"{round(avg_results[model][taskf]['hamming_score'] * 100, 2)}")
+                # metric = f"{round(avg_results[model][taskf]['hamming_score'], 2)} / {round(avg_results[model][taskf]['exact_match'], 2)}"
+
+            elif task.find("pos") != -1 or task.find("ner") != -1:
+                metric = float(f"{round(avg_results[model][taskf]['overall_f1'] * 100, 2)}")
+                # metric = f"{round(avg_results[model][taskf]['overall_f1'], 2)}"
+
+            else:
+                metric = float(f"{round(avg_results[model][taskf]['weighted_f1'] * 100, 2)}")
+                # metric = f"{round(avg_results[model][taskf]['weighted_f1'] * 100, 2)}"
+
+            results_fewshot[key][model][idx_fewshot] = metric
+
+    os.makedirs(os.path.join(STATS_DIR, "fewshot"), exist_ok=True)
+
+    for key in results_fewshot:
+
+        corpus, task = key.split("|")
+
+        min_val = 100
+        max_val = 0
+
+        for model in results_fewshot[key]:
+            if model not in mapping:
+                continue
+            values = [float(v) for v in results_fewshot[key][model]]
+            model_name = mapping[model]
+            # A model without a style of line is drawn with a solid one
+            model_linestyle = mapping_line.get(model_name, "-")
+
+            if min(values) < min_val:
+                min_val = min(values)
+
+            if max(values) > max_val:
+                max_val = max(values)
+
+            plt.plot(bottom, values, label=model_name, linestyle=model_linestyle)
+
+        plt.legend(loc="lower right", prop={'size': 15})
+
+        if max_val + 5 > 100:
+            max_val = 100
+        else:
+            max_val = max_val + 5
+
+        plt.ylim(min_val - 5, max_val)
+        plt.xticks(bottom, [0.25, 0.50, 0.75, 1.0])
+
+        plt.tight_layout()
+
+        output_name = os.path.join(STATS_DIR, "fewshot", f"{corpus}@{task}.pdf")
+        print(output_name)
+        plt.savefig(output_name, bbox_inches='tight', pad_inches=0)
+        plt.clf()
+
+
+if __name__ == '__main__':
+    main()

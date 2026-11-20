@@ -1,18 +1,24 @@
-# python BiasMaskFilling.py
+"""Count the classes of every dataset of the benchmark, and draw their distribution.
+
+The classes of the training, validation and test sets are counted for each task and
+written in `stats/classes_distribution.json`. One figure per task is written in
+`stats/distributions/`: the three sets are drawn in turn in the same file, which ends
+with the distribution of the test set.
+"""
 
 import os
 import json
+import argparse
 from collections import Counter
 
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from datasets import load_dataset
-
+from inputs import label_names, load_benchmark_dataset
 from paths import STATS_DIR
 
-
+# The tasks: "corpus" is the name of their dataset on the HuggingFace Hub
 tasks = [
     {"corpus": "DrBenchmark/QUAERO", "subset": "emea", "task": None},
     {"corpus": "DrBenchmark/QUAERO", "subset": "medline", "task": None},
@@ -45,147 +51,162 @@ tasks = [
     {"corpus": "DrBenchmark/ESSAI", "subset": "ner_spec", "task": None},
 ]
 
-tasks_classes = {f"{t['corpus']}-{t['subset']}-{t['task']}": {
-    "train": [],
-    "validation": [],
-    "test": [],
-} for t in tasks}
 
-for subset in ["train", "validation", "test"]:
+def arguments():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--offline", action="store_true",
+                        help="Read the datasets where download_datasets_locally.py saves them, instead of the HuggingFace Hub.")
+    return parser.parse_args()
 
-    for task in tasks:
 
-        dataset = load_dataset(task['corpus'], task['subset'])[subset]
+def main():
+    args = arguments()
 
-        t_key = f"{task['corpus']}-{task['subset']}-{task['task']}"
-        print(f">> {t_key}")
+    tasks_classes = {f"{t['corpus']}-{t['subset']}-{t['task']}": {
+        "train": [],
+        "validation": [],
+        "test": [],
+    } for t in tasks}
 
-        for e in dataset:
+    for subset in ["train", "validation", "test"]:
 
-            # print(e)
+        for task in tasks:
 
-            if task["corpus"].lower().find("quaero") != -1 or task["corpus"].lower().find("mantragsc") != -1:
+            dataset = load_benchmark_dataset(task['corpus'], task['subset'], args.offline)[subset]
 
-                label_list = dataset.features[f"ner_tags"].feature.names
-                current_classes = [label_list[n] for n in e['ner_tags']]
+            t_key = f"{task['corpus']}-{task['subset']}-{task['task']}"
+            print(f">> {t_key}")
 
-            if task["corpus"].lower().find("e3c") != -1:
+            for e in dataset:
 
-                label_list = dataset.features[f"ner_tags"].feature.names
-                current_classes = [label_list[n] for n in e['ner_tags']]
+                # print(e)
 
-            if (task["corpus"].lower().find("essai") != -1 or task["corpus"].lower().find("cas") != -1) and task["subset"] == "pos":
+                if task["corpus"].lower().find("quaero") != -1 or task["corpus"].lower().find("mantragsc") != -1:
 
-                label_list = dataset.features["pos_tags"][0].names
-                current_classes = [label_list[n] for n in e['pos_tags']]
+                    label_list = dataset.features[f"ner_tags"].feature.names
+                    current_classes = [label_list[n] for n in e['ner_tags']]
 
-            if (task["corpus"].lower().find("essai") != -1 or task["corpus"].lower().find("cas") != -1) and task["subset"].find("ner_") != -1:
+                if task["corpus"].lower().find("e3c") != -1:
 
-                label_list = dataset.features["ner_tags"][0].names
-                current_classes = [label_list[n] for n in e['ner_tags']]
+                    label_list = dataset.features[f"ner_tags"].feature.names
+                    current_classes = [label_list[n] for n in e['ner_tags']]
 
-            if (task["corpus"].lower().find("essai") != -1 or task["corpus"].lower().find("cas") != -1) and task["subset"] == "cls":
+                if (task["corpus"].lower().find("essai") != -1 or task["corpus"].lower().find("cas") != -1) and task["subset"] == "pos":
 
-                label_list = dataset.features["label"].names
-                current_classes = [label_list[e['label']]]
+                    label_list = label_names(dataset.features["pos_tags"])
+                    current_classes = [label_list[n] for n in e['pos_tags']]
 
-            if task["corpus"].lower().find("frenchmedmcqa") != -1 and task["task"] == 1:
+                if (task["corpus"].lower().find("essai") != -1 or task["corpus"].lower().find("cas") != -1) and task["subset"].find("ner_") != -1:
 
-                label_list = dataset.features["correct_answers"].feature.names
-                current_classes = [label_list[n] for n in e['correct_answers']]
+                    label_list = label_names(dataset.features["ner_tags"])
+                    current_classes = [label_list[n] for n in e['ner_tags']]
 
-            if task["corpus"].lower().find("frenchmedmcqa") != -1 and task["task"] == 2:
+                if (task["corpus"].lower().find("essai") != -1 or task["corpus"].lower().find("cas") != -1) and task["subset"] == "cls":
 
-                label_list = dataset.features["number_correct_answers"].names
-                current_classes = [label_list[n] for n in [e['number_correct_answers']]]
+                    label_list = dataset.features["label"].names
+                    current_classes = [label_list[e['label']]]
 
-            if task["corpus"].lower().find("morfitt") != -1:
+                if task["corpus"].lower().find("frenchmedmcqa") != -1 and task["task"] == 1:
 
-                label_list = dataset.features["specialities"].feature.names
-                current_classes = [label_list[n] for n in e['specialities']]
+                    label_list = dataset.features["correct_answers"].feature.names
+                    current_classes = [label_list[n] for n in e['correct_answers']]
 
-            if task["corpus"].lower().find("deft2021") != -1 and task["subset"] == "cls":
+                if task["corpus"].lower().find("frenchmedmcqa") != -1 and task["task"] == 2:
 
-                label_list = dataset.features["specialities"].feature.names
-                current_classes = [label_list[n] for n in e['specialities']]
+                    label_list = dataset.features["number_correct_answers"].names
+                    current_classes = [label_list[n] for n in [e['number_correct_answers']]]
 
-            if task["corpus"].lower().find("deft2021") != -1 and task["subset"] == "ner":
+                if task["corpus"].lower().find("morfitt") != -1:
 
-                label_list = dataset.features[f"ner_tags"].feature.names
-                current_classes = [label_list[n] for n in e['ner_tags']]
+                    label_list = dataset.features["specialities"].feature.names
+                    current_classes = [label_list[n] for n in e['specialities']]
 
-            if task["corpus"].lower().find("deft2019") != -1:
+                if task["corpus"].lower().find("deft2021") != -1 and task["subset"] == "cls":
 
-                label_list = dataset.features[f"ner_tags"].feature.names
-                current_classes = [label_list[n] for n in e['ner_tags']]
+                    label_list = dataset.features["specialities"].feature.names
+                    current_classes = [label_list[n] for n in e['specialities']]
 
-            if task["corpus"].lower().find("pxcorpus") != -1 and task["task"] == 1:
+                if task["corpus"].lower().find("deft2021") != -1 and task["subset"] == "ner":
 
-                label_list = dataset.features[f"ner_tags"].feature.names
-                current_classes = [label_list[n] for n in e['ner_tags']]
+                    label_list = dataset.features[f"ner_tags"].feature.names
+                    current_classes = [label_list[n] for n in e['ner_tags']]
 
-            if task["corpus"].lower().find("pxcorpus") != -1 and task["task"] == 2:
+                if task["corpus"].lower().find("deft2019") != -1:
 
-                label_list = dataset.features["label"].names
-                current_classes = [label_list[n] for n in [e['label']]]
+                    label_list = dataset.features[f"ner_tags"].feature.names
+                    current_classes = [label_list[n] for n in e['ner_tags']]
 
-            if task["corpus"].lower().find("diamed") != -1:
+                if task["corpus"].lower().find("pxcorpus") != -1 and task["task"] == 1:
 
-                label_list = dataset.features["icd-10"].names
-                current_classes = [label_list[n] for n in [e['icd-10']]]
+                    label_list = dataset.features[f"ner_tags"].feature.names
+                    current_classes = [label_list[n] for n in e['ner_tags']]
 
-            if task["corpus"].lower().find("deft2020") != -1 and task["subset"] == "task_1":
-                current_classes = [e['moy']]
+                if task["corpus"].lower().find("pxcorpus") != -1 and task["task"] == 2:
 
-            if task["corpus"].lower().find("deft2020") != -1 and task["subset"] == "task_2":
+                    label_list = dataset.features["label"].names
+                    current_classes = [label_list[n] for n in [e['label']]]
 
-                label_list = dataset.features["correct_cible"].names
-                current_classes = [label_list[n] for n in [e['correct_cible']]]
+                if task["corpus"].lower().find("diamed") != -1:
 
-            if task["corpus"].lower().find("clister") != -1:
-                current_classes = [e['label']]
+                    label_list = dataset.features["icd-10"].names
+                    current_classes = [label_list[n] for n in [e['icd-10']]]
 
-            tasks_classes[t_key][subset].extend(current_classes)
-            del current_classes
+                if task["corpus"].lower().find("deft2020") != -1 and task["subset"] == "task_1":
+                    current_classes = [e['moy']]
 
-os.makedirs(os.path.join(STATS_DIR, "distributions"), exist_ok=True)
+                if task["corpus"].lower().find("deft2020") != -1 and task["subset"] == "task_2":
 
-for subset in ["train", "validation", "test"]:
+                    label_list = dataset.features["correct_cible"].names
+                    current_classes = [label_list[n] for n in [e['correct_cible']]]
 
-    print(subset)
+                if task["corpus"].lower().find("clister") != -1:
+                    current_classes = [e['label']]
 
-    for task in tasks:
+                tasks_classes[t_key][subset].extend(current_classes)
+                del current_classes
 
-        t_key = f"{task['corpus']}-{task['subset']}-{task['task']}"
-        print(t_key)
+    os.makedirs(os.path.join(STATS_DIR, "distributions"), exist_ok=True)
 
-        if (task["corpus"].lower().find("deft2020") != -1 and task["subset"] == "task_1") or (task["corpus"].lower().find("clister") != -1):
-            sns.boxplot(x=tasks_classes[t_key][subset])
-            plt.title('Distribution of the values', fontsize=16)
-            plt.xlabel('Frequencies')
-            plt.ylabel('Classes')
-            plt.savefig(os.path.join(STATS_DIR, "distributions", f"{t_key.replace('/','_')}.png"), bbox_inches='tight', dpi=200)
-            plt.cla()
-            plt.clf()
+    for subset in ["train", "validation", "test"]:
 
-        else:
-            tasks_classes[t_key][subset] = Counter(tasks_classes[t_key][subset]).most_common(9999)
-            tasks_classes[t_key][subset] = sorted(tasks_classes[t_key][subset], key=lambda tup: tup[0])
+        print(subset)
 
-            df = pd.DataFrame({
-                'classes': [s[0] for s in tasks_classes[t_key][subset] if s[0] != "O"],
-                'frequencies': [s[1] for s in tasks_classes[t_key][subset] if s[0] != "O"]
-            })
-            sns.barplot(x=df.frequencies, y=df.classes, orient='h')
-            plt.title('Distribution of classes', fontsize=16)
-            plt.xlabel('Frequencies')
-            plt.ylabel('Classes')
-            plt.savefig(os.path.join(STATS_DIR, "distributions", f"{t_key.replace('/','_')}.png"), bbox_inches='tight', dpi=200)
-            plt.cla()
-            plt.clf()
+        for task in tasks:
 
-        print(tasks_classes[t_key][subset])
+            t_key = f"{task['corpus']}-{task['subset']}-{task['task']}"
+            print(t_key)
 
-with open(os.path.join(STATS_DIR, "classes_distribution.json"), 'w') as f:
-    json.dump(tasks_classes, f, indent=4)
-print("JSON file saved!")
+            if (task["corpus"].lower().find("deft2020") != -1 and task["subset"] == "task_1") or (task["corpus"].lower().find("clister") != -1):
+                sns.boxplot(x=tasks_classes[t_key][subset])
+                plt.title('Distribution of the values', fontsize=16)
+                plt.xlabel('Frequencies')
+                plt.ylabel('Classes')
+                plt.savefig(os.path.join(STATS_DIR, "distributions", f"{t_key.replace('/','_')}.png"), bbox_inches='tight', dpi=200)
+                plt.cla()
+                plt.clf()
+
+            else:
+                tasks_classes[t_key][subset] = Counter(tasks_classes[t_key][subset]).most_common(9999)
+                tasks_classes[t_key][subset] = sorted(tasks_classes[t_key][subset], key=lambda tup: tup[0])
+
+                df = pd.DataFrame({
+                    'classes': [s[0] for s in tasks_classes[t_key][subset] if s[0] != "O"],
+                    'frequencies': [s[1] for s in tasks_classes[t_key][subset] if s[0] != "O"]
+                })
+                sns.barplot(x=df.frequencies, y=df.classes, orient='h')
+                plt.title('Distribution of classes', fontsize=16)
+                plt.xlabel('Frequencies')
+                plt.ylabel('Classes')
+                plt.savefig(os.path.join(STATS_DIR, "distributions", f"{t_key.replace('/','_')}.png"), bbox_inches='tight', dpi=200)
+                plt.cla()
+                plt.clf()
+
+            print(tasks_classes[t_key][subset])
+
+    with open(os.path.join(STATS_DIR, "classes_distribution.json"), 'w') as f:
+        json.dump(tasks_classes, f, indent=4)
+    print("JSON file saved!")
+
+
+if __name__ == '__main__':
+    main()

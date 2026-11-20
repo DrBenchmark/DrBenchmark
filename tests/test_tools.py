@@ -10,7 +10,7 @@ import sys
 
 import pytest
 
-from helpers import ALL_TASKS, REPO, load_module, read_json, run_without_slurm
+from helpers import ALL_TASKS, REPO, copy_tools, load_module, read_json, run_tool, run_without_slurm
 
 TOOLS = sorted(path.name for path in (REPO / "tools").glob("*.py"))
 
@@ -22,26 +22,6 @@ COLLECTED_METRICS = {
     "mcqa": {"hamming_score", "exact_match"},
     "regr": {"edrm", "spearman_correlation_coef"},
 }
-
-
-def copy_tools(repository):
-    """Make `repository` a directory where the tools work as in the real one.
-
-    The tools find `stats/`, `recipes/` and `models.txt` from their own location: their
-    copies use the ones of `repository`.
-    """
-    shutil.copytree(REPO / "tools", repository / "tools", ignore=shutil.ignore_patterns("__pycache__"))
-    # `tools/SlurmFromMissingRuns.py` reads the tasks in `run.py`
-    shutil.copy(REPO / "run.py", repository)
-    (repository / "stats").mkdir()
-
-
-def run_tool(script, repository, *arguments, cwd):
-    """Run the copy of a tool which is in `repository`, from the directory `cwd`."""
-    return subprocess.run(
-        [sys.executable, str(repository / "tools" / script), *arguments],
-        cwd=cwd, capture_output=True, text=True, timeout=300,
-    )
 
 
 def results_key(task):
@@ -73,6 +53,20 @@ def test_tool_does_not_use_a_path_relative_to_the_current_directory(tool):
             if function in PATH_FUNCTIONS and path is not None and not os.path.isabs(path):
                 relative_paths.append(f"line {node.lineno}: {function}({path!r}")
     assert not relative_paths
+
+
+@pytest.mark.parametrize("tool", TOOLS)
+def test_tool_does_nothing_when_it_is_imported(tool):
+    """The work of a tool is in functions, or under `if __name__ == '__main__'`: it has options and can be tested."""
+    tree = ast.parse((REPO / "tools" / tool).read_text())
+    work = [f"line {node.lineno}" for node in tree.body if isinstance(node, (ast.For, ast.While, ast.With))]
+    assert not work
+
+
+@pytest.mark.parametrize("tool", TOOLS)
+def test_tool_is_documented(tool):
+    """`tools/README.md` says what each tool does."""
+    assert f"[{tool}](./{tool})" in (REPO / "tools" / "README.md").read_text()
 
 
 @pytest.fixture(scope="module")

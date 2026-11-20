@@ -1,5 +1,15 @@
+"""Show how the tokenizer of each model splits some biomedical terms.
+
+The sub-word tokens of each term are printed for each model, then a LaTeX table with one
+row per term and one column per model: a term that a tokenizer keeps whole has a check
+mark.
+"""
+
+import argparse
+
 from transformers import AutoTokenizer
 
+from inputs import local_model
 
 words = [
     "asymptomatique",
@@ -19,6 +29,13 @@ words = [
     "vasoconstricteur",
 ]
 
+# The models of the table, when none is given
+default_models = [
+    "almanach/camemberta-base", "camembert-base", "flaubert/flaubert_base_uncased", "Dr-BERT/DrBERT-7GB",
+    "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext", "xlm-roberta-base",
+]
+
+# Names of the models in the table
 mapping = {
     "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext": "PubMedBERT",
     "Dr-BERT/DrBERT-7GB": "DrBERT-FS",
@@ -35,57 +52,69 @@ mapping = {
     "distilbert/distilbert-base-uncased": "DistilBERT",
 }
 
-results = {}
 
-for word in words:
+def arguments():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--models", type=str, nargs='+', required=False, default=default_models,
+                        help="Name or path of the models of the table (default: %(default)s).")
+    parser.add_argument("--offline", action="store_true",
+                        help="Read the models where download_models_locally.py saves them, instead of the HuggingFace Hub.")
+    return parser.parse_args()
 
-    if word not in results:
-        results[word] = []
 
-    for model_name in ["almanach/camemberta-base", "camembert-base", "flaubert/flaubert_base_uncased", "Dr-BERT/DrBERT-7GB", "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext", "xlm-roberta-base"]:
+def main():
+    args = arguments()
+    models = args.models
+    # A model without a name for the table keeps its own
+    names = [mapping.get(model_name, model_name) for model_name in models]
 
-        print(mapping[model_name])
+    tokenizers = {}
+    results = {}
 
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
+    for word in words:
 
-        tokenized_sentence = tokenizer.tokenize(word)
-        tokenized_sentence = [t.replace("##", "").replace("▁", "").replace("</w>", "") for t in tokenized_sentence if len(t.replace("##", "").replace("▁", "").replace("</w>", "")) > 0]
-        results[word].append(tokenized_sentence)
+        if word not in results:
+            results[word] = []
 
-        print(tokenized_sentence)
-        print()
+        for model_name, name in zip(models, names):
 
-text = ""
+            print(name)
 
-text += """
+            if model_name not in tokenizers:
+                tokenizers[model_name] = AutoTokenizer.from_pretrained(local_model(model_name, args.offline))
+            tokenizer = tokenizers[model_name]
+
+            tokenized_sentence = tokenizer.tokenize(word)
+            tokenized_sentence = [t.replace("##", "").replace("▁", "").replace("</w>", "") for t in tokenized_sentence if len(t.replace("##", "").replace("▁", "").replace("</w>", "")) > 0]
+            results[word].append(tokenized_sentence)
+
+            print(tokenized_sentence)
+            print()
+
+    text = ""
+
+    # One column for the terms, and one per model
+    text += """
 \\begin{table}[]
 \\resizebox{\\textwidth}{!}{%
-\\begin{tabular}{cccccccc}
-\\hline
-\\textbf{} &
-\\multicolumn{3}{c}{\\textbf{French Generalist}} &
-\\multicolumn{3}{c}{\\textbf{French Biomedical}} &
-\\textbf{English Biomedical} \\\\
+\\begin{tabular}{""" + "c" * (len(models) + 1) + """}
 \\hline
 \\textbf{Term} &
-\\textbf{CamemBERTa} &
-\\textbf{CamemBERT} &
-\\textbf{FlauBERT} &
-\\textbf{DrBERT} &
-\\textbf{DrBERT CP PubMedBERT} &
-\\textbf{CamemBERT-BIO} &
-\\textbf{PubMedBERT} \\\\
-\\hline
 """
+    text += " &\n".join(["\\textbf{" + name + "}" for name in names]) + " \\\\\n\\hline\n"
 
-for w in results:
-    text += "\\textit{" + w + "} & " + " & ".join(["-".join(r) if len(r) > 1 else "\\checkmark" for r in results[w]]) + " \\\\ \n"
+    for w in results:
+        text += "\\textit{" + w + "} & " + " & ".join(["-".join(r) if len(r) > 1 else "\\checkmark" for r in results[w]]) + " \\\\ \n"
 
-text += """
+    text += """
 \\hline
 \\end{tabular}%
 }
 \\end{table}
 """
 
-print(text)
+    print(text)
+
+
+if __name__ == '__main__':
+    main()

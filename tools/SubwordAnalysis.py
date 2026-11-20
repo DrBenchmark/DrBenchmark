@@ -1,17 +1,19 @@
-# SubwordAnalysis.py
+"""Count in how many sub-word tokens the tokenizer of each model splits the words of each dataset.
+
+The number of tokens per word of every example of the test sets is written in
+`stats/tokens.json`. Its averages are printed as the rows of a LaTeX table.
+"""
 
 import os
 import json
+import argparse
 
-from datasets import load_dataset
 from transformers import AutoTokenizer
 
-from paths import MODELS_FILE, STATS_DIR
+from inputs import load_benchmark_dataset, local_model, models_to_evaluate
+from paths import STATS_DIR
 
-
-with open(MODELS_FILE) as f_in:
-    models = [l.strip() for l in f_in if l.strip()]
-
+# The datasets: "model" is their name on the HuggingFace Hub
 tasks = [
     # {"model": "DrBenchmark/DEFT2019", "subset": None},
     {"model": "DrBenchmark/DEFT2021", "subset": "cls"},
@@ -43,6 +45,7 @@ tasks = [
     {"model": "DrBenchmark/CAS", "subset": "cls"},
 ]
 
+# Names of the models in the table
 mapping = {
     "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext": "PubMedBERT",
     "Dr-BERT/DrBERT-7GB": "DrBERT 7GB",
@@ -59,117 +62,140 @@ mapping = {
     "distilbert/distilbert-base-uncased": "DistilBERT",
 }
 
-matrix_avg_tokens_per_word = {f"{t['model']}-{t['subset']}": {m: [] for m in models} for t in tasks}
 
-for m in models:
+def arguments():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--models", type=str, nargs='+', required=False, default=None,
+                        help="Name or path of the models to analyse (default: the models of models.txt).")
+    parser.add_argument("--offline", action="store_true",
+                        help="Read the models and the datasets where download_models_locally.py and "
+                             "download_datasets_locally.py save them, instead of the HuggingFace Hub.")
+    return parser.parse_args()
 
-    print(f">> {m}")
 
-    tokenizer = AutoTokenizer.from_pretrained(m)
+def main():
+    args = arguments()
+    models = args.models if args.models is not None else models_to_evaluate()
 
-    for task in tasks:
+    matrix_avg_tokens_per_word = {f"{t['model']}-{t['subset']}": {m: [] for m in models} for t in tasks}
+    # Test set of each dataset, read once for all the models
+    test_sets = {}
 
-        if 'dataset' not in task:
-            task['dataset'] = load_dataset(task['model'], task['subset'], trust_remote_code=True)["test"]
+    for m in models:
 
-        t_key = f"{task['model']}-{task['subset']}"
-        print(f">> {t_key}")
+        print(f">> {m}")
 
-        for e in task['dataset']:
+        tokenizer = AutoTokenizer.from_pretrained(local_model(m, args.offline))
 
-            # print(e)
+        for task in tasks:
 
-            if task["model"].lower().find("quaero") != -1 or task["model"].lower().find("e3c") != -1 or task["model"].lower().find("mantragsc") != -1 or task["model"].lower().find("essai") != -1 or task["model"].lower().find("cas") != -1:
+            t_key = f"{task['model']}-{task['subset']}"
 
-                if len(e["tokens"]) == 0:
-                    nbr_tokens = 0
-                else:
-                    output = tokenizer(list(e["tokens"]), is_split_into_words=True)["input_ids"]
-                    nbr_tokens = float(len(output) / len(e["tokens"]))
-                    # print(float(len(output)))
-                    # print(len(e["tokens"]))
+            if t_key not in test_sets:
+                test_sets[t_key] = load_benchmark_dataset(task['model'], task['subset'], args.offline, trust_remote_code=True)["test"]
 
-            if task["model"].lower().find("frenchmedmcqa") != -1:
-                text = f"{e['question']} {tokenizer.sep_token} " + f" {tokenizer.sep_token} ".join([e[f"answer_{letter}"] for letter in ["a", "b", "c", "d", "e"]])
-                tokens = text.split(" ")
-                output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
-                nbr_tokens = float(len(output) / len(tokens))
+            print(f">> {t_key}")
 
-            if task["model"].lower().find("morfitt") != -1:
-                tokens = e['abstract'].split(" ")
-                output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
-                nbr_tokens = float(len(output) / len(tokens))
+            for e in test_sets[t_key]:
 
-            if task["model"].lower().find("deft") != -1 and task["subset"] == "task_1":
-                text = f"{tokenizer.cls_token} {e['source']} {tokenizer.sep_token}  {e['cible']} {tokenizer.eos_token}"
-                tokens = text.split(" ")
-                output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
-                nbr_tokens = float(len(output) / len(tokens))
+                # print(e)
 
-            if task["model"].lower().find("deft") != -1 and task["subset"] == "task_2":
-                text = f"{e['source']} {tokenizer.sep_token} (1) {e['cible_1']} {tokenizer.sep_token} (2) {e['cible_2']} {tokenizer.sep_token} (3) {e['cible_3']}"
-                tokens = text.split(" ")
-                output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
-                nbr_tokens = float(len(output) / len(tokens))
+                if task["model"].lower().find("quaero") != -1 or task["model"].lower().find("e3c") != -1 or task["model"].lower().find("mantragsc") != -1 or task["model"].lower().find("essai") != -1 or task["model"].lower().find("cas") != -1:
 
-            if task["model"].lower().find("clister") != -1:
-                text = f"{e['text_1']} {tokenizer.sep_token} {e['text_2']}"
-                tokens = text.split(" ")
-                output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
-                nbr_tokens = float(len(output) / len(tokens))
+                    if len(e["tokens"]) == 0:
+                        nbr_tokens = 0
+                    else:
+                        output = tokenizer(list(e["tokens"]), is_split_into_words=True)["input_ids"]
+                        nbr_tokens = float(len(output) / len(e["tokens"]))
+                        # print(float(len(output)))
+                        # print(len(e["tokens"]))
 
-            if task["model"].lower().find("diamed") != -1:
-                text = f"{e['clinical_case']}"
-                tokens = text.split(" ")
-                output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
-                nbr_tokens = float(len(output) / len(tokens))
+                if task["model"].lower().find("frenchmedmcqa") != -1:
+                    text = f"{e['question']} {tokenizer.sep_token} " + f" {tokenizer.sep_token} ".join([e[f"answer_{letter}"] for letter in ["a", "b", "c", "d", "e"]])
+                    tokens = text.split(" ")
+                    output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
+                    nbr_tokens = float(len(output) / len(tokens))
 
-            if task["model"].lower().find("pxcorpus") != -1:
-                tokens = e['tokens']
-                output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
-                nbr_tokens = float(len(output) / len(tokens))
+                if task["model"].lower().find("morfitt") != -1:
+                    tokens = e['abstract'].split(" ")
+                    output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
+                    nbr_tokens = float(len(output) / len(tokens))
 
-            if task["model"].lower().find("deft2019") != -1:
-                tokens = e['tokens']
-                if len(tokens) <= 0:
-                    continue
-                output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
-                nbr_tokens = float(len(output) / len(tokens))
+                if task["model"].lower().find("deft") != -1 and task["subset"] == "task_1":
+                    text = f"{tokenizer.cls_token} {e['source']} {tokenizer.sep_token}  {e['cible']} {tokenizer.eos_token}"
+                    tokens = text.split(" ")
+                    output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
+                    nbr_tokens = float(len(output) / len(tokens))
 
-            if task["model"].lower().find("deft2021") != -1 and task["subset"] == "ner":
-                tokens = e['tokens']
-                if len(tokens) <= 0:
-                    continue
-                output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
-                nbr_tokens = float(len(output) / len(tokens))
+                if task["model"].lower().find("deft") != -1 and task["subset"] == "task_2":
+                    text = f"{e['source']} {tokenizer.sep_token} (1) {e['cible_1']} {tokenizer.sep_token} (2) {e['cible_2']} {tokenizer.sep_token} (3) {e['cible_3']}"
+                    tokens = text.split(" ")
+                    output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
+                    nbr_tokens = float(len(output) / len(tokens))
 
-            if task["model"].lower().find("deft2021") != -1 and task["subset"] == "cls":
-                tokens = e['text'].split(" ")
-                if len(tokens) <= 0:
-                    continue
-                output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
-                nbr_tokens = float(len(output) / len(tokens))
+                if task["model"].lower().find("clister") != -1:
+                    text = f"{e['text_1']} {tokenizer.sep_token} {e['text_2']}"
+                    tokens = text.split(" ")
+                    output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
+                    nbr_tokens = float(len(output) / len(tokens))
 
-            matrix_avg_tokens_per_word[t_key][m].append(nbr_tokens)
-            del nbr_tokens
+                if task["model"].lower().find("diamed") != -1:
+                    text = f"{e['clinical_case']}"
+                    tokens = text.split(" ")
+                    output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
+                    nbr_tokens = float(len(output) / len(tokens))
 
-with open(os.path.join(STATS_DIR, "tokens.json"), 'w') as f:
-    json.dump(matrix_avg_tokens_per_word, f, indent=4)
-print("JSON file saved!")
+                if task["model"].lower().find("pxcorpus") != -1:
+                    tokens = e['tokens']
+                    output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
+                    nbr_tokens = float(len(output) / len(tokens))
 
-first_row = " & " + " & ".join([mapping[m] for m in models]) + "\\\\"
-print(first_row)
+                if task["model"].lower().find("deft2019") != -1:
+                    tokens = e['tokens']
+                    if len(tokens) <= 0:
+                        continue
+                    output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
+                    nbr_tokens = float(len(output) / len(tokens))
 
-for t in list(matrix_avg_tokens_per_word.keys()):
+                if task["model"].lower().find("deft2021") != -1 and task["subset"] == "ner":
+                    tokens = e['tokens']
+                    if len(tokens) <= 0:
+                        continue
+                    output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
+                    nbr_tokens = float(len(output) / len(tokens))
 
-    print(f"{t.replace('DrBenchmark/','').replace('-',' ').replace('_',' ').replace('None','')} & ", end="")
+                if task["model"].lower().find("deft2021") != -1 and task["subset"] == "cls":
+                    tokens = e['text'].split(" ")
+                    if len(tokens) <= 0:
+                        continue
+                    output = tokenizer(list(tokens), is_split_into_words=True)["input_ids"]
+                    nbr_tokens = float(len(output) / len(tokens))
 
-    values = []
+                matrix_avg_tokens_per_word[t_key][m].append(nbr_tokens)
+                del nbr_tokens
 
-    for m in matrix_avg_tokens_per_word[t]:
+    with open(os.path.join(STATS_DIR, "tokens.json"), 'w') as f:
+        json.dump(matrix_avg_tokens_per_word, f, indent=4)
+    print("JSON file saved!")
 
-        v = sum(matrix_avg_tokens_per_word[t][m]) / len(matrix_avg_tokens_per_word[t][m])
-        values.append(str(round(v, 2)))
+    # A model without a name for the table keeps its own
+    first_row = " & " + " & ".join([mapping.get(m, m) for m in models]) + "\\\\"
+    print(first_row)
 
-    print(" & ".join(values) + " \\\\", end="")
-    print()
+    for t in list(matrix_avg_tokens_per_word.keys()):
+
+        print(f"{t.replace('DrBenchmark/','').replace('-',' ').replace('_',' ').replace('None','')} & ", end="")
+
+        values = []
+
+        for m in matrix_avg_tokens_per_word[t]:
+
+            v = sum(matrix_avg_tokens_per_word[t][m]) / len(matrix_avg_tokens_per_word[t][m])
+            values.append(str(round(v, 2)))
+
+        print(" & ".join(values) + " \\\\", end="")
+        print()
+
+
+if __name__ == '__main__':
+    main()

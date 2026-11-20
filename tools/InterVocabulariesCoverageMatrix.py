@@ -1,18 +1,22 @@
-# python InterVocabulariesCoverageMatrix.py
+"""Measure how much the vocabularies of the tokenizers of the models overlap.
+
+For each pair of models, the percentage of tokens they share among the ones of both
+vocabularies is written in `stats/matrix.txt`, and the matrix is drawn in
+`stats/matrix_Blues.png`.
+"""
 
 import os
+import argparse
 
 import seaborn as sb
 import matplotlib.pyplot as plt
 
 from transformers import AutoTokenizer
 
-from paths import MODELS_FILE, STATS_DIR
+from inputs import local_model, models_to_evaluate
+from paths import STATS_DIR
 
-
-with open(MODELS_FILE) as f_in:
-    models = [l.strip() for l in f_in if l.strip()]
-
+# Names of the models in the figure
 mapping = {
     "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext": "PubMedBERT",
     "Dr-BERT/DrBERT-7GB": "DrBERT-FS",
@@ -29,56 +33,64 @@ mapping = {
     "distilbert/distilbert-base-uncased": "DistilBERT",
 }
 
-matrix = []
 
-for m1_path in models:
+def arguments():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--models", type=str, nargs='+', required=False, default=None,
+                        help="Name or path of the models to compare (default: the models of models.txt).")
+    parser.add_argument("--offline", action="store_true",
+                        help="Read the models where download_models_locally.py saves them, instead of the HuggingFace Hub.")
+    return parser.parse_args()
 
-    line = []
 
-    m1_tokenizer = AutoTokenizer.from_pretrained(m1_path)
-    m1_vocab = [v.replace("</w>", "").replace("▁", "").replace("##", "") for v in m1_tokenizer.get_vocab().keys()]
+def main():
+    args = arguments()
+    models = args.models if args.models is not None else models_to_evaluate()
 
-    for m2_path in models:
+    matrix = []
 
-        m2_tokenizer = AutoTokenizer.from_pretrained(m2_path)
-        m2_vocab = [v.replace("</w>", "").replace("▁", "").replace("##", "") for v in m2_tokenizer.get_vocab().keys()]
+    for m1_path in models:
 
-        taux = len(set(m1_vocab) & set(m2_vocab)) / float(len(set(m1_vocab) | set(m2_vocab))) * 100
+        line = []
 
-        print(f"{m1_path} - {m2_path} : {taux}")
-        line.append(taux)
+        m1_tokenizer = AutoTokenizer.from_pretrained(local_model(m1_path, args.offline))
+        m1_vocab = [v.replace("</w>", "").replace("▁", "").replace("##", "") for v in m1_tokenizer.get_vocab().keys()]
 
-    matrix.append(line)
+        for m2_path in models:
 
-print(">> Start saving scores!")
+            m2_tokenizer = AutoTokenizer.from_pretrained(local_model(m2_path, args.offline))
+            m2_vocab = [v.replace("</w>", "").replace("▁", "").replace("##", "") for v in m2_tokenizer.get_vocab().keys()]
 
-with open(os.path.join(STATS_DIR, "matrix.txt"), "w") as f_out:
-    # Write in file
-    for row in matrix:
-        f_out.write("\t".join([str(r) for r in row]) + "\n")
+            taux = len(set(m1_vocab) & set(m2_vocab)) / float(len(set(m1_vocab) | set(m2_vocab))) * 100
 
-with open(os.path.join(STATS_DIR, "matrix.txt")) as f_in:
-    matrix = [[float("%.1f" % float(r)) for r in row.split("\t")] for row in f_in.read().split("\n")[:-1]]
+            print(f"{m1_path} - {m2_path} : {taux}")
+            line.append(taux)
 
-# mask = np.zeros_like(matrix)
+        matrix.append(line)
 
-# for i in range(len(mask)):
-#     for j in range(i+1, len(mask)):
-#         mask[i,j] = 1
+    print(">> Start saving scores!")
 
-# mask = np.array(mask, dtype=np.bool)
+    with open(os.path.join(STATS_DIR, "matrix.txt"), "w") as f_out:
+        # Write in file
+        for row in matrix:
+            f_out.write("\t".join([str(r) for r in row]) + "\n")
 
-rotation_angle = 90
+    with open(os.path.join(STATS_DIR, "matrix.txt")) as f_in:
+        matrix = [[float("%.1f" % float(r)) for r in row.split("\t")] for row in f_in.read().split("\n")[:-1]]
 
-cmap = sb.diverging_palette(0, 230, 90, 60, as_cmap=True)
+    rotation_angle = 90
 
-cmap = "Blues"
+    cmap = "Blues"
 
-sb.set(font_scale=0.5, rc={'axes.facecolor': '#ffffff', 'figure.facecolor': '#ffffff'})
+    sb.set(font_scale=0.5, rc={'axes.facecolor': '#ffffff', 'figure.facecolor': '#ffffff'})
 
-heat_map = sb.heatmap(matrix, cmap=cmap, annot=True, cbar=False, fmt='g', cbar_kws={'label': 'Percentage of tokens in commons', 'orientation': 'horizontal'})
-# heat_map = sb.heatmap(matrix, mask=mask, cmap=cmap, annot=True, cbar=False, fmt='g', cbar_kws={'label': 'Percentage of tokens in commons', 'orientation': 'horizontal'})
-heat_map.set_yticklabels([mapping[m] for m in models], rotation=0, fontsize=8)
-heat_map.set_xticklabels([mapping[m] for m in models], rotation=rotation_angle, fontsize=8)
+    heat_map = sb.heatmap(matrix, cmap=cmap, annot=True, cbar=False, fmt='g', cbar_kws={'label': 'Percentage of tokens in commons', 'orientation': 'horizontal'})
+    # A model without a name for the figure keeps its own
+    heat_map.set_yticklabels([mapping.get(m, m) for m in models], rotation=0, fontsize=8)
+    heat_map.set_xticklabels([mapping.get(m, m) for m in models], rotation=rotation_angle, fontsize=8)
 
-plt.savefig(os.path.join(STATS_DIR, f"matrix_{cmap}.png"), bbox_inches='tight')
+    plt.savefig(os.path.join(STATS_DIR, f"matrix_{cmap}.png"), bbox_inches='tight')
+
+
+if __name__ == '__main__':
+    main()

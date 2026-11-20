@@ -1,17 +1,19 @@
-# python BiasMaskFilling.py
+"""List the words that each model predicts in sentences about patients of a gender, an origin or a religion.
+
+Each sentence has a masked word: the 15 words of more than 4 characters that a model
+predicts the most often, among all the sentences of a kind of bias, are written in
+`stats/bias.json` and, as the rows of a LaTeX table, in `stats/bias.tex`.
+"""
 
 import os
 import json
+import argparse
 from collections import Counter
 
 from transformers import pipeline, AutoTokenizer
 
-from paths import MODELS_FILE, STATS_DIR
-
-with open(MODELS_FILE) as f_in:
-    models = [l.strip() for l in f_in if l.strip()]
-
-matrix = []
+from inputs import local_model, models_to_evaluate
+from paths import STATS_DIR
 
 bias = {
     "gender": [
@@ -38,45 +40,64 @@ bias = {
     ],
 }
 
-bias_res = {b: {m: [] for m in models} for b in list(bias.keys())}
 
-for m in models:
+def arguments():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--models", type=str, nargs='+', required=False, default=None,
+                        help="Name or path of the models to analyse (default: the models of models.txt).")
+    parser.add_argument("--offline", action="store_true",
+                        help="Read the models where download_models_locally.py saves them, instead of the HuggingFace Hub.")
+    return parser.parse_args()
 
-    print(f">> {m}")
 
-    fill_mask = pipeline("fill-mask", model=m, tokenizer=m, top_k=500)
-    t = AutoTokenizer.from_pretrained(m)
+def main():
+    args = arguments()
+    models = args.models if args.models is not None else models_to_evaluate()
 
-    for b in list(bias.keys()):
+    bias_res = {b: {m: [] for m in models} for b in list(bias.keys())}
 
-        for template in bias[b]:
+    for m in models:
 
-            for term in template[0]:
+        print(f">> {m}")
 
-                text = template[1].format(term=term).replace("<mask>", t.mask_token)
-                results = fill_mask(text)
-                results = [r["token_str"] for r in results]
-                results = [r for r in results if len(r) > 4][0:15]
+        model = local_model(m, args.offline)
+        fill_mask = pipeline("fill-mask", model=model, tokenizer=model, top_k=500)
+        t = AutoTokenizer.from_pretrained(model)
 
-                bias_res[b][m].extend(results)
+        for b in list(bias.keys()):
 
-        bias_res[b][m] = [c[0] for c in Counter(bias_res[b][m]).most_common(15)]
-        print(bias_res[b][m])
+            for template in bias[b]:
 
-with open(os.path.join(STATS_DIR, "bias.json"), 'w') as f:
-    json.dump(bias_res, f, indent=4)
-print("JSON file saved!")
+                for term in template[0]:
 
-f_out = open(os.path.join(STATS_DIR, "bias.tex"), "w")
+                    text = template[1].format(term=term).replace("<mask>", t.mask_token)
+                    results = fill_mask(text)
+                    results = [r["token_str"] for r in results]
+                    results = [r for r in results if len(r) > 4][0:15]
 
-for b in bias_res.keys():
+                    bias_res[b][m].extend(results)
 
-    f_out.write("\\multirow{" + str(len(models)) + "}{*}{" + b + "} \n")
+            bias_res[b][m] = [c[0] for c in Counter(bias_res[b][m]).most_common(15)]
+            print(bias_res[b][m])
 
-    for m in bias_res[b]:
+    with open(os.path.join(STATS_DIR, "bias.json"), 'w') as f:
+        json.dump(bias_res, f, indent=4)
+    print("JSON file saved!")
 
-        top = ", ".join(bias_res[b][m])
+    with open(os.path.join(STATS_DIR, "bias.tex"), "w") as f_out:
 
-        f_out.write(f"& {m} & {top} \\\\ \n")
+        for b in bias_res.keys():
 
-    f_out.write("\\hline \n\n")
+            f_out.write("\\multirow{" + str(len(models)) + "}{*}{" + b + "} \n")
+
+            for m in bias_res[b]:
+
+                top = ", ".join(bias_res[b][m])
+
+                f_out.write(f"& {m} & {top} \\\\ \n")
+
+            f_out.write("\\hline \n\n")
+
+
+if __name__ == '__main__':
+    main()

@@ -5,6 +5,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -114,6 +115,26 @@ def run_command(command, cwd, timeout=900):
     # The launchers call `python`: make it the interpreter running the tests
     environ["PATH"] = os.path.dirname(sys.executable) + os.pathsep + environ["PATH"]
     return subprocess.run(command, shell=True, cwd=cwd, env=environ, capture_output=True, text=True, timeout=timeout)
+
+
+def copy_tools(repository):
+    """Make `repository` a directory where the tools work as in the real one.
+
+    The tools find `stats/`, `recipes/` and `models.txt` from their own location: their
+    copies use the ones of `repository`.
+    """
+    shutil.copytree(REPO / "tools", repository / "tools", ignore=shutil.ignore_patterns("__pycache__"))
+    # `tools/SlurmFromMissingRuns.py` reads the tasks in `run.py`
+    shutil.copy(REPO / "run.py", repository)
+    (repository / "stats").mkdir()
+
+
+def run_tool(script, repository, *arguments, cwd):
+    """Run the copy of a tool which is in `repository`, from the directory `cwd`."""
+    return subprocess.run(
+        [sys.executable, str(repository / "tools" / script), *arguments],
+        cwd=cwd, capture_output=True, text=True, timeout=300,
+    )
 
 
 def run_without_slurm(script, cwd, directory, task_id=0):
