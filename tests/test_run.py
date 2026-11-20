@@ -153,9 +153,11 @@ def test_script_of_a_task_is_started_by_python_itself(fake_repository):
         ("e3c-ner_clinical", sys.executable, os.path.realpath(fake_repository.scripts_dir("e3c-ner_clinical")),
          ["--config", os.path.join("..", "yaml", "ner.yaml"), "--model_name", MODEL, "--subset", "French_clinical", "--seed", "0", "--epochs", "2"]),
     ]
-    # The fake recipes have nothing but these scripts
+    # The fake recipes have nothing but these scripts. `common/` is not a recipe: it has the code that `run.py`
+    # loads, and the bytecode that Python writes next to it
     recipes = fake_repository.directory / "recipes"
-    assert sorted(str(path.relative_to(recipes)) for path in recipes.rglob("*") if path.is_file() and path.parent.name != "common") == [
+    files = [path.relative_to(recipes) for path in recipes.rglob("*") if path.is_file()]
+    assert sorted(str(path) for path in files if path.parts[0] != "common") == [
         os.path.join("cas", "scripts", "task_1_finetuning_bert_pos.py"), os.path.join("e3c", "scripts", "finetuning_bert_ner.py"),
     ]
 
