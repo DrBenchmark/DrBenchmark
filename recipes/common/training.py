@@ -213,3 +213,4 @@ def save_results(run, trainer, metrics, identifiers, real_labels, system_predict
             },
             'trainer_state': dataclasses.asdict(trainer.state),
         }, f, ensure_ascii=False, indent=4, default=np_encoder)
+    utils.report_status(utils.COMPUTED, run.path)

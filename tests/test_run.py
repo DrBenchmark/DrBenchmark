@@ -45,16 +45,24 @@ class FakeRepository:
     def scripts_dir(self, task_name):
         return self.directory / "recipes" / Task(task_name).recipe / "scripts"
 
-    def create_launchers(self, exit_codes):
-        """Create the launcher of each task of `exit_codes`, with the exit code given for it."""
+    def create_launchers(self, exit_codes, already_computed=()):
+        """Create the launcher of each task of `exit_codes`, with the exit code given for it.
+
+        The launchers of the tasks of `already_computed` say, as a recipe does, that the
+        results of their run exist.
+        """
         for task_name, exit_code in exit_codes.items():
             scripts_dir = self.scripts_dir(task_name)
             scripts_dir.mkdir(parents=True, exist_ok=True)
             launcher = scripts_dir / Task(task_name).launcher
+            status = ""
+            if task_name in already_computed:
+                status = """printf '{"status": "already computed"}' > "$DRBENCHMARK_RUN_STATUS"\n"""
             launcher.write_text(
                 "#!/bin/sh\n"
                 # One line per call: the task, the current directory, then each argument, all followed by a tab
                 f"{{ printf '%s\\t' '{task_name}' \"$(pwd -P)\" \"$@\"; echo; }} >> '{self.calls}'\n"
+                f"{status}"
                 f"exit {exit_code}\n"
             )
             launcher.chmod(0o755)
@@ -109,7 +117,8 @@ def test_runs_every_task_model_and_iteration(fake_repository):
         "--tasks", "cas-pos", "e3c-ner_clinical", "--models", MODEL, "other/model", "--nb-run", "2",
     )
     assert completed.returncode == 0, completed.stderr
-    assert "failed" not in completed.stderr
+    assert "ERROR" not in completed.stderr
+    assert "INFO::8 run(s): 8 computed, 0 already computed, 0 failed" in completed.stderr
 
     assert [(call.task, call.arguments) for call in fake_repository.recorded_calls()] == [
         ("cas-pos", [MODEL, "--seed", "0"]), ("cas-pos", [MODEL, "--seed", "1"]),
@@ -132,8 +141,6 @@ def test_runs_are_the_same_ones_each_time(fake_repository):
 
 def test_seed_of_the_first_run_can_be_chosen(fake_repository):
     fake_repository.create_launchers({"cas-pos": 0})
-    # Without `models.txt`, `run.py` warns about it before it sets its messages up, and does not show the next ones
-    (fake_repository.directory / "models.txt").write_text("not/used\n")
     completed = fake_repository.run("--tasks", "cas-pos", "--models", MODEL, "--nb-run", "3", "--seed", "40")
     assert completed.returncode == 0, completed.stderr
     assert [call.arguments for call in fake_repository.recorded_calls()] == [
@@ -146,8 +153,6 @@ def test_seed_of_the_first_run_can_be_chosen(fake_repository):
 def test_job_is_one_of_the_runs(fake_repository):
     """With `--job`, `run.py` only does the run that has this number, among the ones it does without it."""
     fake_repository.create_launchers({"cas-pos": 0, "e3c-ner_clinical": 0})
-    # Without `models.txt`, `run.py` warns about it before it sets its messages up, and does not show the next ones
-    (fake_repository.directory / "models.txt").write_text("not/used\n")
     asked = ("--tasks", "cas-pos", "e3c-ner_clinical", "--models", MODEL, "other/model", "--nb-run", "2", "--epochs", "3")
 
     assert fake_repository.run(*asked).returncode == 0
@@ -302,6 +307,54 @@ def test_failed_runs_are_reported(fake_repository):
     assert "cas-pos |" not in completed.stderr
 
 
+def test_runs_are_counted(fake_repository):
+    """At its end, `run.py` says how many runs were computed, were already computed and failed."""
+    fake_repository.create_launchers({"cas-pos": 0, "cas-cls": 0, "deft2020-cls": 0, "clister-regr": 3}, already_computed=["cas-cls"])
+
+    # The runs that follow the ones that were already computed are not taken for such runs
+    completed = fake_repository.run(
+        "--tasks", "cas-pos", "cas-cls", "deft2020-cls", "clister-regr", "--models", MODEL, "--nb-run", "2",
+    )
+    assert completed.returncode == 1
+    assert "INFO::8 run(s): 4 computed, 2 already computed, 2 failed" in completed.stderr
+
+    # A run that ends well without saying what it did was computed
+    completed = fake_repository.run("--tasks", "cas-pos", "--models", MODEL)
+    assert completed.returncode == 0
+    assert "INFO::1 run(s): 1 computed, 0 already computed, 0 failed" in completed.stderr
+    completed = fake_repository.run("--tasks", "cas-cls", "--models", MODEL, "--job", "0")
+    assert "INFO::1 run(s): 0 computed, 1 already computed, 0 failed" in completed.stderr
+
+
+def test_run_says_what_it_did_to_run_py(utils, monkeypatch, tmp_path):
+    """A recipe writes what its run did where `run.py` asks for it, and nowhere when nothing asks."""
+    monkeypatch.delenv(utils.STATUS_FILE, raising=False)
+    monkeypatch.chdir(tmp_path)
+    utils.report_status(utils.COMPUTED, "runs/some_run.json")
+    assert list(tmp_path.iterdir()) == []
+
+    monkeypatch.setenv(utils.STATUS_FILE, str(tmp_path / "status.json"))
+    utils.report_status(utils.ALREADY_COMPUTED, "runs/some_run.json")
+    assert read_json(tmp_path / "status.json") == {"status": "already computed", "results": str(tmp_path / "runs" / "some_run.json")}
+
+
+def test_models_file_is_only_needed_without_models(fake_repository):
+    """`run.py` does not warn about a missing `models.txt` when the models are given, and shows its messages in both cases."""
+    fake_repository.create_launchers({"cas-pos": 0})
+    assert not (fake_repository.directory / "models.txt").exists()
+
+    completed = fake_repository.run("--tasks", "cas-pos", "--models", MODEL)
+    assert completed.returncode == 0
+    assert "models.txt" not in completed.stderr
+    assert f"INFO::Evaluating {MODEL} on cas-pos (run 0, seed 0)" in completed.stderr
+
+    completed = fake_repository.run("--tasks", "cas-pos")
+    assert completed.returncode == 0
+    assert "WARNING::`models.txt` not found. Please provide models in --models" in completed.stderr
+    assert "INFO::0 run(s): 0 computed, 0 already computed, 0 failed" in completed.stderr
+    assert len(fake_repository.recorded_calls()) == 1
+
+
 def test_runs_from_any_directory(fake_repository, elsewhere):
     """Each launcher is run in its `scripts/` directory, wherever `run.py` is run from."""
     tasks = ["cas-pos", "e3c-ner_clinical"]
@@ -407,6 +460,7 @@ def test_run_already_computed_is_not_computed_again(small_repository, tiny_bert,
     completed, first = run("--nb-run", "2", *options)
     assert sorted(first) == [0, 1]
     assert "already computed" not in completed.stdout
+    assert "INFO::2 run(s): 2 computed, 0 already computed, 0 failed" in completed.stderr
     for path in first.values():
         hyperparameters = read_json(path)["hyperparameters"]
         # The options of `run.py` were given to the recipe
@@ -416,6 +470,7 @@ def test_run_already_computed_is_not_computed_again(small_repository, tiny_bert,
     completed, second = run("--nb-run", "3", *options)
     assert sorted(second) == [0, 1, 2]
     assert completed.stdout.count("This configuration was already computed") == 2
+    assert "INFO::3 run(s): 1 computed, 2 already computed, 0 failed" in completed.stderr
     # The two first runs were left as they were
     assert {seed: second[seed] for seed in (0, 1)} == first
     assert {seed: second[seed].stat().st_mtime_ns for seed in (0, 1)} == written

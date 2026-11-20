@@ -34,7 +34,7 @@ python run.py --tasks all --nb-run 4
 
 **Note**: `run.py`, the two download scripts, the launchers of the recipes and the tools of `tools/` find the files of the repository from their own location: they can be run from any directory, e.g. `python ~/DrBenchmark/run.py --tasks cas-pos`. A relative path given on their command line, such as the one of a local model, is relative to the current directory.
 
-**Note**: `run.py` gives each run its seed: 0 for the first run of a task for a model, 1 for the second one, and so on (`--seed` gives another seed to the first run). A run whose results already are in `recipes/<recipe>/runs/` is not computed again: the same command resumes a benchmark that was interrupted, and `--nb-run 4` after `--nb-run 2` only computes the two runs that are missing. A launcher that is not given a seed draws one: `run.py` does not take such a run for one of its own.
+**Note**: `run.py` gives each run its seed: 0 for the first run of a task for a model, 1 for the second one, and so on (`--seed` gives another seed to the first run). A run whose results already are in `recipes/<recipe>/runs/` is not computed again: the same command resumes a benchmark that was interrupted, and `--nb-run 4` after `--nb-run 2` only computes the two runs that are missing. Its last message says how many runs were computed, were already computed and failed. A launcher that is not given a seed draws one: `run.py` does not take such a run for one of its own.
 
 **Note**: `run.py` accepts the options of the recipes and gives them to every run, e.g. `python run.py --tasks cas-pos --offline false --epochs 1 --fewshot 0.25`. They are listed by `python run.py --help`. A run with other options is another run, with its own results.
 

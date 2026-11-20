@@ -20,6 +20,19 @@ subset2task_detail = {
 # Arguments that do not take part in the name of a run: they describe it, without changing what it computes
 NOT_IN_RUN_NAME = ("hub_model_name",)
 
+# `run.py` gives, in this variable of the environment, the path of a file where the run it starts
+# writes what it did: it counts this way the runs that it did not have to compute again
+STATUS_FILE = "DRBENCHMARK_RUN_STATUS"
+ALREADY_COMPUTED, COMPUTED = "already computed", "computed"
+
+
+def report_status(status, run_path):
+    """Write what the run did in the file that `run.py` asks for, when it is the one that started the run."""
+    path = os.environ.get(STATUS_FILE)
+    if path:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"status": status, "results": os.path.abspath(run_path)}, f)
+
 
 def create_run_name(args):
     if isinstance(args, argparse.Namespace):
@@ -249,6 +262,7 @@ def parse_args():
             print(f"This configuration was already computed (seed: {args['seed']}, model: {args['model_name']}).")
             print(json.dumps(args))
             print("Exiting...")
+            report_status(ALREADY_COMPUTED, get_run_path(args))
             exit(0)
     # print(f">> Model path: >>{args['model_name']}<<")
 

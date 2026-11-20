@@ -1,9 +1,11 @@
 import importlib.util
+import json
 import logging
 import os
 import shlex
 import subprocess
 import sys
+import tempfile
 
 # Root of the repository: `models.txt` and the recipes are found there, wherever `run.py` is run from
 REPO_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -67,13 +69,8 @@ def load_recipes_utils():
 if __name__ == '__main__':
     import argparse
 
-    try:
-        with open(os.path.join(REPO_DIR, 'models.txt')) as f:
-            # One model per line, but the empty lines and the comments
-            MODELS_TO_EVALUATE = [line.strip() for line in f if line.strip() and not line.strip().startswith('#')]
-    except FileNotFoundError:
-        logging.warning('`models.txt` not found. Please provide models in --models')
-        MODELS_TO_EVALUATE = []
+    # The code shared by the recipes: their options, and how a run says what it did
+    recipes_utils = load_recipes_utils()
 
     def arguments():
         """The options of `run.py`, and the names of the ones that are given to the recipes."""
@@ -99,7 +96,7 @@ if __name__ == '__main__':
             'options of the recipes',
             'They are given to every run, where they take the place of the values of the YAML file of its task '
             'and of config.yaml.')
-        given_to_the_recipes = load_recipes_utils().add_arguments(recipes, but=NOT_OPTIONS_OF_RUN_PY)
+        given_to_the_recipes = recipes_utils.add_arguments(recipes, but=NOT_OPTIONS_OF_RUN_PY)
         args = parser.parse_args()
 
         # The seeds of the runs: `transformers.set_seed` accepts the ones below 2**32
@@ -129,16 +126,23 @@ if __name__ == '__main__':
         for argument in (f'--{name}', str(getattr(args, name)))
     ]
 
-    if args.models is None:
-        args.models = MODELS_TO_EVALUATE
-    elif not os.path.samefile(os.getcwd(), REPO_DIR):
-        args.models = [from_repository(model) for model in args.models]
-
+    # Before the first message: a message sets the default format and level up otherwise, and hides the next ones
     logging.basicConfig(
         format='%(asctime)s %(levelname)s::%(message)s',
         level=logging.getLevelName(args.log_level),
         datefmt='%Y-%m-%d %H:%M:%S'
     )
+
+    if args.models is None:
+        try:
+            with open(os.path.join(REPO_DIR, 'models.txt')) as f:
+                # One model per line, but the empty lines and the comments
+                args.models = [line.strip() for line in f if line.strip() and not line.strip().startswith('#')]
+        except FileNotFoundError:
+            logging.warning('`models.txt` not found. Please provide models in --models')
+            args.models = []
+    elif not os.path.samefile(os.getcwd(), REPO_DIR):
+        args.models = [from_repository(model) for model in args.models]
 
     if args.tasks == ['all']:
         args.tasks = sorted(list(task2script.keys()))
@@ -158,30 +162,45 @@ if __name__ == '__main__':
 
     # Runs that did not end properly: (task, model, iteration, exit code)
     failures = []
+    # Runs whose results existed: the recipe did not compute them again
+    already_computed = 0
 
-    for task, model, iteration in runs:
-        corpus, subset = task.split('-')
-        # Each run has its own seed, always the same: the recipe names its results after its
-        # arguments, and does not compute again a run whose results exist
-        seed = args.seed + iteration
-        logging.info('=============================')
-        logging.info(f'Evaluating {model} on {corpus}-{subset} (run {iteration}, seed {seed})')
-        logging.info('=============================')
-        logging.info('')
+    with tempfile.TemporaryDirectory(prefix='drbenchmark_') as directory:
+        # Where each run writes what it did: see `report_status` in recipes/common/utils.py
+        status_file = os.path.join(directory, 'status.json')
+        environ = dict(os.environ, **{recipes_utils.STATUS_FILE: status_file})
 
-        command = task2script[task].format(model_name=shlex.quote(model))
-        # What follows the model and the subset is given to the script of the recipe
-        command += ' ' + shlex.join(['--seed', str(seed), *recipe_options])
-        scripts_dir = os.path.join(REPO_DIR, 'recipes', corpus.lower(), 'scripts')
-        try:
-            returncode = subprocess.call(command, shell=True, cwd=scripts_dir)
-        except KeyboardInterrupt:
-            logging.info('KeyboardInterrupt Exiting...')
-            sys.exit(130)
+        for task, model, iteration in runs:
+            corpus, subset = task.split('-')
+            # Each run has its own seed, always the same: the recipe names its results after its
+            # arguments, and does not compute again a run whose results exist
+            seed = args.seed + iteration
+            logging.info('=============================')
+            logging.info(f'Evaluating {model} on {corpus}-{subset} (run {iteration}, seed {seed})')
+            logging.info('=============================')
+            logging.info('')
 
-        if returncode != 0:
-            logging.error(f'Evaluation of {model} on {corpus}-{subset} (run {iteration}) failed with exit code {returncode}')
-            failures.append((task, model, iteration, returncode))
+            command = task2script[task].format(model_name=shlex.quote(model))
+            # What follows the model and the subset is given to the script of the recipe
+            command += ' ' + shlex.join(['--seed', str(seed), *recipe_options])
+            scripts_dir = os.path.join(REPO_DIR, 'recipes', corpus.lower(), 'scripts')
+            if os.path.exists(status_file):
+                os.remove(status_file)
+            try:
+                returncode = subprocess.call(command, shell=True, cwd=scripts_dir, env=environ)
+            except KeyboardInterrupt:
+                logging.info('KeyboardInterrupt Exiting...')
+                sys.exit(130)
+
+            if returncode != 0:
+                logging.error(f'Evaluation of {model} on {corpus}-{subset} (run {iteration}) failed with exit code {returncode}')
+                failures.append((task, model, iteration, returncode))
+            elif os.path.exists(status_file):
+                with open(status_file, encoding='utf-8') as f:
+                    already_computed += json.load(f)['status'] == recipes_utils.ALREADY_COMPUTED
+
+    computed = len(runs) - already_computed - len(failures)
+    logging.info(f'{len(runs)} run(s): {computed} computed, {already_computed} already computed, {len(failures)} failed')
 
     # A failed run does not stop the other ones, but it must not go unnoticed
     if failures:
