@@ -58,56 +58,76 @@ def compute_metrics(p):
     return result
 
 
-def main(dataset, text_column):
-    """Fine-tune and evaluate a model on a multi-label classification task.
+def scores(references, predictions):
+    """The scores of a run, from the labels of the examples given as vectors of 0 and 1."""
+    return classification_report(references, predictions, zero_division=.0, output_dict=True)
+
+
+class Task(training.Task):
+    """A task that gives several labels to a text.
 
     Args:
         dataset: name of the dataset on the HuggingFace Hub.
         text_column: column with the text given to the model.
     """
-    run = training.start(dataset)
-    args, dataset = run.args, run.dataset
 
-    labels_list = dataset["train"].features["specialities"].feature.names
+    kind = "multi-label classification"
+    model_class = AutoModelForSequenceClassification
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
-    model = AutoModelForSequenceClassification.from_pretrained(args.model_name, num_labels=len(labels_list), problem_type="multi_label_classification")
+    def __init__(self, dataset, text_column):
+        self.dataset = dataset
+        self.text_column = text_column
+        self.inputs = {text_column: "text"}
 
-    def preprocess_function(e):
-        res = tokenizer(e[text_column], truncation=True, max_length=args.max_position_embeddings, padding="do_not_pad")
-        res["labels"] = e["specialities_one_hot"]
-        return res
+    def encode(self, example, tokenizer, max_length, model_name=None):
+        return {"inputs": dict(tokenizer(example[self.text_column], truncation=True, max_length=max_length, padding="do_not_pad"))}
 
-    dataset_train, dataset_val, dataset_test = [
-        split.remove_columns([text_column, "id", "specialities"])
-        for split in training.prepare_splits(run, preprocess_function, batched=False)
-    ]
-    for split in (dataset_train, dataset_val, dataset_test):
-        split.set_format("torch")
+    def train(self):
+        text_column = self.text_column
+        run = training.start(self.dataset)
+        args, dataset = run.args, run.dataset
+        model_name = training.model_of(args)
 
-    training_args = training.training_arguments(run, "f1_weighted")
+        labels_list = dataset["train"].features["specialities"].feature.names
 
-    trainer = training.create_trainer(model, training_args, dataset_train, dataset_val, tokenizer, compute_metrics)
+        tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
+        model = AutoModelForSequenceClassification.from_pretrained(args.model_name, num_labels=len(labels_list), problem_type="multi_label_classification")
 
-    training.train(run, trainer)
+        def preprocess_function(e):
+            res = self.encode(e, tokenizer, args.max_position_embeddings, model_name)["inputs"]
+            res["labels"] = e["specialities_one_hot"]
+            return res
 
-    logging.info("***** Starting Evaluation *****")
+        dataset_train, dataset_val, dataset_test = [
+            split.remove_columns([text_column, "id", "specialities"])
+            for split in training.prepare_splits(run, preprocess_function, batched=False)
+        ]
+        for split in (dataset_train, dataset_val, dataset_test):
+            split.set_format("torch")
 
-    predictions, labels, _ = trainer.predict(dataset_test)
+        training_args = training.training_arguments(run, "f1_weighted")
 
-    predictions = toLogits(predictions, THRESHOLD_VALUE)
+        trainer = training.create_trainer(model, training_args, dataset_train, dataset_val, tokenizer, compute_metrics)
 
-    metrics = multi_label_metrics(predictions, labels, THRESHOLD_VALUE)
-    logging.info(metrics)
+        training.train(run, trainer)
 
-    cr = classification_report(labels, predictions, labels=range(len(labels_list)), target_names=labels_list, digits=4, zero_division=.0)
-    logging.info(cr)
+        logging.info("***** Starting Evaluation *****")
 
-    training.save_results(
-        run,
-        trainer,
-        metrics=classification_report(labels, predictions, zero_division=.0, output_dict=True),
-        identifiers=list(dataset["test"]["id"]),
-        real_labels=labels.tolist(),
-        system_predictions=predictions.tolist(),
-    )
+        predictions, labels, _ = trainer.predict(dataset_test)
+
+        predictions = toLogits(predictions, THRESHOLD_VALUE)
+
+        metrics = multi_label_metrics(predictions, labels, THRESHOLD_VALUE)
+        logging.info(metrics)
+
+        cr = classification_report(labels, predictions, labels=range(len(labels_list)), target_names=labels_list, digits=4, zero_division=.0)
+        logging.info(cr)
+
+        training.save_results(
+            run,
+            trainer,
+            metrics=scores(labels, predictions),
+            identifiers=list(dataset["test"]["id"]),
+            real_labels=labels.tolist(),
+            system_predictions=predictions.tolist(),
+        )

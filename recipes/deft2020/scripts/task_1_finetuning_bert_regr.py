@@ -13,5 +13,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from common import regression  # noqa: E402
 
+# What is specific to the task: the code that the recipes share does the rest
+TASK = regression.Task(dataset="DrBenchmark/DEFT2020", text_columns=("source", "cible"), label_column="moy")
+
 if __name__ == '__main__':
-    regression.main(dataset="DrBenchmark/DEFT2020", text_columns=("source", "cible"), label_column="moy")
+    TASK.train()

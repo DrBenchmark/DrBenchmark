@@ -28,5 +28,15 @@ def build_text(e, tokenizer):
     return ' '.join([t for t in e['clinical_case'].lower().split(" ") if t not in STOPWORDS])
 
 
+# What is specific to the task: the code that the recipes share does the rest
+TASK = sequence_classification.Task(
+    dataset="DrBenchmark/DiaMED",
+    build_text=build_text,
+    inputs={"clinical_case": "text"},
+    label_column="icd-10",
+    id_column="identifier",
+)
+
+
 if __name__ == '__main__':
-    sequence_classification.main(dataset="DrBenchmark/DiaMED", build_text=build_text, label_column="icd-10", id_column="identifier")
+    TASK.train()

@@ -13,5 +13,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from common import token_classification  # noqa: E402
 
+# What is specific to the task: the code that the recipes share does the rest
+TASK = token_classification.Task(dataset="DrBenchmark/CAS", metric_for_best_model="f1")
+
 if __name__ == '__main__':
-    token_classification.main(dataset="DrBenchmark/CAS", metric_for_best_model="f1")
+    TASK.train()

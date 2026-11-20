@@ -18,5 +18,9 @@ def build_text(e, tokenizer):
     return f"{' '.join(e['tokens'])}"
 
 
+# What is specific to the task: the code that the recipes share does the rest
+TASK = sequence_classification.Task(dataset="DrBenchmark/PxCorpus", build_text=build_text, inputs={"tokens": "words"})
+
+
 if __name__ == '__main__':
-    sequence_classification.main(dataset="DrBenchmark/PxCorpus", build_text=build_text)
+    TASK.train()

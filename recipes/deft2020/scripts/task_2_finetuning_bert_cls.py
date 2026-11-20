@@ -18,5 +18,14 @@ def build_text(e, tokenizer):
     return f"{tokenizer.cls_token} {e['source']} {tokenizer.sep_token} (1) {e['cible_1']} {tokenizer.sep_token} (2) {e['cible_2']} {tokenizer.sep_token} (3) {e['cible_3']} {tokenizer.eos_token}"
 
 
+# What is specific to the task: the code that the recipes share does the rest
+TASK = sequence_classification.Task(
+    dataset="DrBenchmark/DEFT2020",
+    build_text=build_text,
+    inputs={"source": "text", "cible_1": "text", "cible_2": "text", "cible_3": "text"},
+    label_column="correct_cible",
+)
+
+
 if __name__ == '__main__':
-    sequence_classification.main(dataset="DrBenchmark/DEFT2020", build_text=build_text, label_column="correct_cible")
+    TASK.train()

@@ -63,6 +63,23 @@ The arguments given after the model (and after the subset, for the launchers tha
 
 Each run writes its metrics, its hyper-parameters, its predictions on the test set and the versions that computed it (Python, the libraries and the commit of the repository) in `runs/DrBenchmark-<task name>-<hash>.json`, and saves its best model in `save_models/DrBenchmark-<task name>-<hash>_best_model/`. The hash is the one of the arguments of the run, among which its seed. With `--seed`, a run whose results exist is not computed again; without it, a seed that was not used yet is drawn.
 
+## The script of a task
+
+The Python script of a task only states what is specific to the task, in a line `TASK = ...`, and trains a model when it is started (`TASK.train()`). The rest is in [common/](./common/), which has one module for each kind of task: `token_classification`, `sequence_classification`, `multi_label_classification` and `regression`.
+
+```python
+def build_text(e, tokenizer):
+    return f"{' '.join(e['tokens'])}"
+
+
+TASK = sequence_classification.Task(dataset="DrBenchmark/CAS", build_text=build_text, inputs={"tokens": "words"})
+
+if __name__ == '__main__':
+    TASK.train()
+```
+
+What the model reads for an example is built by the task, in one place: `TASK.encode`. A script that builds its text itself, as the one above, also says which columns of an example it reads (`inputs`: a `"text"`, or the `"words"` of a sentence).
+
 ## Data
 
 Except for DEFT 2019, whose access is restricted (see [its README](./deft2019/)), the datasets are hosted on the [HuggingFace Hub](https://huggingface.co/DrBenchmark). The way they are loaded depends on the value of `offline` in `config.yaml` (see the [main README](../README.md)):

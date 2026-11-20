@@ -28,66 +28,102 @@ def compute_metrics(pred):
     }
 
 
-def main(dataset, build_text, label_column="label", id_column="id"):
-    """Fine-tune and evaluate a model on a multi-class classification task.
+def scores(references, predictions):
+    """The scores of a run, from the classes of the examples given by their numbers."""
+    return classification_report(references, predictions, zero_division=.0, output_dict=True)
+
+
+class Task(training.Task):
+    """A task that gives one class to an example.
 
     Args:
         dataset: name of the dataset on the HuggingFace Hub.
         build_text: function `(example, tokenizer) -> str` that returns the text given to the model.
+        inputs: the columns of an example that `build_text` reads: {column: "text" or "words"}.
         label_column: column with the class of the examples.
         id_column: column with the identifier of the examples.
     """
-    run = training.start(dataset)
-    args, dataset = run.args, run.dataset
 
-    labels_list = dataset["train"].features[label_column].names
+    kind = "classification"
+    model_class = AutoModelForSequenceClassification
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
-    model = AutoModelForSequenceClassification.from_pretrained(args.model_name, num_labels=len(labels_list))
+    def __init__(self, dataset, build_text, inputs, label_column="label", id_column="id"):
+        self.dataset = dataset
+        self.build_text = build_text
+        self.inputs = inputs
+        self.label_column = label_column
+        self.id_column = id_column
 
-    def preprocess_function(e):
+    def label_names(self, dataset):
+        """Names of the classes: the outputs of the model, in their order."""
+        return dataset["train"].features[self.label_column].names
 
-        text = build_text(e, tokenizer)
+    def target(self, example, labels, features):
+        """Number of the class of an example of the dataset: what the model learns."""
+        return example[self.label_column]
 
-        res = tokenizer(text, truncation=True, max_length=args.max_position_embeddings, padding="do_not_pad")
-        res["text"] = text
+    def encode(self, example, tokenizer, max_length, model_name=None):
+        text = self.build_text(example, tokenizer)
+        return {"inputs": dict(tokenizer(text, truncation=True, max_length=max_length, padding="do_not_pad")), "text": text}
 
-        res["label"] = e[label_column]
+    def results(self, references, predictions, labels):
+        """What a run writes, from the classes of the test set given by their numbers: its scores, the references and the predictions."""
+        logging.info(classification_report(
+            references,
+            predictions,
+            digits=4,
+            labels=range(len(labels)),
+            target_names=labels,
+            zero_division=.0
+        ))
+        return scores(references, predictions), references.tolist(), predictions.tolist()
 
-        return res
+    def train(self):
+        run = training.start(self.dataset)
+        args, dataset = run.args, run.dataset
+        features = dataset["train"].features
+        model_name = training.model_of(args)
 
-    dataset_train, dataset_val, dataset_test = [
-        split.remove_columns(["text"])
-        for split in training.prepare_splits(run, preprocess_function, batched=False)
-    ]
-    for split in (dataset_train, dataset_val, dataset_test):
-        split.set_format("torch")
+        labels_list = self.label_names(dataset)
 
-    training_args = training.training_arguments(run, "accuracy")
+        tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
+        model = AutoModelForSequenceClassification.from_pretrained(args.model_name, num_labels=len(labels_list))
 
-    trainer = training.create_trainer(model, training_args, dataset_train, dataset_val, tokenizer, compute_metrics)
+        def preprocess_function(e):
 
-    training.train(run, trainer)
+            encoded = self.encode(e, tokenizer, args.max_position_embeddings, model_name)
 
-    logging.info("***** Starting Evaluation *****")
-    predictions, labels, _ = trainer.predict(dataset_test)
-    predictions = np.argmax(predictions, axis=1)
+            res = encoded["inputs"]
+            res["text"] = encoded["text"]
 
-    cr_metrics = classification_report(
-        labels,
-        predictions,
-        digits=4,
-        labels=range(len(labels_list)),
-        target_names=labels_list,
-        zero_division=.0
-    )
-    logging.info(cr_metrics)
+            res["label"] = self.target(e, labels_list, features)
 
-    training.save_results(
-        run,
-        trainer,
-        metrics=classification_report(labels, predictions, zero_division=.0, output_dict=True),
-        identifiers=list(dataset["test"][id_column]),
-        real_labels=labels.tolist(),
-        system_predictions=predictions.tolist(),
-    )
+            return res
+
+        dataset_train, dataset_val, dataset_test = [
+            split.remove_columns(["text"])
+            for split in training.prepare_splits(run, preprocess_function, batched=False)
+        ]
+        for split in (dataset_train, dataset_val, dataset_test):
+            split.set_format("torch")
+
+        training_args = training.training_arguments(run, "accuracy")
+
+        trainer = training.create_trainer(model, training_args, dataset_train, dataset_val, tokenizer, compute_metrics)
+
+        training.train(run, trainer)
+
+        logging.info("***** Starting Evaluation *****")
+        predictions, labels, _ = trainer.predict(dataset_test)
+        predictions = np.argmax(predictions, axis=1)
+
+        metrics, real_labels, system_predictions = self.results(labels, predictions, labels_list)
+
+        training.save_results(
+            run,
+            trainer,
+            metrics=metrics,
+            identifiers=list(dataset["test"][self.id_column]),
+            real_labels=real_labels,
+            system_predictions=system_predictions,
+        )

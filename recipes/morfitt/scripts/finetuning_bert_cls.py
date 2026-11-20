@@ -13,5 +13,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from common import multi_label_classification  # noqa: E402
 
+# What is specific to the task: the code that the recipes share does the rest
+TASK = multi_label_classification.Task(dataset="DrBenchmark/MORFITT", text_column="abstract")
+
 if __name__ == '__main__':
-    multi_label_classification.main(dataset="DrBenchmark/MORFITT", text_column="abstract")
+    TASK.train()

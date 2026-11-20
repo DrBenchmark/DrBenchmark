@@ -6,6 +6,8 @@ style of the real ones (IOB2 tags, `B_scope_neg`, ICD-10 chapters, ...), but mos
 sets are shortened.
 """
 
+import functools
+
 from datasets import ClassLabel, Dataset, DatasetDict, Features, Sequence, Value
 
 WORDS = (
@@ -226,6 +228,12 @@ def build_all():
             ),
         },
     }
+
+
+@functools.lru_cache(maxsize=None)
+def dataset_of(recipe, subset):
+    """The dataset that a recipe reads for a subset: `None`, also as a text, for a dataset that has a single configuration."""
+    return build_all()[recipe][None if subset in (None, "None") else subset]
 
 
 def save_all(root):

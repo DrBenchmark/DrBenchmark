@@ -31,6 +31,38 @@ transformers_version = parse_version(transformers_version)
 LIBRARIES = ("torch", "transformers", "tokenizers", "datasets", "accelerate", "evaluate", "numpy", "scipy", "scikit-learn", "seqeval")
 
 
+class Task:
+    """A task of the benchmark, as the script of its recipe defines it.
+
+    The script creates a task with what is specific to it, and trains a model for it:
+    `TASK.train()`. What the model reads for an example is built by the task, in one place:
+    `encode`.
+    """
+
+    #: Name of the kind of task
+    kind = None
+    #: Class of `transformers` that loads a model of the task
+    model_class = None
+    #: The columns of an example that the model reads, in their order: {column: "text" or "words"}
+    inputs = {}
+
+    def train(self):
+        """Fine-tune a model, evaluate it on the test set and write the results of the run."""
+        raise NotImplementedError
+
+    def encode(self, example, tokenizer, max_length, model_name):
+        """What is given to the model for an example: its arguments are in `inputs`.
+
+        `model_name` is the name of the model that is fine-tuned, as `model_of` gives it.
+        """
+        raise NotImplementedError
+
+
+def model_of(args):
+    """Name of the model that a run fine-tunes: the one of the HuggingFace Hub when it is known, or else its path."""
+    return args.hub_model_name or args.model_name
+
+
 @dataclasses.dataclass
 class Run:
     """What a script needs to know about the run it is doing."""

@@ -8,113 +8,89 @@ import logging
 import sys
 from pathlib import Path
 
-from transformers import pipeline
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-
 # The code shared by the recipes is in `recipes/common/`: its parent is added to the search path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from common import training  # noqa: E402
-from common.sequence_classification import compute_metrics  # noqa: E402
+from common import sequence_classification  # noqa: E402
+
+LETTERS = ["a", "b", "c", "d", "e"]
+
+# A question and its five answers
+INPUTS = {"question": "text", **{f"answer_{letter}": "text" for letter in LETTERS}}
+
+# The classes of the model: every set of right answers
+LABELS = ["c", "a", "e", "d", "b", "be", "ae", "bc", "bd", "ab", "de", "cd", "ac", "ad", "ce", "bce", "abc", "cde", "bcd", "ace", "ade", "abe", "acd", "bde", "abd", "abde", "abcd", "bcde", "abce", "acde", "abcde"]
 
 
-def main():
+def build_text(e, tokenizer):
+    concatenated_choices = f" {tokenizer.sep_token} ".join([e[f"answer_{letter}"] for letter in LETTERS])
+    return f"{tokenizer.cls_token} {e['question']} {tokenizer.sep_token} {concatenated_choices} {tokenizer.eos_token}"
 
-    run = training.start("DrBenchmark/FrenchMedMCQA")
-    args, dataset = run.args, run.dataset
 
-    labels_list = ["c", "a", "e", "d", "b", "be", "ae", "bc", "bd", "ab", "de", "cd", "ac", "ad", "ce", "bce", "abc", "cde", "bcd", "ace", "ade", "abe", "acd", "bde", "abd", "abde", "abcd", "bcde", "abce", "acde", "abcde"]
-    original_labels_list = dataset["train"].features["correct_answers"].feature.names
+def compute_accuracy_exact_match(preds, refs):
+    exact_score = []
+    for p, r in zip(preds, refs):
+        exact_score.append(sorted(p) == sorted(r))
+    return sum(exact_score) / len(exact_score)
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
-    model = AutoModelForSequenceClassification.from_pretrained(args.model_name, num_labels=len(labels_list))
 
-    def preprocess_function(e):
+def compute_accuracy_hamming(preds, refs):
+    corrects = [True for p in preds if p in refs]
+    corrects = sum(corrects)
+    total_refs = len(list(set(preds + refs)))
+    return corrects / total_refs
 
-        concatenated_choices = f" {tokenizer.sep_token} ".join([e[f"answer_{letter}"] for letter in ["a", "b", "c", "d", "e"]])
-        text = f"{tokenizer.cls_token} {e['question']} {tokenizer.sep_token} {concatenated_choices} {tokenizer.eos_token}"
 
-        res = tokenizer(text, truncation=True, max_length=args.max_position_embeddings, padding="do_not_pad")
-        res["text"] = text
+class MultipleChoiceTask(sequence_classification.Task):
+    """A question with several right answers among five: the model chooses among the sets of answers.
 
-        labels_letters = [original_labels_list[label] for label in e["correct_answers"]]  # Get from the answers indexes to the original letters
-        labels_letters = "".join(sorted(labels_letters))  # Transform the multi-label answers into a multi-class problem
-        labels_letters = labels_list.index(labels_letters)  # Get the corresponding index of the class
-        res["label"] = labels_letters
+    A prediction is the letters of the answers that the model takes for right, e.g. `ab`.
+    """
 
-        return res
+    kind = "multiple-choice question answering"
+    labels = LABELS
 
-    dataset_train, dataset_val, dataset_test = training.prepare_splits(run, preprocess_function, batched=False)
-    dataset_train = dataset_train.remove_columns(["text"])
-    dataset_train.set_format("torch")
-    dataset_val = dataset_val.remove_columns(["text"])
-    dataset_val.set_format("torch")
-    # The text of the test examples is kept: it is given to the pipeline below
+    def label_names(self, dataset):
+        return self.labels
 
-    training_args = training.training_arguments(run, "accuracy")
+    def reference(self, example, labels, features):
+        # Get from the answers indexes to the original letters
+        names = features[self.label_column].feature.names
+        # Transform the multi-label answers into a multi-class problem
+        return "".join(sorted(names[answer] for answer in example[self.label_column]))
 
-    trainer = training.create_trainer(model, training_args, dataset_train, dataset_val, tokenizer, compute_metrics)
+    def target(self, example, labels, features):
+        # Get the corresponding index of the class
+        return labels.index(self.reference(example, labels, features))
 
-    training.train(run, trainer)
+    def metrics(self, references, predictions, labels, identifiers=None):
+        hamming_scores = [
+            compute_accuracy_hamming(sorted(list(prediction)), sorted(list(reference)))
+            for reference, prediction in zip(references, predictions)
+        ]
 
-    logging.info("***** Starting Evaluation *****")
-    pipe = pipeline(task="text-classification", model=run.model_path + "_best_model", top_k=None, device=training_args.device)
+        logging.info(">> Hamming Score")
+        hamming_score = sum(hamming_scores) / len(hamming_scores)
+        logging.info(hamming_score)
 
-    def compute_accuracy_exact_match(preds, refs):
-        exact_score = []
-        for p, r in zip(preds, refs):
-            exact_score.append(sorted(p) == sorted(r))
-        return sum(exact_score) / len(exact_score)
+        logging.info(">> Exact Match Ratio (EMR)")
+        exact_match = compute_accuracy_exact_match(references, predictions)
+        logging.info(exact_match)
 
-    def compute_accuracy_hamming(preds, refs):
-        corrects = [True for p in preds if p in refs]
-        corrects = sum(corrects)
-        total_refs = len(list(set(preds + refs)))
-        return corrects / total_refs
-
-    y_pred = []
-    y_true = []
-
-    hamming_scores = []
-
-    for e in dataset_test:
-
-        res = pipe(e["text"], truncation=True, max_length=model.config.max_position_embeddings)
-
-        pred = int(res[0][0]["label"].split("_")[-1])
-        pred = labels_list[pred]
-        y_pred.append(pred)
-        splitted_pred = sorted(list(pred))
-
-        # Reference
-        true_label = labels_list[e["label"]]
-        y_true.append(true_label)
-        splitted_true_label = sorted(list(true_label))
-
-        # Compute hamming score
-        score = compute_accuracy_hamming(splitted_pred, splitted_true_label)
-        hamming_scores.append(score)
-
-    logging.info(">> Hamming Score")
-    hamming_score = sum(hamming_scores) / len(hamming_scores)
-    logging.info(hamming_score)
-
-    logging.info(">> Exact Match Ratio (EMR)")
-    exact_match = compute_accuracy_exact_match(y_true, y_pred)
-    logging.info(exact_match)
-
-    training.save_results(
-        run,
-        trainer,
-        metrics={
+        return {
             "hamming_score": float(hamming_score),
             "exact_match": float(exact_match),
-        },
-        identifiers=list(dataset["test"]["id"]),
-        real_labels=y_true,
-        system_predictions=y_pred,
-    )
+        }
+
+    def results(self, references, predictions, labels):
+        y_true = [labels[index] for index in references]
+        y_pred = [labels[index] for index in predictions]
+        return self.metrics(y_true, y_pred, labels), y_true, y_pred
+
+
+# What is specific to the task: the code that the recipes share does the rest
+TASK = MultipleChoiceTask(dataset="DrBenchmark/FrenchMedMCQA", build_text=build_text, inputs=INPUTS, label_column="correct_answers")
 
 
 if __name__ == '__main__':
-    main()
+    TASK.train()
