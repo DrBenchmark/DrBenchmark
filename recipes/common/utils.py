@@ -22,12 +22,17 @@ subset2task_detail = {
 }
 
 
+# Arguments that do not take part in the name of a run: they describe it, without changing what it computes
+NOT_IN_RUN_NAME = ("hub_model_name",)
+
+
 def create_run_name(args):
     if isinstance(args, argparse.Namespace):
         args = args.__dict__
     # Creating the hash using the parameters (including the seed, dataset, model, ...)
+    hashed = {name: value for name, value in args.items() if name not in NOT_IN_RUN_NAME}
     hash_ = hashlib.shake_128(
-        json.dumps(args, sort_keys=True, ensure_ascii=True).encode()
+        json.dumps(hashed, sort_keys=True, ensure_ascii=True).encode()
     ).hexdigest(8)
     output_name = f'DrBenchmark-{args["task"]}-{hash_}'
     return output_name
@@ -196,6 +201,8 @@ def parse_args():
 
     # Resolve path to model, it can be either hub, full path, rel path
     m = args["model_name"]
+    # Name of the model on the HuggingFace Hub, when it is not given by a path
+    hub_model_name = None
     # If path exists, no problem
     if not os.path.exists(m):
         # If path not exist, it's either a model from the hub model or a
@@ -208,11 +215,15 @@ def parse_args():
             m = fixed_path
         else:
             # Still do not exist, it must me a model from the hub
+            hub_model_name = m
             if args['offline']:
                 # If online
                 model_name_clean = m.lower().replace('/', '_')
                 m = os.path.join('..', '..', '..', 'models', model_name_clean)
     args['model_name'] = m
+    # Written in the results of the run, for the tools to know which model it is: in offline
+    # mode, `model_name` is the directory of its local copy, whose name is in lower case
+    args['hub_model_name'] = hub_model_name
 
     if args['subset'] in subset2task_detail:
         args['task'] += '_' + subset2task_detail[args['subset']]

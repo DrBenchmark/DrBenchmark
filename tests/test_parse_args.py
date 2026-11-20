@@ -134,6 +134,40 @@ def test_hub_model_in_offline_mode(parse):
     assert os.environ["HF_HUB_OFFLINE"] == "1"
 
 
+def test_name_of_the_model_on_the_hub_is_kept(parse):
+    """In offline mode, `model_name` is the local copy of the model, in lower case: its name is kept apart."""
+    offline = parse("cas-pos", "--offline", "True")
+    assert offline.model_name != MODEL
+    assert offline.hub_model_name == MODEL
+
+    online = parse("cas-pos", "--offline", "False")
+    assert (online.model_name, online.hub_model_name) == (MODEL, MODEL)
+
+
+def test_model_given_by_a_path_has_no_name_on_the_hub(parse, tmp_path):
+    assert parse("cas-pos", model=str(tmp_path)).hub_model_name is None
+    # A path relative to the root of the repository
+    assert parse("cas-pos", model="assets").hub_model_name is None
+    # The local copy of a model, given by its path
+    (tmp_path / "dr-bert_drbert-7gb").mkdir()
+    assert parse("cas-pos", model="dr-bert_drbert-7gb", cwd=tmp_path).hub_model_name is None
+
+
+def test_name_of_the_model_on_the_hub_is_not_part_of_the_name_of_the_run(parse, utils):
+    """The names of the runs must not change: the model is already named by `model_name`."""
+    args = parse("cas-pos", "--seed", "1")
+    name = utils.create_run_name(args)
+    assert "hub_model_name" in vars(args)
+
+    args.hub_model_name = "another/name"
+    assert utils.create_run_name(args) == name
+    del args.hub_model_name
+    assert utils.create_run_name(args) == name
+    # The other arguments are part of it
+    args.model_name = "another/name"
+    assert utils.create_run_name(args) != name
+
+
 @pytest.mark.parametrize("task", ALL_TASKS, ids=task_ids)
 def test_arguments_do_not_depend_on_the_starting_directory(task, parse, starting_directories):
     """The name of a run is built from its arguments: they are the same wherever the script is started from."""

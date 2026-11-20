@@ -5,6 +5,9 @@ The runs are read in `recipes/<recipe>/runs/`. The scores are written in
 
 The runs of a task are averaged for each model: they have to be trained in the same
 way. When they are not, nothing is written and the runs that differ are listed.
+
+A model is named as on the HuggingFace Hub when this name is known: it is written in
+the recent runs, and looked for in `models.txt` for the other ones.
 """
 
 import os
@@ -12,9 +15,9 @@ import sys
 import json
 import argparse
 from glob import glob
-from collections import defaultdict
+from collections import Counter, defaultdict
 
-from paths import RECIPES_DIR, REPO_DIR, STATS_DIR
+from paths import MODELS_FILE, RECIPES_DIR, REPO_DIR, STATS_DIR
 
 try:
     from tqdm import tqdm
@@ -26,15 +29,72 @@ except ModuleNotFoundError:
 # distinguishes them, and the others say where the files are, or name the model and the task
 # (the runs are averaged by model, task and proportion of the training set).
 NOT_COMPARED = {
-    "seed", "config", "model_name", "output_dir", "run_dir", "data_dir", "offline",
+    "seed", "config", "model_name", "hub_model_name", "output_dir", "run_dir", "data_dir", "offline",
     "task", "subset", "dataset", "fewshot",
 }
+# Where the models are saved for the offline mode, as the scripts of the recipes write it
+LOCAL_MODELS = '../../../models/'
 EFFECTIVE_BATCH_SIZE = "effective_batch_size"
 UPDATES_PER_EPOCH = "updates_per_epoch"
 DESCRIPTIONS = {
     EFFECTIVE_BATCH_SIZE: "batch_size x gradient_accumulation_steps",
     UPDATES_PER_EPOCH: "measured: updates of the weights during the training / epochs",
 }
+
+
+def local_copy(hub_name):
+    """Name of the directory where `download_models_locally.py` saves a model of the HuggingFace Hub."""
+    return hub_name.lower().replace('/', '_')
+
+
+def names_on_the_hub(all_hyperparameters):
+    """{directory of the local copy of a model: name of the model on the HuggingFace Hub}
+
+    The names are the ones of `models.txt`, then the ones that are written in the runs. When
+    a model is written in several ways, with other upper case letters, the most frequent wins.
+    """
+    try:
+        with open(MODELS_FILE) as f:
+            names = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+    except FileNotFoundError:
+        names = []
+    written = Counter(
+        hyperparameters["hub_model_name"] for hyperparameters in all_hyperparameters if hyperparameters.get("hub_model_name")
+    )
+    names += sorted(written, key=lambda name: (-written[name], name))
+
+    hub_names = {}
+    for name in names:
+        hub_names.setdefault(local_copy(name), name)
+    return hub_names
+
+
+def name_of_model(hyperparameters, hub_names):
+    """Name under which the runs of a model are gathered: its name on the HuggingFace Hub, when it is known.
+
+    In offline mode, `model_name` is the local copy of the model, whose name is in lower
+    case: `../../../models/dr-bert_drbert-7gb`. The recent runs also have the name of the
+    model. For the other ones, it is looked for in `hub_names`; when it is not there, it is
+    rebuilt from the name of the directory.
+    """
+    name = hyperparameters.get("hub_model_name") or hyperparameters["model_name"]
+    if name.startswith(LOCAL_MODELS):
+        # dr-bert_drbert-7gb -> dr-bert/drbert-7gb
+        name = '/'.join(name[len(LOCAL_MODELS):].split('_', 1))
+    return hub_names.get(local_copy(name), name)
+
+
+def scores_of(task, metrics):
+    """Scores of a run that are kept for its kind of task: {name in the results: score}."""
+    if "ner" in task or "pos" in task:
+        return {"overall_f1": metrics["overall_f1"], "overall_accuracy": metrics["overall_accuracy"]}
+    if "cls" in task:
+        return {"macro_f1": metrics["macro avg"]["f1-score"], "weighted_f1": metrics["weighted avg"]["f1-score"]}
+    if "mcqa" in task:
+        return {"hamming_score": metrics["hamming_score"], "exact_match": metrics["exact_match"]}
+    if "regr" in task:
+        return {"edrm": metrics["EDRM"], "spearman_correlation_coef": metrics["spearman_correlation_coef"]}
+    return {}
 
 
 def normalise(value):
@@ -147,37 +207,27 @@ if __name__ == '__main__':
 
     file_paths = glob(os.path.join(path, '*', 'runs', '*.json'))
     print("Reading run results...")
+    # What is kept of each run: (path, hyper-parameters, scores, configuration)
+    read = []
     for file_path in tqdm(file_paths):
 
         with open(file_path) as f_json:
             data = json.load(f_json)
 
-        corpus, task = data['hyperparameters']['task'].split('-')
+        hyperparameters = data['hyperparameters']
+        scores = scores_of(hyperparameters['task'].split('-')[1], data["metrics"])
+        read.append((file_path, hyperparameters, scores, configuration(data)))
 
-        model_name = data["hyperparameters"]["model_name"]
-        if model_name.startswith('../../../models/'):
-            model_name = model_name.replace('../../../models/', '')
-            model_name = '/'.join(model_name.split('_', 1))
-
-        fewshot = data["hyperparameters"]["fewshot"]
+    # The name of a model may be written in other runs than the one that is read
+    hub_names = names_on_the_hub(hyperparameters for _, hyperparameters, _, _ in read)
+    for file_path, hyperparameters, scores, config in read:
+        corpus, task = hyperparameters['task'].split('-')
+        model_name = name_of_model(hyperparameters, hub_names)
+        fewshot = hyperparameters["fewshot"]
         key = f"{corpus}|{task}|{fewshot}"
-        runs[model_name, corpus, task, fewshot].append((file_path, configuration(data)))
-
-        if "ner" in task or "pos" in task:
-            results[model_name][key]["overall_f1"].append(data["metrics"]["overall_f1"])
-            results[model_name][key]["overall_accuracy"].append(data["metrics"]["overall_accuracy"])
-
-        elif "cls" in task:
-            results[model_name][key]["macro_f1"].append(data["metrics"]["macro avg"]["f1-score"])
-            results[model_name][key]["weighted_f1"].append(data["metrics"]["weighted avg"]["f1-score"])
-
-        elif "mcqa" in task:
-            results[model_name][key]["hamming_score"].append(data["metrics"]["hamming_score"])
-            results[model_name][key]["exact_match"].append(data["metrics"]["exact_match"])
-
-        elif "regr" in task:
-            results[model_name][key]["edrm"].append(data["metrics"]["EDRM"])
-            results[model_name][key]["spearman_correlation_coef"].append(data["metrics"]["spearman_correlation_coef"])
+        runs[model_name, corpus, task, fewshot].append((file_path, config))
+        for metric, score in scores.items():
+            results[model_name][key][metric].append(score)
 
     # The scores of runs trained in different ways must not be averaged
     problems = {}

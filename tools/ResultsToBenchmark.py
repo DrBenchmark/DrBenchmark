@@ -98,18 +98,6 @@ order = [
     ('essai', 'ner_spec', 'overall_f1')
 ]
 
-custom_model_map = {
-    "../../../models/almanach_camembert-bio-base": "almanach/camembert-bio-base",
-    "../../../models/dr-bert_drbert-7gb": "Dr-BERT/DrBERT-7GB",
-    "../../../models/dr-bert_drbert-7gb-large": "Dr-BERT/DrBERT-7GB-Large",
-    "../../../models/flaubert_flaubert_base_cased": "flaubert/flaubert_base_cased",
-    "../../../models/flaubert_flaubert_large_cased": "flaubert/flaubert_large_cased",
-    "../../../models/answerdotai_modernbert-base": "answerdotai/modernbert-base",
-    "../../../models/answerdotai_modernbert-large": "answerdotai/modernbert-large",
-    "../../../models/thomas-sounack_bioclinical-modernbert-base": "thomas-sounack/bioclinical-modernbert-base",
-    "../../../models/thomas-sounack_bioclinical-modernbert-large": "thomas-sounack/bioclinical-modernbert-large",
-}
-
 
 if __name__ == '__main__':
     import logging
@@ -150,7 +138,6 @@ if __name__ == '__main__':
     df.loc[(df['dataset'] == "deft2021") & (df['task'] == "cls"), 'task'] = 'mcls'
     df.loc[(df['dataset'] == "morfitt") & (df['task'] == "cls"), 'task'] = 'mcls'
 
-    df['model'] = df['model'].map(lambda x: custom_model_map.get(x, x))
     logging.info(f"Filtering out experiments with less than {args.nb_run} runs...")
     nb_runs = df.groupby(['model', 'dataset', 'task', 'fewshot', 'metric'])['score'].transform(len)
     tmp = df.assign(n=nb_runs)[nb_runs < args.nb_run][['model', 'dataset', 'task', 'n']].drop_duplicates()

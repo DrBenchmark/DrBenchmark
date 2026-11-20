@@ -279,6 +279,57 @@ def test_runs_of_different_versions_of_the_scripts_are_compared(runs):
     assert "    learning_rate\n        2e-05: 2 run(s)\n" in completed.stderr
 
 
+def test_runs_of_a_model_are_gathered_under_its_name_on_the_hub(runs):
+    """Online or offline, old or recent: the runs of a model are the runs of one model."""
+    local_copy, name = "../../../models/dr-bert_drbert-7gb", "Dr-BERT/DrBERT-7GB"
+    runs.write_run("recent_offline", scores=(0.1, 0.1), model_name=local_copy, hub_model_name=name)
+    runs.write_run("recent_online", scores=(0.2, 0.2), model_name=name, hub_model_name=name)
+    # The runs older than `hub_model_name`: the name is the one of the recent runs
+    runs.write_run("old_offline", scores=(0.3, 0.3), model_name=local_copy)
+    runs.write_run("old_online", scores=(0.4, 0.4), model_name=name)
+    # The same model, named with other upper case letters
+    runs.write_run("other_case", scores=(0.5, 0.5), model_name="dr-bert/DrBERT-7GB", hub_model_name="dr-bert/DrBERT-7GB")
+
+    completed = runs.compute_metrics()
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    results = runs.results()
+    assert list(results) == [name]
+    assert sorted(results[name]["morfitt|cls|1.0"]["macro_f1"]) == [0.1, 0.2, 0.3, 0.4, 0.5]
+    assert list(read_json(runs.stats / "overall_averaged_metrics.json")) == [name]
+
+
+def test_name_of_an_old_run_is_looked_for_in_the_models_file(runs):
+    """An old offline run only has the directory of its model, in lower case."""
+    (runs.repository / "models.txt").write_text("# Models to evaluate\nFacebookAI/xlm-roberta-base\n\nflaubert/flaubert_base_uncased")
+    runs.write_run("in_the_file", model_name="../../../models/facebookai_xlm-roberta-base")
+    runs.write_run("underscores_in_the_name", model_name="../../../models/flaubert_flaubert_base_uncased")
+    # Unknown: the name is rebuilt from the directory, in lower case
+    runs.write_run("not_in_the_file", model_name="../../../models/dr-bert_drbert-7gb")
+    # A model given by a path is named by its path
+    runs.write_run("path", model_name="/somewhere/my_model", hub_model_name=None)
+    runs.write_run("other_relative_path", model_name="../../../assets/my_model", hub_model_name=None)
+
+    completed = runs.compute_metrics()
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    assert set(runs.results()) == {
+        "FacebookAI/xlm-roberta-base", "flaubert/flaubert_base_uncased", "dr-bert/drbert-7gb",
+        "/somewhere/my_model", "../../../assets/my_model",
+    }
+
+
+def test_runs_gathered_under_the_name_of_a_model_are_compared(runs):
+    """Online and offline runs are averaged together: they have to be trained in the same way."""
+    name = "Dr-BERT/DrBERT-7GB"
+    runs.write_run("offline", epochs=10, model_name="../../../models/dr-bert_drbert-7gb", hub_model_name=name)
+    runs.write_run("online", epochs=3, model_name=name, hub_model_name=name)
+
+    completed = runs.compute_metrics()
+    assert completed.returncode == 1
+    assert "Dr-BERT/DrBERT-7GB | morfitt-cls | 1.0 of the training set\n    epochs\n" in completed.stderr
+    # The name of the model is not a difference between the runs
+    assert "model_name" not in completed.stderr
+
+
 def test_only_the_runs_that_are_averaged_together_are_compared(runs):
     runs.write_run("reference", epochs=10)
     runs.write_run("another_model", epochs=3, model_name="../../../models/another_model")

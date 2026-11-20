@@ -55,14 +55,6 @@ echo "index: $CURRENT, value: $COMMAND"
 eval "$COMMAND"
 """
 
-custom_model_map = {
-    "../../../models/almanach_camembert-bio-base": "almanach/camembert-bio-base",
-    "../../../models/dr-bert_drbert-7gb": "Dr-BERT/DrBERT-7GB",
-    "../../../models/dr-bert_drbert-7gb-large": "Dr-BERT/DrBERT-7GB-Large",
-    "../../../models/flaubert_flaubert_base_cased": "flaubert/flaubert_base_cased",
-    "../../../models/flaubert_flaubert_large_cased": "flaubert/flaubert_large_cased"
-}
-
 
 if __name__ == '__main__':
     import argparse
@@ -91,8 +83,6 @@ if __name__ == '__main__':
             for score in scores],
         columns='model dataset task fewshot metric score'.split()
     )
-
-    df['model'] = df['model'].map(lambda x: custom_model_map.get(x, x))
 
     # Only keep 4 runs and compute score's mean
     nb_runs = df.groupby(['model', 'dataset', 'task', 'fewshot', 'metric'])['score'].apply(len)
