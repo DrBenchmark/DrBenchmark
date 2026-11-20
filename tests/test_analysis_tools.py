@@ -144,7 +144,7 @@ def test_missing_model_in_offline_mode(repository, elsewhere):
     assert completed.returncode == 1
     assert "Traceback" not in completed.stderr
     assert f"its copy is not in {repository / 'models' / 'some-org_some-model'}, where it is read with --offline." in completed.stderr
-    assert f"`python {repository / 'download_models_locally.py'}`" in completed.stderr
+    assert f"Save it with `python {repository / 'download_models_locally.py'} --models Some-Org/Some-Model`" in completed.stderr
 
 
 @pytest.mark.e2e

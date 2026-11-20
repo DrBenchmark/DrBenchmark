@@ -56,6 +56,48 @@ def test_models_to_download_are_the_ones_of_the_models_file(monkeypatch, tmp_pat
     assert module.models_to_download() == MODELS_OF_THE_FILE
 
 
+@pytest.fixture
+def download_models(monkeypatch, tmp_path):
+    """Run `download_models_locally.py` with arguments, in a repository that has a `models.txt`: the models it saves."""
+    module = load_module("download_models_locally", REPO / "download_models_locally.py")
+    (tmp_path / "models.txt").write_text(MODELS_FILE)
+    monkeypatch.setattr(module, "REPO_DIR", str(tmp_path))
+    saved = []
+    monkeypatch.setattr(module, "save_locally", saved.append)
+
+    def download(*arguments):
+        saved.clear()
+        monkeypatch.setattr(sys, "argv", ["download_models_locally.py", *arguments])
+        module.main()
+        return list(saved)
+
+    return download
+
+
+def test_models_of_the_models_file_are_saved_by_default(download_models):
+    assert download_models() == MODELS_OF_THE_FILE
+
+
+def test_models_given_on_the_command_line_are_saved(download_models):
+    """`--models`: other models than the ones of `models.txt`, as for `run.py`."""
+    assert download_models("--models", "Dr-BERT/DrBERT-7GB") == ["Dr-BERT/DrBERT-7GB"]
+    assert download_models("--models", "another/model", "first/model") == ["another/model", "first/model"]
+
+
+def test_models_are_needed(download_models, tmp_path, capsys):
+    """Without `models.txt`, the script says how to give the models instead of failing on the file."""
+    (tmp_path / "models.txt").unlink()
+    with pytest.raises(SystemExit) as stopped:
+        download_models()
+    assert stopped.value.code == f"`models.txt` is not in {tmp_path}: give the models to save with --models."
+    # The file is not needed when the models are given
+    assert download_models("--models", "another/model") == ["another/model"]
+
+    with pytest.raises(SystemExit) as stopped:
+        download_models("--models")
+    assert stopped.value.code == 2 and "argument --models: expected at least one argument" in capsys.readouterr().err
+
+
 def test_model_is_saved_where_the_recipes_read_it(utils, monkeypatch, tmp_path):
     module = load_module("download_models_locally", REPO / "download_models_locally.py")
     saved = Saved()

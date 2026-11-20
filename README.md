@@ -28,7 +28,7 @@ python run.py --tasks all --nb-run 4
 
 **Note**: The access to **DEFT-2019** data is restricted. Once data is acquired, add files to `./recipes/deft2019/data/` (see [its README](./recipes/deft2019/README.md) for the expected layout).
 
-**Note**: `offline` is set to `True` by default in `./config.yaml`: the datasets and the models are read from local copies, which have to be built first with `python ./download_datasets_locally.py` and `python ./download_models_locally.py`. This is the mode to use on an **offline machine / cluster**. To download the datasets and the models directly from the HuggingFace Hub instead, set `offline` to `False` in `./config.yaml`, or give `--offline false` to `run.py`.
+**Note**: `offline` is set to `True` by default in `./config.yaml`: the datasets and the models are read from local copies, which have to be built first with `python ./download_datasets_locally.py` and `python ./download_models_locally.py`. The second one saves the models of `models.txt`, or the ones given with `--models`, e.g. `python ./download_models_locally.py --models Dr-BERT/DrBERT-7GB`. This is the mode to use on an **offline machine / cluster**. To download the datasets and the models directly from the HuggingFace Hub instead, set `offline` to `False` in `./config.yaml`, or give `--offline false` to `run.py`.
 
 **Note**: `requirements.txt` bounds each dependency below the next major release after the one the tests were run with, and the tests are also run with the lowest versions it allows. To install exactly the versions of a tested environment, which are listed in `constraints.txt`, use `pip install -r requirements.txt -c constraints.txt` (Python >= 3.12 is needed).
 

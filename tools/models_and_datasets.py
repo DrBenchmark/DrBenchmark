@@ -28,7 +28,7 @@ def local_model(name, offline):
         if not os.path.isdir(path):
             sys.exit(
                 f"The model {name} is not a directory, and its copy is not in {path}, where it is read with --offline.\n"
-                f"Save the models of models.txt with `python {os.path.join(REPO_DIR, 'download_models_locally.py')}`, "
+                f"Save it with `python {os.path.join(REPO_DIR, 'download_models_locally.py')} --models {name}`, "
                 f"{HUB}, or do not give --offline."
             )
         return path

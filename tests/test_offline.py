@@ -12,7 +12,8 @@ import pytest
 from helpers import REPO, Task, run_command
 
 DATASETS_SCRIPT = f"`python {REPO / 'download_datasets_locally.py'}`"
-MODELS_SCRIPT = f"`python {REPO / 'download_models_locally.py'}`"
+# The command that saves the model of the run
+MODELS_SCRIPT = f"`python {REPO / 'download_models_locally.py'} --models Some-Org/Some-Model`"
 HUB = "on a machine that has access to the HuggingFace Hub"
 
 
@@ -71,7 +72,7 @@ def test_missing_model(training, arguments, saved_dataset, tmp_path):
     assert message_of(training, arguments()) == (
         f"The model Some-Org/Some-Model is not a directory, and its copy is not in {tmp_path}/models/some-org_some-model, "
         "where it is read in offline mode.\n"
-        f"Save the models of models.txt with {MODELS_SCRIPT}, {HUB}.\n"
+        f"Save it with {MODELS_SCRIPT}, {HUB}.\n"
         "\n"
         "To read the model from the HuggingFace Hub instead, give `--offline false` "
         f"or set `offline: False` in {REPO / 'config.yaml'}."

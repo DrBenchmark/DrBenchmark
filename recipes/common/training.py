@@ -212,7 +212,7 @@ def check_local_copies(args, needs_data_dir=False):
         missing.append(
             f"The model {args.hub_model_name} is not a directory, and its copy is not in {os.path.abspath(args.model_name)}, "
             "where it is read in offline mode.\n"
-            f"Save the models of models.txt with `python {os.path.join(utils.REPO_DIR, 'download_models_locally.py')}`, {hub}."
+            f"Save it with `python {os.path.join(utils.REPO_DIR, 'download_models_locally.py')} --models {args.hub_model_name}`, {hub}."
         )
         on_the_hub.append("the model")
 
