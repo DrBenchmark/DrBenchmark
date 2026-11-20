@@ -132,20 +132,25 @@ def test_flaubert_token_classification(task_name, run_recipe, tiny_flaubert):
 GRADIENT_ACCUMULATION_TASKS = [task for task in ALL_TASKS if "gradient_accumulation_steps" in task.config]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="Known bug: no training script gives `gradient_accumulation_steps` to the Trainer, "
-           "so the batch size is the one of the YAML file instead of the effective one.",
-)
 @pytest.mark.parametrize("task", GRADIENT_ACCUMULATION_TASKS, ids=task_ids)
 def test_gradient_accumulation_is_applied(task, run_recipe, tiny_bert):
+    """The weights are updated once per effective batch: `batch_size * gradient_accumulation_steps` examples."""
     config = task.config
     examples_per_update = config["batch_size"] * config["gradient_accumulation_steps"]
     expected_updates = math.ceil(synthetic.SPLIT_SIZES["train"] / examples_per_update)
+    # Without accumulation, there would be one update per batch
+    assert expected_updates < math.ceil(synthetic.SPLIT_SIZES["train"] / config["batch_size"])
 
-    state = run_recipe(task.name, tiny_bert).result["trainer_state"]
-    assert state["global_step"] == expected_updates
+    result = run_recipe(task.name, tiny_bert).result
+    assert result["hyperparameters"]["gradient_accumulation_steps"] == config["gradient_accumulation_steps"]
+    assert result["trainer_state"]["global_step"] == expected_updates
+
+
+def test_gradient_accumulation_given_on_the_command_line(run_recipe, tiny_bert):
+    """6 batches of 2 examples, accumulated 3 by 3: the weights are updated twice instead of 6 times."""
+    assert synthetic.SPLIT_SIZES["train"] == 12
+    run = run_recipe("cas-cls", tiny_bert, "--batch_size", "2", "--gradient_accumulation_steps", "3")
+    assert run.result["trainer_state"]["global_step"] == 2
 
 
 @pytest.mark.xfail(

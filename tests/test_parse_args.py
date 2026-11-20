@@ -228,16 +228,48 @@ def test_fewshot_and_max_train_samples_are_exclusive(parse):
     assert parse("cas-pos", "--max_train_samples", "10").max_train_samples == 10
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="Known bug: the default value of --gradient_accumulation_steps (1) overrides the YAML file.",
-)
-@pytest.mark.parametrize(
-    "task", [task for task in ALL_TASKS if "gradient_accumulation_steps" in task.config], ids=task_ids,
-)
+GRADIENT_ACCUMULATION_TASKS = [task for task in ALL_TASKS if "gradient_accumulation_steps" in task.config]
+
+
+def test_some_tasks_accumulate_gradients():
+    """The tests below would check nothing if no YAML file set `gradient_accumulation_steps` any more."""
+    assert {task.name for task in GRADIENT_ACCUMULATION_TASKS} == {"diamed-cls", "morfitt-cls", "deft2021-ner", "deft2021-cls"}
+
+
+@pytest.mark.parametrize("task", GRADIENT_ACCUMULATION_TASKS, ids=task_ids)
 def test_gradient_accumulation_of_the_yaml_file_is_kept(task, parse):
+    assert task.config["gradient_accumulation_steps"] > 1
     assert parse(task).gradient_accumulation_steps == task.config["gradient_accumulation_steps"]
+
+
+def test_gradient_accumulation_on_the_command_line_overrides_the_yaml_file(parse):
+    assert parse("diamed-cls", "--gradient_accumulation_steps", "3").gradient_accumulation_steps == 3
+    assert parse("cas-pos", "--gradient_accumulation_steps", "3").gradient_accumulation_steps == 3
+
+
+@pytest.mark.parametrize(
+    "task", [task for task in ALL_TASKS if task not in GRADIENT_ACCUMULATION_TASKS], ids=task_ids,
+)
+def test_no_gradient_accumulation_by_default(task, parse):
+    """Without accumulation, the weights are updated after each batch."""
+    assert parse(task).gradient_accumulation_steps == 1
+
+
+@pytest.mark.parametrize("value", ["0", "-2"])
+def test_gradient_accumulation_needs_at_least_one_batch(value, parse):
+    with pytest.raises(ValueError, match="gradient_accumulation_steps"):
+        parse("cas-pos", "--gradient_accumulation_steps", value)
+
+
+def test_name_of_a_run_is_stable(parse, utils):
+    """An unchanged configuration keeps the name of its run from one version of the code to the next.
+
+    This is how a run already computed is recognised. The name is built from every argument:
+    if this test fails, the change gives a new name to all the runs, even to the ones it does
+    not affect. The values of `config.yaml` are given, for the test not to depend on that file.
+    """
+    args = parse("cas-pos", "--seed", "0", "--offline", "True", "--max_position_embeddings", "512")
+    assert utils.create_run_name(args) == "DrBenchmark-cas-pos-8c05112b3a9ba5af"
 
 
 @pytest.mark.parametrize("value, expected", [

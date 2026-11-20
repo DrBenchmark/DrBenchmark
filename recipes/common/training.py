@@ -107,6 +107,9 @@ def training_arguments(run, metric_for_best_model, **kwargs):
         learning_rate=args.learning_rate,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
+        # The weights are updated every `gradient_accumulation_steps` batches:
+        # the effective batch size is `batch_size * gradient_accumulation_steps`
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
         num_train_epochs=args.epochs,
         weight_decay=args.weight_decay,
         load_best_model_at_end=True,

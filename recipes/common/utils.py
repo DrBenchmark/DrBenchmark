@@ -138,8 +138,9 @@ def parse_args():
                         help="Training epochs")
     parser.add_argument("--batch_size", type=int, required=False,
                         help="Training batch size")
-    parser.add_argument("--gradient_accumulation_steps", type=int, required=False, default=1,
-                        help="Number of batches before update model's weights.")
+    parser.add_argument("--gradient_accumulation_steps", type=int, required=False,
+                        help="Number of batches before update model's weights: "
+                             "the effective batch size is batch_size * gradient_accumulation_steps.")
     parser.add_argument("--max_position_embeddings", type=int, required=False,
                         help="Max position embeddings")
     parser.add_argument("--weight_decay", type=float, required=False,
@@ -181,6 +182,12 @@ def parse_args():
     # Overwrite local and global with command line arguments (which allow precise param changing)
     #  and fills missing arguments with default values
     args.update({k: v for k, v in args_cli.items() if v is not None or k not in args})
+
+    # Without gradient accumulation, the weights are updated after each batch
+    if args['gradient_accumulation_steps'] is None:
+        args['gradient_accumulation_steps'] = 1
+    if args['gradient_accumulation_steps'] < 1:
+        raise ValueError(f"`gradient_accumulation_steps` must be at least 1, got {args['gradient_accumulation_steps']}.")
 
     if args['max_train_samples'] is not None and (args['fewshot'] is not None and args['fewshot'] != 1.0):
         raise ValueError('Cannot use `max_train_samples` and `fewshot` at the same time. Please check local and global config files.')
