@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Predict with a model that a run of the benchmark kept: on a sentence, or on a file.
+"""Predict with a model that a run of the benchmark kept: on a sentence, on a file, or on annotated data.
 
     python predict.py --list
     python predict.py --task cas-pos --model Dr-BERT/DrBERT-7GB "Le patient présente une toux sèche."
     python predict.py --task cas-pos --model Dr-BERT/DrBERT-7GB
     python predict.py --task cas-pos --model Dr-BERT/DrBERT-7GB --input sentences.txt --output labels.conll
+    python predict.py --task cas-pos --model Dr-BERT/DrBERT-7GB --evaluate corpus.conll
     python predict.py --model-dir recipes/cas/save_models/<run>_best_model "Le patient présente une toux sèche."
 
 A run keeps its best model in `recipes/<recipe>/save_models/` and writes its results in
@@ -16,17 +17,21 @@ or the one of `--seed`. `--list` shows the runs, their scores and the one that i
 
 What the model reads is built by the script of the task, as when the model was trained.
 
-Without a text or `--input`, the texts are asked for, until an empty line.
+Without a text, `--input` or `--evaluate`, the texts are asked for, until an empty line.
 
-`--input` reads:
+`--input` and `--evaluate` read:
 - a text file: one example per line, with a tabulation between the texts of a task that reads several;
 - a CoNLL file (`.conll`, or `--format conll`), for the tasks that label words: one word per
-  line, an empty line after each sentence;
+  line, an empty line after each sentence. `--evaluate` reads the label of a word at the end of its line;
 - a CSV or TSV file (`.csv`, `.tsv`, or `--format`), for the other tasks: its first line names its
-  columns, which are the ones of the dataset of the task.
+  columns, which are the ones of the dataset of the task. `--evaluate` reads the column of the answer;
+- a directory: a dataset saved by `datasets`, with the columns of the dataset of the task. The
+  copies of `download_datasets_locally.py` are such directories.
 
-The predictions are written on the standard output, or in the file of `--output`: in the CoNLL
-format for the tasks that label words, in CSV for the other ones.
+The predictions of `--input` are written on the standard output, or in the file of `--output`:
+in the CoNLL format for the tasks that label words, in CSV for the other ones. `--evaluate`
+prints the scores of the task, the ones a run computes on its test set; with `--output`, it
+also writes its predictions, next to what was expected.
 """
 
 import argparse
@@ -454,6 +459,8 @@ class Examples:
     """Examples that are read: what a model is given, and the columns that are written with its predictions."""
     examples: list
     columns: list
+    # The features of a dataset: they name its classes
+    features: object = None
 
 
 def format_of(path, given=None):
@@ -462,34 +469,39 @@ def format_of(path, given=None):
     return EXTENSIONS.get(os.path.splitext(path)[1].lower(), "text")
 
 
-def read_conll(path):
-    examples, words = [], []
+def read_conll(path, model, annotated):
+    column = model.task.reference_column
+    examples, words, labels = [], [], []
 
     def end_of_sentence():
         if words:
-            examples.append({"tokens": list(words)})
+            examples.append({"tokens": list(words), **({column: list(labels)} if annotated else {})})
             words.clear()
+            labels.clear()
 
     with open(path, encoding="utf-8") as f:
-        for line in f:
+        for number_, line in enumerate(f, start=1):
             line = line.rstrip("\n").rstrip("\r")
             if not line.strip():
                 end_of_sentence()
                 continue
             if line.startswith("-DOCSTART-"):
                 continue
-            # A line starts with its word
-            words.append(line.split("\t")[0] if "\t" in line else line.split()[0])
+            fields = line.split("\t") if "\t" in line else line.split()
+            if annotated and len(fields) < 2:
+                raise PredictError(f"{path}, line {number_}: a word and its label are expected, separated by a tabulation or a space")
+            words.append(fields[0])
+            labels.append(fields[-1])
     end_of_sentence()
-    return Examples(examples, ["tokens"])
+    return Examples(examples, ["tokens"] + ([column] if annotated else []))
 
 
-def read_table(path, model, words, delimiter):
+def read_table(path, model, annotated, words, delimiter):
     task = model.task
     with open(path, encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f, delimiter=delimiter)
         columns = list(reader.fieldnames or [])
-        needed = list(task.inputs)
+        needed = list(task.inputs) + ([task.reference_column] if annotated else [])
         missing = [column for column in needed if column not in columns]
         if missing:
             raise PredictError(
@@ -517,8 +529,29 @@ def read_text(path, model, words):
     return Examples(examples, list(model.task.inputs))
 
 
-def read_examples(path, model, words=False, file_format=None):
-    """The examples of a file, for a model."""
+def read_dataset(path, model, annotated, split):
+    from datasets import load_from_disk
+
+    task = model.task
+    dataset = load_from_disk(path)
+    if hasattr(dataset, "keys"):
+        # The splits of a dataset
+        if split not in dataset:
+            raise PredictError(f"{path} has no split {split}: its splits are {', '.join(dataset.keys())}. Give one with --split.")
+        dataset = dataset[split]
+    missing = [column for column in task.inputs if column not in dataset.column_names]
+    if missing:
+        raise PredictError(f"{path} has no column {', '.join(missing)}: its columns are {', '.join(dataset.column_names)}")
+    columns = [column for column in [task.id_column, *task.inputs] if column in dataset.column_names]
+    if annotated and task.reference_column in dataset.column_names:
+        columns.append(task.reference_column)
+    return Examples(list(dataset), columns, dataset.features)
+
+
+def read_examples(path, model, annotated=False, words=False, split="test", file_format=None):
+    """The examples of a file or of a saved dataset, for a model. `annotated`: with what the model should predict."""
+    if os.path.isdir(path):
+        return read_dataset(path, model, annotated, split)
     if not os.path.isfile(path):
         raise PredictError(f"{path} does not exist")
 
@@ -528,31 +561,72 @@ def read_examples(path, model, words=False, file_format=None):
         if not labels_words:
             raise PredictError(f"{path}: {model.name} does not label words, its examples are not read in a CoNLL file. "
                                "They are read in a text file, or in a CSV or TSV file.")
-        return read_conll(path)
+        return read_conll(path, model, annotated)
+    if labels_words and (annotated or file_format in ("csv", "tsv")):
+        raise PredictError(
+            f"{path}: {model.name} labels words, its {'annotated ' if annotated else ''}examples are read in a CoNLL file "
+            "(`.conll`, or `--format conll`): one word per line, an empty line after each sentence"
+            + (", and the label of a word at the end of its line." if annotated else "."))
     if file_format in ("csv", "tsv"):
-        if labels_words:
-            raise PredictError(
-                f"{path}: {model.name} labels words, its examples are read in a CoNLL file "
-                "(`.conll`, or `--format conll`): one word per line, an empty line after each sentence.")
-        return read_table(path, model, words, "," if file_format == "csv" else "\t")
+        return read_table(path, model, annotated, words, "," if file_format == "csv" else "\t")
+    if annotated:
+        raise PredictError(
+            f"{path}: the annotated examples of {model.name} are read in a CSV or TSV file (`.csv`, `.tsv`, or `--format`), "
+            f"whose columns are {', '.join([*model.task.inputs, model.task.reference_column])}.")
     return read_text(path, model, words)
 
 
-def write_predictions(file, model, read, predictions):
+def references_of(model, read):
+    """What the model should predict for annotated examples, and their identifiers."""
+    task = model.task
+    references = []
+    for index, example in enumerate(read.examples):
+        try:
+            references.append(task.reference(example, model.labels, read.features))
+        except KeyError as error:
+            raise PredictError(f"The example {index + 1} has no column {error}: it is not annotated for {model.name}")
+        except ValueError as error:
+            raise PredictError(f"Example {index + 1}: {error}")
+    identifiers = [example.get(task.id_column, index) for index, example in enumerate(read.examples)]
+    return references, identifiers
+
+
+def write_predictions(file, model, read, predictions, references=None):
     """Write predictions: in the CoNLL format for the labels of words, in CSV for the other ones."""
     task = model.task
     if task.word_labels:
-        for example, prediction in zip(read.examples, predictions):
-            for word, label in zip(example["tokens"], prediction):
-                file.write(f"{word}\t{label}\n")
+        for index, (example, prediction) in enumerate(zip(read.examples, predictions)):
+            for position, word in enumerate(example["tokens"]):
+                fields = [word] + ([references[index][position]] if references is not None else []) + [prediction[position]]
+                file.write("\t".join(fields) + "\n")
             file.write("\n")
         return
 
     writer = csv.writer(file, lineterminator="\n")
     writer.writerow(read.columns + ["prediction"])
-    for example, prediction in zip(read.examples, predictions):
-        row = [as_text(example[column], " " if task.inputs.get(column) == "words" else "|") for column in read.columns]
+    for index, (example, prediction) in enumerate(zip(read.examples, predictions)):
+        row = []
+        for column in read.columns:
+            if references is not None and column == task.reference_column:
+                row.append(as_text(references[index]))
+            else:
+                row.append(as_text(example[column], " " if task.inputs.get(column) == "words" else "|"))
         writer.writerow(row + [as_text(prediction)])
+
+
+def scores_as_text(metrics, labels):
+    """The scores of an evaluation: the ones of the whole, then the ones of each class."""
+    lines, details = [], []
+    for name, value in metrics.items():
+        if isinstance(value, dict):
+            # The classes of a classification are written by their numbers
+            name = labels[int(name)] if name.isdigit() and int(name) < len(labels) else name
+            details.append(f"  {name}: " + ", ".join(
+                f"{key} {score:.4f}" if isinstance(score, float) and key not in ("support", "number") else f"{key} {score:g}"
+                for key, score in value.items()))
+        elif isinstance(value, (int, float)):
+            lines.append(f"{name}: {value:.4f}")
+    return "\n".join(lines + details)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -574,25 +648,30 @@ def arguments():
     parser.add_argument("--model-dir", type=str, default=None, metavar="DIR",
                         help="Directory of a model that a run kept, instead of --task and --model.")
     parser.add_argument("--input", type=str, default=None, metavar="PATH",
-                        help="File of the examples to predict.")
+                        help="File, or saved dataset, of the examples to predict.")
+    parser.add_argument("--evaluate", type=str, default=None, metavar="PATH",
+                        help="File, or saved dataset, of annotated examples: the predictions are scored with the metrics of the task.")
     parser.add_argument("--output", type=str, default=None, metavar="FILE",
-                        help="File where the predictions of --input are written (default: the standard output).")
+                        help="File where the predictions are written (default: the standard output for --input, and no "
+                             "file for --evaluate, which prints the scores).")
     parser.add_argument("--format", type=str, default=None, choices=FORMATS,
-                        help="Format of the file of --input (default: from the end of its name).")
+                        help="Format of the file of --input or --evaluate (default: from the end of its name).")
+    parser.add_argument("--split", type=str, default="test",
+                        help="Split of a saved dataset that is read (default: test).")
     parser.add_argument("--words", action="store_true",
                         help="The sentences are already split into words, at their spaces: they are not split again.")
     args = parser.parse_args()
 
     if args.list:
-        if args.texts or args.input or args.model_dir:
+        if args.texts or args.input or args.evaluate or args.model_dir:
             parser.error("--list only goes with --task and --model")
         return args
     if args.model_dir is None and (args.task is None or args.model is None):
         parser.error("give the model: --task and --model, or --model-dir (the runs are listed by --list)")
     if args.model_dir is not None and (args.model is not None or args.seed is not None):
         parser.error("--model-dir is the directory of one model: --model and --seed choose one among runs")
-    if args.texts and args.input:
-        parser.error("give texts, or --input")
+    if sum(bool(source) for source in (args.texts, args.input, args.evaluate)) > 1:
+        parser.error("give texts, or --input, or --evaluate")
     return args
 
 
@@ -626,7 +705,7 @@ def typed_examples(model, args):
 
 def predict_file(model, args):
     """Write the predictions for the examples of a file."""
-    read = read_examples(args.input, model, words=args.words, file_format=args.format)
+    read = read_examples(args.input, model, words=args.words, split=args.split, file_format=args.format)
     if not read.examples:
         raise PredictError(f"{args.input} has no example")
     predictions = model.predict(read.examples)
@@ -635,6 +714,21 @@ def predict_file(model, args):
             write_predictions(f, model, read, predictions)
     else:
         write_predictions(sys.stdout, model, read, predictions)
+
+
+def evaluate_file(model, args):
+    """Print the scores of the task for the annotated examples of a file, and write the predictions in the file that is given for them."""
+    read = read_examples(args.evaluate, model, annotated=True, words=args.words, split=args.split, file_format=args.format)
+    if not read.examples:
+        raise PredictError(f"{args.evaluate} has no example")
+    references, identifiers = references_of(model, read)
+    predictions = model.predict(read.examples)
+    if args.output:
+        with open(args.output, "w", encoding="utf-8", newline="") as f:
+            write_predictions(f, model, read, predictions, references)
+    metrics = model.task.metrics(references, predictions, model.labels, identifiers)
+    print(f"{len(predictions)} examples of {args.evaluate}")
+    print(scores_as_text(metrics, model.labels))
 
 
 def what_is_loaded(model):
@@ -672,6 +766,9 @@ def main():
 
     if args.input:
         predict_file(model, args)
+        return
+    if args.evaluate:
+        evaluate_file(model, args)
         return
     for example in typed_examples(model, args):
         print(shown(model, example, model.predict([example])[0]), flush=True)

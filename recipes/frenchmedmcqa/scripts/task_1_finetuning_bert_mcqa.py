@@ -11,7 +11,7 @@ from pathlib import Path
 # The code shared by the recipes is in `recipes/common/`: its parent is added to the search path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from common import sequence_classification  # noqa: E402
+from common import sequence_classification, training  # noqa: E402
 
 LETTERS = ["a", "b", "c", "d", "e"]
 
@@ -53,11 +53,15 @@ class MultipleChoiceTask(sequence_classification.Task):
     def label_names(self, dataset):
         return self.labels
 
-    def reference(self, example, labels, features):
+    def reference(self, example, labels, features=None):
+        answers = example[self.label_column]
+        if isinstance(answers, str):
+            # The letters of the right answers, as they are written in a file: `ab`, or `a, b`
+            answers = [letter for letter in answers.lower() if letter.isalnum()]
         # Get from the answers indexes to the original letters
-        names = features[self.label_column].feature.names
+        names = training.class_names(features, self.label_column) or LETTERS
         # Transform the multi-label answers into a multi-class problem
-        return "".join(sorted(names[answer] for answer in example[self.label_column]))
+        return "".join(sorted(training.name_of(answer, names) for answer in answers))
 
     def target(self, example, labels, features):
         # Get the corresponding index of the class

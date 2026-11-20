@@ -34,6 +34,9 @@ LIBRARIES = ("torch", "transformers", "tokenizers", "datasets", "accelerate", "e
 # The file, next to a model that a run kept, which says what the model is: `predict.py` reads it
 DESCRIPTION = "drbenchmark.json"
 
+# What separates the labels of an example, when it has several, in a file
+SEPARATOR = "|"
+
 
 class Task:
     """A task of the benchmark, as the script of its recipe defines it.
@@ -52,6 +55,10 @@ class Task:
     model_class = None
     #: The columns of an example that the model reads, in their order: {column: "text" or "words"}
     inputs = {}
+    #: The column of an annotated example that has what the model should predict
+    reference_column = None
+    #: The column that has the identifier of an example
+    id_column = "id"
     #: Whether a prediction is one label for each word of the column `tokens`
     word_labels = False
     #: The names of the classes, for a task whose classes are not the ones of a column of its dataset
@@ -72,6 +79,18 @@ class Task:
         """The prediction for an example, from the output of the model for what `encode` returned."""
         raise NotImplementedError
 
+    def reference(self, example, labels, features=None):
+        """What a model should predict for an annotated example, in the form of a prediction.
+
+        The classes of the example are numbers in a dataset, whose `features` name them, or
+        names when the example is read from a file: `labels` are the names of the outputs of the model.
+        """
+        raise NotImplementedError
+
+    def metrics(self, references, predictions, labels, identifiers=None):
+        """The scores of predictions against references: the ones that a run computes on the test set."""
+        raise NotImplementedError
+
 
 def model_of(args):
     """Name of the model that a run fine-tunes: the one of the HuggingFace Hub when it is known, or else its path."""
@@ -82,6 +101,29 @@ def name_outputs(model, labels):
     """Give the outputs of a model the names of the classes of its task: they are saved with the model."""
     model.config.id2label = dict(enumerate(labels))
     model.config.label2id = {label: index for index, label in enumerate(labels)}
+
+
+def class_names(features, column):
+    """Names of the classes of a column of a dataset: None when the column is not one of classes, or is not known."""
+    feature = features.get(column) if features else None
+    if isinstance(feature, list):
+        # A list of classes, for datasets<4
+        feature = feature[0] if feature else None
+    for candidate in (feature, getattr(feature, "feature", None)):
+        names = getattr(candidate, "names", None)
+        if names is not None:
+            return list(names)
+    return None
+
+
+def name_of(value, names):
+    """Name of a class that is given by its number, as in a dataset, or by its name, as in a file."""
+    if isinstance(value, str):
+        if value in names:
+            return value
+    elif 0 <= int(value) < len(names):
+        return names[int(value)]
+    raise ValueError(f"Unknown class {value!r}: the classes are {', '.join(repr(name) for name in names)}")
 
 
 class Predictor:

@@ -383,6 +383,8 @@ def test_predict_py_does_not_load_torch_to_list_the_runs():
     (["--list", "--input", "a.txt"], "--list only goes with --task and --model"),
     (["--task", "cas-pos", "--model", MODEL, "--input", "a.txt", "a sentence"], "give texts, or --input"),
     (["--task", "cas-pos", "--model", MODEL, "--input", "a.txt", "--format", "json"], "argument --format: invalid choice: 'json'"),
+    (["--list", "--evaluate", "a.conll"], "--list only goes with --task and --model"),
+    (["--task", "cas-pos", "--model", MODEL, "--input", "a.txt", "--evaluate", "b.conll"], "give texts, or --input, or --evaluate"),
 ], ids=lambda value: " ".join(value) if isinstance(value, list) else None)
 def test_wrong_arguments(arguments, message):
     completed = subprocess.run([sys.executable, str(REPO / "predict.py"), *arguments], capture_output=True, text=True, timeout=120)
@@ -570,6 +572,167 @@ def test_classes_are_written_in_csv(classifier, comparer, predict):
 
 
 # ---------------------------------------------------------------------------------------------
+# The annotated files, and what a model should predict for their examples
+# ---------------------------------------------------------------------------------------------
+
+def test_annotated_conll_file(tagger, predict, tmp_path):
+    """The label of a word is at the end of its line."""
+    path = tmp_path / "corpus.conll"
+    path.write_text(CONLL, encoding="utf-8")
+    read = predict.read_examples(str(path), tagger, annotated=True)
+    assert read.examples == [
+        {"tokens": ["Le", "patient"], "pos_tags": ["B-DET", "B-NOM"]}, {"tokens": ["tousse", "."], "pos_tags": ["B-VER", "B-SENT"]},
+    ]
+    assert read.columns == ["tokens", "pos_tags"]
+
+    path.write_text("Le\tB-DET\npatient\n", encoding="utf-8")
+    with pytest.raises(predict.PredictError, match=r"corpus.conll, line 2: a word and its label are expected"):
+        predict.read_examples(str(path), tagger, annotated=True)
+    # Without labels, the file is still one of words
+    assert predict.read_examples(str(path), tagger).examples == [{"tokens": ["Le", "patient"]}]
+
+
+def test_annotated_table_file(classifier, predict, tmp_path):
+    path = tmp_path / "examples.csv"
+    write_table(path, [["tokens", "label"], ["pas de toux", "negation"]])
+    read = predict.read_examples(str(path), classifier, annotated=True)
+    assert read.examples == [{"tokens": ["pas", "de", "toux"], "label": "negation"}]
+
+    # The column of the answers has the name it has in the dataset of the task
+    write_table(path, [["tokens", "class"], ["pas de toux", "negation"]])
+    with pytest.raises(predict.PredictError) as error:
+        predict.read_examples(str(path), classifier, annotated=True)
+    assert str(error.value) == (
+        f"{path} has no column label: its first line names its columns, which are tokens, class. cas-cls reads the columns tokens, label.")
+
+
+def test_annotated_file_that_a_task_does_not_read(tagger, classifier, predict, tmp_path):
+    path = tmp_path / "examples.txt"
+    path.write_text("une toux\n", encoding="utf-8")
+    with pytest.raises(predict.PredictError, match="cas-pos labels words, its annotated examples are read in a CoNLL file"):
+        predict.read_examples(str(path), tagger, annotated=True)
+    with pytest.raises(predict.PredictError, match="the annotated examples of cas-cls are read in a CSV or TSV file .* whose columns are tokens, label"):
+        predict.read_examples(str(path), classifier, annotated=True)
+
+
+def test_expected_labels_are_written_before_the_predicted_ones(tagger, classifier, predict):
+    read = predict.Examples([{"tokens": ["Le", "patient"]}, {"tokens": ["tousse"]}], ["tokens"])
+    text = written(predict, tagger, read, [["B-DET", "B-NOM"], ["B-VER"]], references=[["B-DET", "B-ADJ"], ["B-VER"]])
+    assert text == "Le\tB-DET\tB-DET\npatient\tB-ADJ\tB-NOM\n\ntousse\tB-VER\tB-VER\n\n"
+
+    # The classes that are expected are written as the model names them: here the dataset has their numbers
+    read = predict.Examples([{"tokens": ["pas", "de", "toux"], "label": 1}, {"tokens": ["une", "toux"], "label": 3}], ["tokens", "label"])
+    text = written(predict, classifier, read, ["negation", "neutral"], references=["negation", "speculation"])
+    assert text.splitlines() == ["tokens,label,prediction", "pas de toux,negation,negation", "une toux,speculation,neutral"]
+
+
+def test_scores_are_shown_with_the_names_of_the_classes(predict):
+    metrics = {
+        "0": {"precision": 0.5, "recall": 1.0, "f1-score": 0.75, "support": 2.0},
+        "accuracy": 0.5,
+        "macro avg": {"precision": 0.25, "recall": 0.5, "f1-score": 0.375, "support": 4.0},
+    }
+    assert predict.scores_as_text(metrics, ["negation", "neutral"]).splitlines() == [
+        "accuracy: 0.5000",
+        "  negation: precision 0.5000, recall 1.0000, f1-score 0.7500, support 2",
+        "  macro avg: precision 0.2500, recall 0.5000, f1-score 0.3750, support 4",
+    ]
+    entities = {"DISO": {"precision": 0.5, "recall": 0.25, "f1": 0.375, "number": 8}, "overall_f1": 0.375}
+    assert predict.scores_as_text(entities, ["O", "B-DISO"]).splitlines() == [
+        "overall_f1: 0.3750", "  DISO: precision 0.5000, recall 0.2500, f1 0.3750, number 8"]
+
+
+def task_of(predict, name):
+    return predict.load_task(predict.script_of(name))
+
+
+def test_expected_class_of_an_example(predict):
+    from datasets import ClassLabel, Features
+
+    task = task_of(predict, "cas-cls")
+    labels = ["negation_speculation", "negation", "neutral", "speculation"]
+    # In a file, the name of the class
+    assert task.reference({"label": "neutral"}, labels) == "neutral"
+    # In a dataset, its number: the dataset names its classes, in its own order
+    assert task.reference({"label": 2}, labels) == "neutral"
+    features = Features({"label": ClassLabel(names=["neutral", "negation"])})
+    assert task.reference({"label": 1}, labels, features) == "negation"
+    for unknown in ("neutre", "2", 4, -1):
+        with pytest.raises(ValueError) as error:
+            task.reference({"label": unknown}, labels)
+        assert str(error.value) == f"Unknown class {unknown!r}: the classes are 'negation_speculation', 'negation', 'neutral', 'speculation'"
+
+    # Classes that are named by numbers: a text is a name, not the number of a class
+    task = task_of(predict, "deft2020-cls")
+    assert task.reference({"correct_cible": "1"}, ["1", "2", "3"]) == "1"
+    assert task.reference({"correct_cible": 1}, ["1", "2", "3"]) == "2"
+
+
+def test_expected_labels_of_a_sentence(predict):
+    from datasets import ClassLabel, Features, Sequence
+
+    task = task_of(predict, "cas-pos")
+    labels = ["B-DET", "B-NOM", "B-VER"]
+    assert task.reference({"pos_tags": ["B-NOM", "B-VER"]}, labels) == ["B-NOM", "B-VER"]
+    features = Features({"pos_tags": Sequence(ClassLabel(names=["B-VER", "B-NOM"]))})
+    assert task.reference({"pos_tags": [0, 1, 1]}, labels, features) == ["B-VER", "B-NOM", "B-NOM"]
+    with pytest.raises(ValueError, match="Unknown class 'B-ADJ'"):
+        task.reference({"pos_tags": ["B-NOM", "B-ADJ"]}, labels)
+
+
+def test_expected_labels_of_a_text_are_read_as_they_are_written(predict):
+    from datasets import ClassLabel, Features, Sequence
+
+    task = task_of(predict, "morfitt-cls")
+    labels = ["microbiology", "etiology", "virology"]
+    # In a file: what `predict.py` writes for several labels
+    several = predict.as_text(["virology", "microbiology"])
+    assert task.reference({"specialities": several}, labels) == ["virology", "microbiology"]
+    assert task.reference({"specialities": " etiology | virology "}, labels) == ["etiology", "virology"]
+    assert task.reference({"specialities": ""}, labels) == []
+    with pytest.raises(ValueError, match="Unknown class 'cardiology'"):
+        task.reference({"specialities": "virology|cardiology"}, labels)
+    # In a dataset: the numbers of the labels, or one number for each label of the model
+    features = Features({"specialities": Sequence(ClassLabel(names=["virology", "microbiology"]))})
+    assert task.reference({"specialities": [1, 0]}, labels, features) == ["microbiology", "virology"]
+    assert task.reference({"specialities_one_hot": [1.0, 0.0, 1.0]}, labels) == ["microbiology", "virology"]
+
+
+def test_expected_answers_and_score(predict):
+    from datasets import ClassLabel, Features, Sequence
+
+    task = task_of(predict, "frenchmedmcqa-mcqa")
+    # The letters of the right answers, in a file, whatever is between them
+    for answers in ("ab", "ba", "a, b", "A|B", "b a"):
+        assert task.reference({"correct_answers": answers}, task.labels) == "ab"
+    # In a dataset: their numbers
+    features = Features({"correct_answers": Sequence(ClassLabel(names=["a", "b", "c", "d", "e"]))})
+    assert task.reference({"correct_answers": [4, 0, 2]}, task.labels, features) == "ace"
+    with pytest.raises(ValueError, match="Unknown class 'f'"):
+        task.reference({"correct_answers": "af"}, task.labels)
+
+    task = task_of(predict, "clister-regr")
+    assert task.reference({"label": "2.5"}, None) == task.reference({"label": 2.5}, None) == 2.5
+
+
+def test_scores_of_predictions(predict):
+    """The scores of a task for what is expected and what is predicted, as `predict.py` gives them: by their names."""
+    labels = ["negation_speculation", "negation", "neutral", "speculation"]
+    scores = task_of(predict, "cas-cls").metrics(["negation", "neutral", "neutral", "negation"], ["negation", "neutral", "negation", "negation"], labels)
+    # The scores of a class have the number of the class
+    assert scores["accuracy"] == 0.75 and scores["1"]["recall"] == 1.0 and scores["2"]["recall"] == 0.5
+
+    scores = task_of(predict, "morfitt-cls").metrics([["a"], ["a", "b"]], [["a"], ["b"]], ["a", "b", "c"])
+    assert (scores["0"]["recall"], scores["1"]["recall"], scores["micro avg"]["precision"]) == (0.5, 1.0, 1.0)
+
+    scores = task_of(predict, "cas-pos").metrics([["B-NOM", "O"], ["B-VER"]], [["B-NOM", "O"], ["B-NOM"]], ["O", "B-NOM", "B-VER"])
+    assert scores["overall_accuracy"] == pytest.approx(2 / 3) and scores["NOM"]["precision"] == 0.5
+
+    scores = task_of(predict, "clister-regr").metrics([0.0, 2.5, 5.0], [0.0, 2.5, 5.0], None)
+    assert scores["EDRM"] == 1.0 and scores["spearman_correlation_coef"] == pytest.approx(1.0)
+
+
+# ---------------------------------------------------------------------------------------------
 # The models that the recipes keep after a training on synthetic data
 # ---------------------------------------------------------------------------------------------
 
@@ -612,6 +775,22 @@ def test_prediction_is_the_one_of_the_run(task, run_recipe, tiny_bert, synthetic
     model = predict.load(model_dir=result["model_name"])
     predictions = model.predict(list(the_test_set(task, synthetic_data)))
     assert close(predictions, named(task, result["predictions"]["system_predictions"], model.labels))
+
+
+@pytest.mark.e2e
+@pytest.mark.parametrize("task", ALL_TASKS, ids=task_ids)
+def test_scores_of_the_test_set_are_the_ones_of_the_run(task, run_recipe, tiny_bert, synthetic_data, predict):
+    """The test set of a task is annotated data: what is expected for its examples and their scores are the ones of the run."""
+    result = run_recipe(task.name, tiny_bert).result
+    model = predict.load(model_dir=result["model_name"])
+    read = predict.read_examples(str(synthetic_data / task.recipe / f"local_hf_{task.subset}"), model, annotated=True)
+    references, identifiers = predict.references_of(model, read)
+    assert identifiers == result["predictions"]["identifiers"]
+    assert close(references, named(task, result["predictions"]["real_labels"], model.labels))
+
+    predictions = model.predict(read.examples)
+    scores = json.loads(json.dumps(model.task.metrics(references, predictions, model.labels, identifiers), default=float))
+    assert close(scores, result["metrics"])
 
 
 @pytest.mark.e2e
@@ -889,6 +1068,79 @@ def test_classes_of_a_file_are_written_in_csv(trained_repository, tiny_bert, syn
     sentences.write_text("\n", encoding="utf-8")
     completed = run_predict(trained_repository, "--task", "cas-cls", "--model", tiny_bert, "--input", sentences, cwd=tmp_path)
     assert (completed.returncode, completed.stderr.splitlines()[-1]) == (1, f"{sentences} has no example")
+
+
+@pytest.mark.e2e
+def test_annotated_corpus_is_scored_with_the_metrics_of_the_task(trained_repository, tiny_bert, synthetic_data, tmp_path):
+    """A corpus annotated as the dataset of the task: here its test set, whose scores are the ones of the run."""
+    test = the_test_set(Task("cas-pos"), synthetic_data)
+    names = test.features["pos_tags"].feature.names
+    corpus = tmp_path / "corpus.conll"
+    corpus.write_text("".join(
+        "".join(f"{word}\t{names[tag]}\n" for word, tag in zip(example["tokens"], example["pos_tags"])) + "\n" for example in test
+    ), encoding="utf-8")
+    _, run = taken_run(trained_repository, "cas-pos")
+    output = tmp_path / "compared.conll"
+
+    completed = run_predict(
+        trained_repository, "--task", "cas-pos", "--model", tiny_bert, "--evaluate", corpus, "--output", output, cwd=tmp_path)
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    lines = completed.stdout.splitlines()
+    assert lines[0] == f"6 examples of {corpus}"
+    for name in ("overall_precision", "overall_recall", "overall_f1", "overall_accuracy"):
+        assert f"{name}: {run['metrics'][name]:.4f}" in lines
+    assert any(re.fullmatch(r"  NOM: precision \d\.\d{4}, recall \d\.\d{4}, f1 \d\.\d{4}, number \d+", line) for line in lines)
+
+    # The file has, for each word, what was expected and what the model predicts
+    compared = [line.split("\t") for line in output.read_text(encoding="utf-8").splitlines() if line]
+    assert [label for _, label, _ in compared] == [label for sentence in run["predictions"]["real_labels"] for label in sentence]
+    assert [label for _, _, label in compared] == [label for sentence in run["predictions"]["system_predictions"] for label in sentence]
+
+    # Without a file for them, the predictions are not written
+    completed = run_predict(trained_repository, "--task", "cas-pos", "--model", tiny_bert, "--evaluate", corpus, cwd=tmp_path)
+    assert completed.stdout.splitlines() == lines
+
+
+@pytest.mark.e2e
+def test_annotated_table_and_saved_dataset_are_scored(trained_repository, tiny_bert, synthetic_data, tmp_path):
+    test = the_test_set(Task("cas-cls"), synthetic_data)
+    names = test.features["label"].names
+    _, run = taken_run(trained_repository, "cas-cls")
+    annotated = tmp_path / "annotated.csv"
+    write_table(annotated, [["tokens", "label"]] + [[" ".join(example["tokens"]), names[example["label"]]] for example in test])
+
+    for corpus in (annotated, synthetic_data / "cas" / "local_hf_cls"):
+        output = tmp_path / "compared.csv"
+        completed = run_predict(
+            trained_repository, "--task", "cas-cls", "--model", tiny_bert, "--evaluate", corpus, "--words", "--output", output, cwd=tmp_path)
+        assert completed.returncode == 0, completed.stderr[-3000:]
+        lines = completed.stdout.splitlines()
+        assert lines[:2] == [f"6 examples of {corpus}", f"accuracy: {run['metrics']['accuracy']:.4f}"]
+        macro = run["metrics"]["macro avg"]
+        assert f"  macro avg: precision {macro['precision']:.4f}, recall {macro['recall']:.4f}, f1-score {macro['f1-score']:.4f}, support 6" in lines
+        # The classes have their names
+        assert any(line.startswith(f"  {names[run['predictions']['real_labels'][0]]}: precision ") for line in lines)
+        # What was expected, by its name, and what the model predicts
+        rows = list(csv.reader(output.open(encoding="utf-8", newline="")))
+        assert rows[0][-2:] == ["label", "prediction"]
+        assert [row[-2] for row in rows[1:]] == [names[index] for index in run["predictions"]["real_labels"]]
+        assert [row[-1] for row in rows[1:]] == [names[index] for index in run["predictions"]["system_predictions"]]
+
+    # Another split of the saved dataset, and one that it does not have
+    completed = run_predict(
+        trained_repository, "--task", "cas-cls", "--model", tiny_bert, "--evaluate", synthetic_data / "cas" / "local_hf_cls", "--split", "train")
+    assert completed.stdout.splitlines()[0].startswith("12 examples of ")
+    completed = run_predict(
+        trained_repository, "--task", "cas-cls", "--model", tiny_bert, "--input", synthetic_data / "cas" / "local_hf_cls", "--split", "dev")
+    assert completed.returncode == 1 and "has no split dev: its splits are train, validation, test. Give one with --split." in completed.stderr
+
+    # A class that the model does not have, and a corpus without any example
+    write_table(annotated, [["tokens", "label"], ["une toux", "unknown"]])
+    completed = run_predict(trained_repository, "--task", "cas-cls", "--model", tiny_bert, "--evaluate", annotated)
+    assert completed.returncode == 1 and completed.stderr.splitlines()[-1].startswith("Example 1: Unknown class 'unknown': the classes are ")
+    write_table(annotated, [["tokens", "label"]])
+    completed = run_predict(trained_repository, "--task", "cas-cls", "--model", tiny_bert, "--evaluate", annotated)
+    assert (completed.returncode, completed.stderr.splitlines()[-1]) == (1, f"{annotated} has no example")
 
 
 @pytest.mark.e2e

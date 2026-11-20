@@ -52,6 +52,7 @@ class Task(training.Task):
         self.build_text = build_text
         self.inputs = inputs
         self.label_column = label_column
+        self.reference_column = label_column
         self.id_column = id_column
 
     def label_names(self, dataset):
@@ -68,6 +69,12 @@ class Task(training.Task):
 
     def decode(self, logits, encoded, labels):
         return labels[int(np.argmax(logits))]
+
+    def reference(self, example, labels, features=None):
+        return training.name_of(example[self.label_column], training.class_names(features, self.label_column) or labels)
+
+    def metrics(self, references, predictions, labels, identifiers=None):
+        return scores([labels.index(reference) for reference in references], [labels.index(prediction) for prediction in predictions])
 
     def results(self, references, predictions, labels):
         """What a run writes, from the classes of the test set given by their numbers: its scores, the references and the predictions."""

@@ -98,6 +98,7 @@ class Task(training.Task):
         self.text_columns = text_columns
         self.inputs = {column: "text" for column in text_columns}
         self.label_column = label_column
+        self.reference_column = label_column
 
     def encode(self, example, tokenizer, max_length, model_name=None):
         first_column, second_column = self.text_columns
@@ -106,6 +107,15 @@ class Task(training.Task):
 
     def decode(self, logits, encoded, labels):
         return float(np.reshape(logits, -1)[0])
+
+    def reference(self, example, labels, features=None):
+        return float(example[self.label_column])
+
+    def metrics(self, references, predictions, labels, identifiers=None):
+        if identifiers is None:
+            identifiers = range(len(references))
+        # The numbers of a run have 32 bits: its scores are computed with them
+        return scores(list(identifiers), np.asarray(references, dtype=np.float32), np.asarray(predictions, dtype=np.float32))
 
     def train(self):
         run = training.start(self.dataset, task=self)

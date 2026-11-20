@@ -73,6 +73,7 @@ class Task(training.Task):
 
     kind = "multi-label classification"
     model_class = AutoModelForSequenceClassification
+    reference_column = "specialities"
 
     def __init__(self, dataset, text_column):
         self.dataset = dataset
@@ -85,6 +86,21 @@ class Task(training.Task):
     def decode(self, logits, encoded, labels):
         """The labels whose probability reaches the threshold."""
         return [label for label, predicted in zip(labels, toLogits(logits[None], THRESHOLD_VALUE)[0]) if predicted]
+
+    def reference(self, example, labels, features=None):
+        specialities = example.get("specialities")
+        if specialities is None:
+            return [label for label, expected in zip(labels, example["specialities_one_hot"]) if expected]
+        if isinstance(specialities, str):
+            specialities = [name.strip() for name in specialities.split(training.SEPARATOR) if name.strip()]
+        names = training.class_names(features, "specialities") or labels
+        return [training.name_of(speciality, names) for speciality in specialities]
+
+    def metrics(self, references, predictions, labels, identifiers=None):
+        def vectors(examples):
+            return np.array([[float(label in example) for label in labels] for example in examples])
+
+        return scores(vectors(references), vectors(predictions))
 
     def train(self):
         text_column = self.text_column

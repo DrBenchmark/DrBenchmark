@@ -115,6 +115,7 @@ class Task(training.Task):
     def __init__(self, dataset, tag_column="ner_tags", metric_for_best_model="f1", needs_data_dir=False):
         self.dataset = dataset
         self.tag_column = tag_column
+        self.reference_column = tag_column
         self.metric_for_best_model = metric_for_best_model
         self.needs_data_dir = needs_data_dir
 
@@ -133,6 +134,14 @@ class Task(training.Task):
                 seen.add(word)
                 prediction[word] = labels[predicted[position]]
         return prediction
+
+    def reference(self, example, labels, features=None):
+        names = training.class_names(features, self.tag_column) or labels
+        return [training.name_of(tag, names) for tag in example[self.tag_column]]
+
+    def metrics(self, references, predictions, labels, identifiers=None):
+        metric = load_seqeval(f"metrics-{os.getpid()}")
+        return metric.compute(predictions=predictions, references=references, zero_division=.0)
 
     def train(self):
         tag_column = self.tag_column
