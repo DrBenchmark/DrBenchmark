@@ -1,0 +1,16 @@
+# TODO: the hyper-parameters of the task. The options of the command line take their place for a run.
+epochs: 10
+model_name: Dr-BERT/DrBERT-7GB
+batch_size: 16
+weight_decay: 0.01
+learning_rate: 2.0e-5
+# The directories of the recipe, from its `scripts/` directory
+output_dir: "../save_models/"
+run_dir: "../runs/"
+data_dir: "../data/"
+# TODO: the subset of the dataset that is read, when it has several
+subset: null
+fewshot: 1.0
+# TODO: the name of the task for `run.py`, and the dataset
+task: "mycorpus-cls"
+dataset: "DrBenchmark/MyCorpus"

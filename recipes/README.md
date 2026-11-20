@@ -9,6 +9,8 @@ Each sub-directory contains the recipe of one dataset of DrBenchmark:
 - `runs/`: results of the runs (one JSON file per run)
 - `save_models/`: best model of each run
 
+[template/](./template/) is not a recipe of the benchmark: it is the recipe that a new task is made from, with the guide [ADDING_A_TASK.md](./ADDING_A_TASK.md).
+
 ## Datasets
 
 | Dataset                           | Task                                                          | Task name for `run.py`  | Launcher (from `scripts/`)         |
@@ -89,6 +91,10 @@ if __name__ == '__main__':
 A script reads the arguments of its run first, with `utils.stop_if_already_computed()`, before it imports the module of its kind of task: this import loads the libraries that train, which takes seconds, and a run whose results exist stops before.
 
 `predict.py` loads the same script to predict with a model that a run kept: what the model reads is built by the same code, `TASK.encode`, when the model is trained and when it predicts. A script that builds its text itself, as the one above, also says which columns of an example it reads (`inputs`: a `"text"`, or the `"words"` of a sentence): they are what `predict.py` asks for.
+
+## Adding a task
+
+[ADDING_A_TASK.md](./ADDING_A_TASK.md) is a guide in seven steps, from the choice of the kind of the task to the tables of the benchmark. It starts from the recipe [template/](./template/), which has the script, the YAML file, the launcher and the README of a classification task, to copy and to fill in.
 
 ## Data
 

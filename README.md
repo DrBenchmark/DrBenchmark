@@ -76,6 +76,10 @@ Dr-BERT/DrBERT-4GB-CP-PubMedBERT
 almanach/camembert-bio-base
 ```
 
+## Add a task
+
+A task is a Python script and a YAML file in a recipe, with a line in `run.py`. [recipes/ADDING_A_TASK.md](./recipes/ADDING_A_TASK.md) is a guide to add one, from the template recipe [recipes/template/](./recipes/template/): its data, its script, its tests and its place in the tables.
+
 ## Using a trained model
 
 Each run keeps its best model in `recipes/<recipe>/save_models/`. `predict.py` predicts with it on your own data: a sentence, a file or an annotated corpus.

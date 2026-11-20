@@ -37,8 +37,11 @@ def load_module(name, path):
 RUN_PY = load_module("drbenchmark_run", REPO / "run.py")
 TASKS = RUN_PY.task2script
 
-# The directories of `recipes/` with scripts: every one but `common/`, the code they share
-RECIPE_NAMES = sorted(path.name for path in RECIPES.iterdir() if (path / "scripts").is_dir())
+# The recipe that a new task is made from: it is not one of the benchmark
+TEMPLATE = RECIPES / "template"
+
+# The directories of `recipes/` with scripts, but the template: `common/`, the code they share, has none
+RECIPE_NAMES = sorted(path.name for path in RECIPES.iterdir() if (path / "scripts").is_dir() and path != TEMPLATE)
 
 # A `models.txt` with what is not a model: empty lines and comments, some after spaces. Its
 # last line does not end with a new line. Whatever reads the file has to find the same models.
