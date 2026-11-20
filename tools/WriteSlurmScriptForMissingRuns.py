@@ -1,14 +1,29 @@
-import os
-import sys
-import json
+"""Write a script for SLURM that does the runs which are missing.
 
-import pandas as pd
+The benchmark expects 4 runs (`--nb-run`) on the whole training set, for each task of `run.py`
+and each model of `models.txt` (`--models`). The runs are read in `recipes/<recipe>/runs/`,
+and the script that is printed has one job for each run that is missing.
+
+A job is a run of `run.py` with a seed: one of the first seeds, from 0, that no run of the
+task for the model has. The runs that `run.py` computed are then not asked for again, and the
+ones that a launcher computed with a seed it drew are counted too.
+
+The script has to be submitted from the root of the repository.
+"""
+
+import sys
+import shlex
+import argparse
+
 from liquid import parse
 
+from models_and_datasets import models_to_evaluate
 from number_of_runs import NB_RUNS
-from repository_paths import REPO_DIR, STATS_DIR
+from repository_paths import REPO_DIR
 
-sys.path.append(REPO_DIR)
+# `run.py` has the tasks, and `predict.py` reads the runs: both are at the root of the repository
+sys.path.insert(0, REPO_DIR)
+import predict  # noqa: E402
 from run import task2script  # noqa: E402
 
 slurm_template = """#!/bin/bash
@@ -28,8 +43,8 @@ slurm_template = """#!/bin/bash
 #SBATCH --partition=gpu
 #SBATCH --constraint='GPURAM_Min_12GB'
 {% endif %}
-# recipes/ and logs/ are looked for in the directory the job is submitted from
-if [ ! -d recipes ]; then
+# run.py, recipes/ and logs/ are looked for in the directory the job is submitted from
+if [ ! -f run.py ] || [ ! -d recipes ]; then
     echo "This script has to be submitted from the root of the DrBenchmark repository, not from $PWD" >&2
     exit 1
 fi
@@ -57,60 +72,55 @@ eval "$COMMAND"
 """
 
 
-if __name__ == '__main__':
-    import argparse
+def arguments():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--nb-run", type=int, required=False, default=NB_RUNS,
+                        help=f"Number of runs expected for each task and each model (default: {NB_RUNS}).")
+    parser.add_argument("--models", type=str, nargs='+', required=False, default=None,
+                        help="Name or path of the models that have to have their runs (default: the models of models.txt).")
+    parser.add_argument("--jeanzay", action='store_true',
+                        help="Use jean-zay's slurm variables.")
+    parser.add_argument("--filter", type=str, nargs='+', required=False, default=[],
+                        help="Filter out jobs containing any of the texts (similar to echo \"$JOBS\" | grep -v A | grep -v B).")
+    return parser.parse_args()
 
-    def arguments():
-        parser = argparse.ArgumentParser(
-            description='Write a script for SLURM that does the runs which are missing, for each task and each model '
-                        'of `stats/results.json`.')
-        parser.add_argument("--nb-run", type=int, required=False, default=NB_RUNS,
-                            help=f"Number of runs expected for each task and each model (default: {NB_RUNS}).")
-        parser.add_argument("--jeanzay", action='store_true',
-                            help="Use jean-zay's slurm variables.")
-        parser.add_argument("--filter", type=str, nargs='+', required=False, default=[],
-                            help="Filter out jobs containing any of the texts (similar to echo \"$JOBS\" | grep -v A | grep -v B).")
-        args = parser.parse_args()
 
-        return args
+def missing_runs(runs, tasks, models, nb_run):
+    """The runs that are missing, as `run.py` does them: (task, model, seed), task by task then model by model.
 
+    The runs of a task for a model are counted whatever their seeds. The ones that are
+    missing get the first seeds, from 0, that none of them has.
+    """
+    missing = []
+    for task in tasks:
+        for model in models:
+            seeds = [run.seed for run in runs if run.task == task and run.fewshot == 1.0 and predict.is_model(run, model)]
+            free = (seed for seed in range(nb_run + len(seeds)) if seed not in seeds)
+            missing += [(task, model, next(free)) for _ in range(nb_run - len(seeds))]
+    return missing
+
+
+def main():
     args = arguments()
+    if args.models is None:
+        try:
+            args.models = models_to_evaluate()
+        except FileNotFoundError:
+            sys.exit(f"`models.txt` is not in {REPO_DIR}: give the models with --models.")
 
-    with open(os.path.join(STATS_DIR, 'results.json')) as f:
-        res = json.load(f)
-
-    df = pd.DataFrame(
-        [[model, *task.split('|'), metric, score * 100]
-            for model, tasks in res.items()
-            for task, metrics in tasks.items()
-            for metric, scores in metrics.items()
-            for score in scores],
-        columns='model dataset task fewshot metric score'.split()
-    )
-
-    # Number of runs of each task for each model: the one of its metric that has the most scores
-    nb_runs = df.groupby(['model', 'dataset', 'task', 'fewshot', 'metric'])['score'].apply(len)
-    nb_runs = nb_runs.unstack(4).fillna(0).apply(max, axis=1)
-    # Add all datasets and tasks
-    all_models = df['model'].unique()
-    dat_tasks = [e.split('-') for e in task2script]
-    nb_runs = nb_runs.reindex([(m, d, t, '1.0') for m in all_models for d, t in dat_tasks]).fillna(0)
-    # Number of runs that are missing
-    nb_runs = (args.nb_run - nb_runs[nb_runs < args.nb_run]).astype(int)
-    nb_runs = nb_runs.reset_index().drop_duplicates()
-    JOBS = []
-    for i, r in nb_runs.iterrows():
-        corpus = r['dataset']
-        task = r['task']
-        model = r['model']
-        comm = f'cd recipes/{corpus}/scripts/ ; ' + task2script[f'{corpus}-{task}'].format(model_name=model)
-        if any(f in comm for f in args.filter):
-            continue
-        JOBS += [comm] * r[0]
-
-    if not JOBS:
+    # The tasks in the order `run.py --tasks all` does them
+    jobs = [
+        f"python run.py --tasks {task} --models {shlex.quote(model)} --nb-run 1 --seed {seed}"
+        for task, model, seed in missing_runs(predict.read_runs(), sorted(task2script), args.models, args.nb_run)
+    ]
+    jobs = [job for job in jobs if not any(text in job for text in args.filter)]
+    if not jobs:
         # An empty job array is not valid for SLURM (--array=0--1)
         sys.exit('No missing run: there is no SLURM script to generate.')
 
     # `parse(...).render(mapping)` works with python-liquid 2 and 3, unlike `render(..., **variables)`
-    print(parse(slurm_template).render({'JOBS': JOBS, 'JEANZAY': args.jeanzay}))
+    print(parse(slurm_template).render({'JOBS': jobs, 'JEANZAY': args.jeanzay}))
+
+
+if __name__ == '__main__':
+    main()

@@ -20,7 +20,7 @@ import types
 import pytest
 
 import synthetic
-from helpers import ALL_TASKS, RECIPES, REPO, Task, copy_tools, load_module, read_json, run_command, run_tool
+from helpers import ALL_TASKS, RECIPES, REPO, Runs, Task, copy_tools, load_module, read_json, run_command, run_tool
 
 MODEL = "Some-Org/Some-Model"
 
@@ -99,48 +99,6 @@ def test_prediction_as_it_is_written_in_a_file(prediction, text, predict):
 # ---------------------------------------------------------------------------------------------
 # The runs and the models that they kept, read in results written by hand
 # ---------------------------------------------------------------------------------------------
-
-class Runs:
-    """Results of runs in a directory that is laid out as `recipes/`."""
-
-    def __init__(self, recipes):
-        self.recipes = recipes
-
-    def write(self, task="cas-pos", seed=0, validation=0.5, metric="f1", model=MODEL, kept=True, fewshot=1.0,
-              metrics=None, recent=True, offline=False):
-        """Write the results of a run, and the model that it kept.
-
-        `kept`: True when the model is there, False when it was removed since, None when
-        the run did not keep it. A run which is not `recent` was written by the scripts that
-        did not say which score of the validation set chose its checkpoint.
-        """
-        recipe = self.recipes / task.split("-")[0]
-        for name in ("runs", "scripts", "save_models"):
-            (recipe / name).mkdir(parents=True, exist_ok=True)
-        name = f"DrBenchmark-{task}-{model.replace('/', '_')}-{seed}-{fewshot}"
-        if kept:
-            (recipe / "save_models" / f"{name}_best_model").mkdir()
-            (recipe / "save_models" / f"{name}_best_model" / "config.json").write_text("{}")
-        local_copy = f"../../../models/{model.lower().replace('/', '_')}"
-        results = {
-            # A run writes the path from the directory of its script
-            "model_name": None if kept is None else f"../save_models/{name}_best_model",
-            "metrics": metrics or {"overall_f1": 0.75, "overall_accuracy": 0.875},
-            "hyperparameters": {
-                "task": task, "seed": seed, "fewshot": fewshot, "max_position_embeddings": 512,
-                "model_name": local_copy if offline else model, "hub_model_name": model if recent else None,
-            },
-            "trainer_state": {"best_metric": validation, "log_history": [{f"eval_{metric}": validation, "epoch": 1.0}]},
-        }
-        if recent:
-            results["validation"] = {"metric": metric, "score": validation}
-        path = recipe / "runs" / f"{name}.json"
-        path.write_text(json.dumps(results))
-        return path
-
-    def model_dir(self, path):
-        return path.parent.parent / "save_models" / f"{path.stem}_best_model"
-
 
 @pytest.fixture
 def runs(predict, tmp_path, monkeypatch):

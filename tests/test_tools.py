@@ -12,7 +12,7 @@ import sys
 import pandas
 import pytest
 
-from helpers import ALL_TASKS, REPO, copy_tools, load_module, read_json, run_tool, run_without_slurm
+from helpers import ALL_TASKS, REPO, Runs, copy_tools, load_module, read_json, run_tool, run_without_slurm
 
 TOOLS = sorted(path.name for path in (REPO / "tools").glob("*.py"))
 
@@ -431,61 +431,126 @@ def test_only_the_runs_that_are_averaged_together_are_compared(runs):
     assert set(results["some/model"]) == {"morfitt|cls|1.0", "diamed|cls|1.0", "morfitt|cls|0.5"}
 
 
+MODEL_OF_THE_FILE = "Dr-BERT/DrBERT-7GB"
+
+
 @pytest.fixture
 def write_slurm_script(tmp_path):
-    """Run `tools/WriteSlurmScriptForMissingRuns.py` on the number of runs given for each task."""
+    """Run `tools/WriteSlurmScriptForMissingRuns.py` in a repository whose `models.txt` has one model.
+
+    `write_slurm_script(seeds, *arguments)` first writes the results of runs of this model: the
+    seeds given for each task.
+    """
     pytest.importorskip("liquid", reason="python-liquid is needed by tools/WriteSlurmScriptForMissingRuns.py")
     repository = tmp_path / "repository"
     repository.mkdir()
     copy_tools(repository)
+    (repository / "models.txt").write_text(f"# The models to evaluate\n{MODEL_OF_THE_FILE}\n")
+    runs = Runs(repository / "recipes")
     elsewhere = tmp_path / "elsewhere"
     elsewhere.mkdir()
 
-    def run(runs_per_task, *arguments):
-        results = {
-            results_key(task): {"overall_f1": [0.5] * runs_per_task[task.name]}
-            for task in ALL_TASKS if runs_per_task.get(task.name)
-        }
-        (repository / "stats" / "results.json").write_text(json.dumps({"Dr-BERT/DrBERT-7GB": results}))
+    def run(seeds_of_tasks, *arguments, **how_they_are_written):
+        for task_name, seeds in seeds_of_tasks.items():
+            for seed in seeds:
+                runs.write(task=task_name, seed=seed, model=MODEL_OF_THE_FILE, **how_they_are_written)
         return run_tool("WriteSlurmScriptForMissingRuns.py", repository, *arguments, cwd=elsewhere)
 
+    run.repository, run.runs = repository, runs
     return run
 
 
+def job(task_name, seed, model=MODEL_OF_THE_FILE):
+    """The job of a missing run: a run of `run.py`, with the seed of the run."""
+    return f"python run.py --tasks {task_name} --models {model} --nb-run 1 --seed {seed}"
+
+
+def jobs_of(script, task_name=None):
+    """The jobs of a generated script, or its jobs for a task."""
+    jobs = re.findall(r'^    "(python run\.py .+)"$', script, re.M)
+    return jobs if task_name is None else [command for command in jobs if f" --tasks {task_name} " in command]
+
+
 def test_write_slurm_script_for_missing_runs(write_slurm_script):
-    """The generated job array has one index per missing run, for 4 runs per task."""
-    completed = write_slurm_script({"cas-pos": 4, "cas-cls": 1})
+    """The generated job array has one job per missing run, for 4 runs per task: `run.py` with the seed that has no run."""
+    completed = write_slurm_script({"cas-pos": [0, 1, 2, 3], "cas-cls": [0, 2]})
     assert completed.returncode == 0, completed.stderr[-3000:]
     script = completed.stdout
 
-    jobs = re.findall(r'^    "(cd recipes/\w+/scripts/ ; \./run\S*\.sh .+)"$', script, re.M)
-    # Nothing for cas-pos, 3 runs for cas-cls and 4 runs for each of the other tasks
-    assert len(jobs) == 3 + 4 * (len(ALL_TASKS) - 2)
-    assert jobs.count("cd recipes/cas/scripts/ ; ./run_task_2.sh Dr-BERT/DrBERT-7GB") == 3
-    assert not any("run_task_1.sh" in job for job in jobs if "recipes/cas/" in job)
+    jobs = jobs_of(script)
+    # Nothing for cas-pos, 2 runs for cas-cls and 4 runs for each of the other tasks
+    assert len(jobs) == 2 + 4 * (len(ALL_TASKS) - 2)
+    assert jobs_of(script, "cas-pos") == []
+    assert jobs_of(script, "cas-cls") == [job("cas-cls", 1), job("cas-cls", 3)]
+    assert jobs_of(script, "quaero-ner_emea") == [job("quaero-ner_emea", seed) for seed in (0, 1, 2, 3)]
+    # The tasks are in the order `run.py --tasks all` does them
+    tasks = [command.split()[3] for command in jobs]
+    assert tasks == sorted(tasks) and set(tasks) == {task.name for task in ALL_TASKS} - {"cas-pos"}
 
     first, last = re.search(r"^#SBATCH --array=(\d+)-(\d+)%\d+", script, re.M).groups()
     assert (int(first), int(last)) == (0, len(jobs) - 1)
 
 
+def test_runs_whose_seed_was_drawn_are_counted(write_slurm_script):
+    """A launcher draws the seed of a run: the run is one of its task, and the missing ones get the first seeds."""
+    completed = write_slurm_script({"cas-cls": [123456, 1], "cas-pos": [5, 6, 7, 8, 9]})
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    assert jobs_of(completed.stdout, "cas-cls") == [job("cas-cls", 0), job("cas-cls", 2)]
+    assert jobs_of(completed.stdout, "cas-pos") == []
+
+
 def test_write_slurm_script_with_another_number_of_runs(write_slurm_script):
     """`--nb-run` is the number of runs that each task must have."""
-    completed = write_slurm_script({"cas-pos": 4, "cas-cls": 1, "clister-regr": 2}, "--nb-run", "2")
+    completed = write_slurm_script({"cas-pos": [0, 1, 2, 3], "cas-cls": [0], "clister-regr": [0, 1]}, "--nb-run", "2")
     assert completed.returncode == 0, completed.stderr[-3000:]
 
-    jobs = re.findall(r'^    "(cd recipes/\w+/scripts/ ; \./run\S*\.sh .+)"$', completed.stdout, re.M)
     # Nothing for cas-pos and clister-regr, 1 run for cas-cls and 2 runs for each of the other tasks
-    assert len(jobs) == 1 + 2 * (len(ALL_TASKS) - 3)
-    assert jobs.count("cd recipes/cas/scripts/ ; ./run_task_2.sh Dr-BERT/DrBERT-7GB") == 1
-    assert "cd recipes/cas/scripts/ ; ./run_task_1.sh Dr-BERT/DrBERT-7GB" not in jobs
-    assert not any(job.startswith("cd recipes/clister/") for job in jobs)
+    assert len(jobs_of(completed.stdout)) == 1 + 2 * (len(ALL_TASKS) - 3)
+    assert jobs_of(completed.stdout, "cas-cls") == [job("cas-cls", 1)]
+    assert jobs_of(completed.stdout, "cas-pos") == jobs_of(completed.stdout, "clister-regr") == []
 
 
 def test_write_slurm_script_without_missing_run(write_slurm_script):
-    completed = write_slurm_script({task.name: 4 for task in ALL_TASKS})
+    completed = write_slurm_script({task.name: [0, 1, 2, 3] for task in ALL_TASKS})
     assert completed.returncode != 0
     assert completed.stdout == ""
     assert "No missing run" in completed.stderr
+
+
+def test_runs_that_are_not_the_ones_of_the_benchmark_are_not_counted(write_slurm_script):
+    """A run on a part of the training set, and a run of a model that is not asked for."""
+    write_slurm_script.runs.write(task="cas-cls", seed=0, model=MODEL_OF_THE_FILE, fewshot=0.5)
+    write_slurm_script.runs.write(task="cas-cls", seed=1, model="another/model")
+    completed = write_slurm_script({"cas-cls": [2]})
+    assert jobs_of(completed.stdout, "cas-cls") == [job("cas-cls", 0), job("cas-cls", 1), job("cas-cls", 3)]
+
+
+def test_run_of_the_copy_of_a_model_is_one_of_the_model(write_slurm_script):
+    """In offline mode a run has the copy of its model, `models/dr-bert_drbert-7gb`: the first scripts did not write its name."""
+    completed = write_slurm_script({"cas-cls": [0, 1, 2]}, recent=False, offline=True)
+    assert jobs_of(completed.stdout, "cas-cls") == [job("cas-cls", 3)]
+
+
+def test_models_that_have_to_have_their_runs(write_slurm_script):
+    """The models of `models.txt`, or the ones of `--models`: a name is given to `run.py` as one argument."""
+    completed = write_slurm_script({"cas-cls": [0, 1, 2, 3]}, "--models", MODEL_OF_THE_FILE, "some org/a model")
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    assert jobs_of(completed.stdout, "cas-cls") == [job("cas-cls", seed, "'some org/a model'") for seed in (0, 1, 2, 3)]
+    assert jobs_of(completed.stdout, "cas-pos")[:5] == (
+        [job("cas-pos", seed) for seed in (0, 1, 2, 3)] + [job("cas-pos", 0, "'some org/a model'")])
+
+    (write_slurm_script.repository / "models.txt").unlink()
+    completed = write_slurm_script({})
+    assert completed.returncode == 1
+    assert completed.stderr == f"`models.txt` is not in {write_slurm_script.repository}: give the models with --models.\n"
+    assert write_slurm_script({}, "--models", "another/model").returncode == 0
+
+
+def test_jobs_can_be_left_out_of_the_slurm_script(write_slurm_script):
+    completed = write_slurm_script({}, "--filter", "cas-", "quaero", "--seed 3")
+    jobs = jobs_of(completed.stdout)
+    assert len(jobs) == 3 * (len(ALL_TASKS) - 6)
+    assert not any(text in command for command in jobs for text in ("cas-", "quaero", "--seed 3"))
 
 
 def test_number_of_runs_is_checked(tmp_path):
@@ -534,20 +599,27 @@ def test_tools_expect_the_same_number_of_runs(tool):
 
 @pytest.mark.parametrize("arguments", [[], ["--jeanzay"]], ids=["slurm", "jean-zay"])
 def test_generated_slurm_script_is_submitted_from_the_root_of_the_repository(arguments, write_slurm_script, tmp_path):
-    """The jobs of the generated script are relative to the root of the repository: it refuses to run elsewhere."""
+    """The jobs of the generated script run `run.py` in the directory it is submitted from: it refuses to run elsewhere."""
     script = tmp_path / "missing_runs.sh"
-    script.write_text(write_slurm_script({"cas-pos": 4}, *arguments).stdout)
-
-    refused, commands = run_without_slurm(script, cwd=tmp_path / "elsewhere", directory=tmp_path / "slurm")
-    assert refused.returncode == 1
-    assert "has to be submitted from the root of the DrBenchmark repository" in refused.stderr
-    # Nothing was run: neither the set up of the environment, nor a job
-    assert commands == []
-
-    # From a directory with the recipes, the environment is set up and the job is run
+    script.write_text(write_slurm_script({"cas-pos": [0, 1, 2, 3], "cas-cls": [0]}, *arguments).stdout)
     root = tmp_path / "root"
-    (root / "recipes" / "cas" / "scripts").mkdir(parents=True)
-    accepted, commands = run_without_slurm(script, cwd=root, directory=tmp_path / "slurm")
-    assert "has to be submitted" not in accepted.stderr
-    assert commands[-1] == "conda activate DrBenchmark"
-    assert "index: 0, value: cd recipes/cas/scripts/ ; ./run_task_2.sh Dr-BERT/DrBERT-7GB" in accepted.stdout
+    (root / "recipes").mkdir(parents=True)
+    # A directory that has a file named `run.py`, without the recipes
+    not_the_repository = tmp_path / "not_the_repository"
+    not_the_repository.mkdir()
+    (not_the_repository / "run.py").touch()
+
+    # Without `run.py` or without `recipes/`, or elsewhere: nothing is run, neither the set up of the environment nor a job
+    for directory in (tmp_path / "elsewhere", root, not_the_repository):
+        refused, commands = run_without_slurm(script, cwd=directory, directory=tmp_path / "slurm")
+        assert refused.returncode == 1
+        assert f"has to be submitted from the root of the DrBenchmark repository, not from {directory}" in refused.stderr
+        assert commands == []
+
+    # From the root of the repository, the environment is set up and the job does its run
+    (root / "run.py").touch()
+    for task_id, command in ((0, job("cas-cls", 1)), (3, job("cas-ner_neg", 0))):
+        accepted, commands = run_without_slurm(script, cwd=root, directory=tmp_path / "slurm", task_id=task_id)
+        assert accepted.returncode == 0 and "has to be submitted" not in accepted.stderr
+        assert commands[-2:] == ["conda activate DrBenchmark", command]
+        assert f"index: {task_id}, value: {command}" in accepted.stdout

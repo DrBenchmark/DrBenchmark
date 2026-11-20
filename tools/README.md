@@ -30,7 +30,7 @@ python tools/CollectAndAverageScores.py --help
 
 ## From the runs to the tables
 
-Each run of a recipe writes its results in `recipes/<recipe>/runs/DrBenchmark-<task name>-<hash>.json`. The tools below turn these files into the scores of the benchmark. `CollectAndAverageScores.py` has to be run first: the other ones read what it writes.
+Each run of a recipe writes its results in `recipes/<recipe>/runs/DrBenchmark-<task name>-<hash>.json`. The tools below turn these files into the scores of the benchmark. `CollectAndAverageScores.py` has to be run first for the tools that read the scores it collects: `CheckNumberOfRuns.py`, the two tables and the figure. The other ones read the runs themselves.
 
 ```bash
 python tools/CollectAndAverageScores.py    # stats/results.json
@@ -75,14 +75,16 @@ Prints the scores of `stats/results.json` that do not come from the expected num
 
 ### WriteSlurmScriptForMissingRuns.py
 
-Prints a script for SLURM with one job per missing run, for each model of `stats/results.json` and each task of `run.py`, so that all of them have 4 runs (`--nb-run`). It has to be submitted from the root of the repository. Its jobs call the launchers of the recipes, which draw the seed of each run: they add runs to the ones that exist, whatever their seeds. After `run_all_slurm.sh` or `run_all_jean_zay.sh`, whose runs have the seeds of `run.py`, submitting the same script again is enough: it only computes the runs that are missing.
+Prints a script for SLURM with one job per missing run, for each task of `run.py` and each model of `models.txt` (`--models`), so that all of them have 4 runs (`--nb-run`) on the whole training set. The runs are read in `recipes/<recipe>/runs/`: `CollectAndAverageScores.py` does not have to be run first. The script has to be submitted from the root of the repository.
+
+A job is a run of `run.py` with its seed, e.g. `python run.py --tasks cas-cls --models Dr-BERT/DrBERT-7GB --nb-run 1 --seed 2`. The seeds are the first ones, from 0, that no run of the task for the model has: a run that `run.py` computed is not asked for again, and a run whose seed was drawn by a launcher is counted as one of the runs. After `run_all_slurm.sh` or `run_all_jean_zay.sh`, submitting the same script again also computes the runs that are missing, but with one job for every run: this tool only writes the jobs of the missing ones.
 
 ```bash
 python tools/WriteSlurmScriptForMissingRuns.py > missing_runs.sh
 sbatch missing_runs.sh
 ```
 
-`--jeanzay` writes the header for Jean Zay, and `--filter` leaves out the jobs whose command contains one of the given texts (a recipe, a model).
+`--jeanzay` writes the header for Jean Zay, and `--filter` leaves out the jobs whose command contains one of the given texts (a recipe, a model). The jobs give `run.py` no option of the recipes: their runs are the ones of the YAML files and of `config.yaml`.
 
 ### BuildExcelTableOfScores.py
 
