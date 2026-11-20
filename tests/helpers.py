@@ -142,12 +142,16 @@ def run_tool(script, repository, *arguments, cwd):
     )
 
 
-def run_without_slurm(script, cwd, directory, task_id=0):
+def run_without_slurm(script, cwd, directory, task_id=0, last_task_id=None, run_python=False):
     """Run a script for SLURM with bash, from the directory `cwd`, as the job `task_id` of its array.
 
     The programs the script calls (`srun`, `conda`, `module` and `python`) are replaced by
     one that only records its command line. They are created in `directory`, as the home
     directory of the script. Returns the process and the commands that were recorded.
+
+    With `run_python`, `srun` runs its command after it recorded it, and `python` is the
+    interpreter of the tests: what the script asks Python for is really done.
+    `last_task_id` is the number of the last job of the array, which SLURM gives to each job.
     """
     programs = directory / "bin"
     home = directory / "home"
@@ -159,11 +163,18 @@ def run_without_slurm(script, cwd, directory, task_id=0):
     recorded.write_text("")
     for name in ("srun", "conda", "module", "python"):
         program = programs / name
-        program.write_text(f"#!/bin/sh\necho \"{name} $*\" >> '{recorded}'\n")
+        commands = [f"echo \"{name} $*\" >> '{recorded}'"]
+        if run_python and name == "srun":
+            commands.append('exec "$@"')
+        if run_python and name == "python":
+            commands.append(f"exec {shlex.quote(sys.executable)} \"$@\"")
+        program.write_text("#!/bin/sh\n" + "\n".join(commands) + "\n")
         program.chmod(0o755)
 
     # Nothing of the environment of the tests is given to the script
     environ = {"PATH": f"{programs}{os.pathsep}/usr/bin{os.pathsep}/bin", "HOME": str(home), "SLURM_ARRAY_TASK_ID": str(task_id)}
+    if last_task_id is not None:
+        environ["SLURM_ARRAY_TASK_MAX"] = str(last_task_id)
     completed = subprocess.run(["bash", str(script)], cwd=cwd, env=environ, capture_output=True, text=True, timeout=60)
     return completed, recorded.read_text().splitlines()
 

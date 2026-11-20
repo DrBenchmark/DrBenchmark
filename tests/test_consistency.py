@@ -103,18 +103,19 @@ def test_datasets_saved_for_the_offline_mode():
         assert f"DrBenchmark/{corpus}" == datasets[corpus.lower()]
 
 
+def names_of_tasks(text):
+    """The names of tasks of `run.py` that are written in a text."""
+    return re.findall("|".join(sorted(TASKS, key=len, reverse=True)), text)
+
+
 @pytest.mark.parametrize("script", ["run_all_slurm.sh", "run_all_jean_zay.sh"])
-def test_slurm_script_runs_every_task(script):
-    jobs = re.findall(
-        r"""^\s*"cd \./recipes/(\w+)/scripts/ && srun bash (\S+) '\$MODEL_NAME'(?: '(\w+)')?"$""",
-        (REPO / script).read_text(),
-        re.M,
-    )
-    commands = sorted(
-        (recipe, f"./{launcher} {{model_name}}" + (f" {subset}" if subset else ""))
-        for recipe, launcher, subset in jobs
-    )
-    assert commands == sorted((task.recipe, TASKS[task.name]) for task in ALL_TASKS)
+def test_slurm_script_asks_run_py_for_every_task(script):
+    """The tasks are only listed in `run.py`: the scripts for SLURM ask it for a run of all of them."""
+    source = (REPO / script).read_text()
+    assert 'srun python run.py --tasks all --nb-run "$NBR_RUNS" --job "$SLURM_ARRAY_TASK_ID"' in source.splitlines()
+    # Neither a task nor a launcher is written in the script
+    assert names_of_tasks(source) == []
+    assert "run_task_" not in source and "run.sh" not in source
 
 
 @pytest.mark.parametrize("script", ["run_all_slurm.sh", "run_all_jean_zay.sh"])
@@ -131,13 +132,13 @@ def test_slurm_script_does_the_runs_of_the_benchmark(script):
     assert (int(first), int(last)) == (0, len(ALL_TASKS) * len(models) * runs - 1)
 
 
-def test_run_one_jean_zay_lists_every_task():
-    """`run_one_jean_zay.sh` proposes one line per task, with the names `run.py` accepts."""
+def test_task_of_run_one_jean_zay_is_one_of_run_py():
+    """`run_one_jean_zay.sh` does one task, which has a name that `run.py` accepts."""
     script = (REPO / "run_one_jean_zay.sh").read_text()
-    proposed = re.findall(r"^#? ?TASK='([^']+)'$", script, re.M)
-    assert sorted(proposed) == sorted(TASKS)
-    # Exactly one of them is not commented out
-    assert len(re.findall(r"^TASK='([^']+)'$", script, re.M)) == 1
+    (task,) = re.findall(r"^TASK='([^']+)'$", script, re.M)
+    assert task in TASKS
+    # The other tasks are not listed: their names are the ones of `python run.py --help`
+    assert names_of_tasks(script) == [task]
 
 
 def test_recipes_readme_lists_every_task():

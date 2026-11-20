@@ -70,7 +70,7 @@ Prints the scores of `stats/results.json` that do not come from the expected num
 
 ### WriteSlurmScriptForMissingRuns.py
 
-Prints a script for SLURM with one job per missing run, for each model of `stats/results.json` and each task of `run.py`, so that all of them have 4 runs (`--nb-run`). It has to be submitted from the root of the repository.
+Prints a script for SLURM with one job per missing run, for each model of `stats/results.json` and each task of `run.py`, so that all of them have 4 runs (`--nb-run`). It has to be submitted from the root of the repository. Its jobs call the launchers of the recipes, which draw the seed of each run: they add runs to the ones that exist, whatever their seeds. After `run_all_slurm.sh` or `run_all_jean_zay.sh`, whose runs have the seeds of `run.py`, submitting the same script again is enough: it only computes the runs that are missing.
 
 ```bash
 python tools/WriteSlurmScriptForMissingRuns.py > missing_runs.sh

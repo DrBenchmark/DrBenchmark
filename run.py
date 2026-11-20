@@ -89,6 +89,10 @@ if __name__ == '__main__':
         parser.add_argument("--seed", type=int, required=False,
                             help="Seed of the first run of each task for each model: the next runs have the next "
                                  "seeds (default: 0)", default=0)
+        parser.add_argument("--job", type=int, required=False,
+                            help="Only do the run that has this number, from 0, among the runs that are asked for: they "
+                                 "are numbered task by task, then model by model. A job of a job array of SLURM does "
+                                 "the run that has its number this way: see run_all_slurm.sh.", default=None)
         parser.add_argument("--log-level", type=str, required=False,
                             help="Level of logging (default: INFO)", default='INFO')
         recipes = parser.add_argument_group(
@@ -101,6 +105,8 @@ if __name__ == '__main__':
         # The seeds of the runs: `transformers.set_seed` accepts the ones below 2**32
         if args.seed < 0 or args.seed + args.nb_run > 2**32:
             parser.error(f'the seeds of the runs have to be between 0 and 2**32-1: --seed {args.seed} --nb-run {args.nb_run}')
+        if args.job is not None and args.job < 0:
+            parser.error(f'the runs are numbered from 0: --job {args.job}')
 
         return args, given_to_the_recipes
 
@@ -137,35 +143,45 @@ if __name__ == '__main__':
     if args.tasks == ['all']:
         args.tasks = sorted(list(task2script.keys()))
 
+    # The runs that are asked for, in the order they are done: (task, model, number of the run)
+    runs = [(task, model, iteration) for task in args.tasks for model in args.models for iteration in range(args.nb_run)]
+    if args.job is not None:
+        # The last job of the job array of SLURM, when `run.py` is run by one
+        last_job = os.environ.get('SLURM_ARRAY_TASK_MAX', '')
+        if last_job.isdigit() and int(last_job) < len(runs) - 1:
+            logging.warning(
+                f'The job array stops at the job {last_job}: the runs {int(last_job) + 1} to {len(runs) - 1} have no job. '
+                f'There is one job per run with --array=0-{len(runs) - 1}')
+        if args.job >= len(runs):
+            logging.warning(f'There is no run {args.job}: {len(runs)} runs are asked for, numbered from 0')
+        runs = runs[args.job:args.job + 1]
+
     # Runs that did not end properly: (task, model, iteration, exit code)
     failures = []
 
-    for task in args.tasks:
+    for task, model, iteration in runs:
         corpus, subset = task.split('-')
+        # Each run has its own seed, always the same: the recipe names its results after its
+        # arguments, and does not compute again a run whose results exist
+        seed = args.seed + iteration
+        logging.info('=============================')
+        logging.info(f'Evaluating {model} on {corpus}-{subset} (run {iteration}, seed {seed})')
+        logging.info('=============================')
+        logging.info('')
 
-        for model in args.models:
-            for iteration in range(args.nb_run):
-                # Each run has its own seed, always the same: the recipe names its results after its
-                # arguments, and does not compute again a run whose results exist
-                seed = args.seed + iteration
-                logging.info('=============================')
-                logging.info(f'Evaluating {model} on {corpus}-{subset} (run {iteration}, seed {seed})')
-                logging.info('=============================')
-                logging.info('')
+        command = task2script[task].format(model_name=shlex.quote(model))
+        # What follows the model and the subset is given to the script of the recipe
+        command += ' ' + shlex.join(['--seed', str(seed), *recipe_options])
+        scripts_dir = os.path.join(REPO_DIR, 'recipes', corpus.lower(), 'scripts')
+        try:
+            returncode = subprocess.call(command, shell=True, cwd=scripts_dir)
+        except KeyboardInterrupt:
+            logging.info('KeyboardInterrupt Exiting...')
+            sys.exit(130)
 
-                command = task2script[task].format(model_name=shlex.quote(model))
-                # What follows the model and the subset is given to the script of the recipe
-                command += ' ' + shlex.join(['--seed', str(seed), *recipe_options])
-                scripts_dir = os.path.join(REPO_DIR, 'recipes', corpus.lower(), 'scripts')
-                try:
-                    returncode = subprocess.call(command, shell=True, cwd=scripts_dir)
-                except KeyboardInterrupt:
-                    logging.info('KeyboardInterrupt Exiting...')
-                    sys.exit(130)
-
-                if returncode != 0:
-                    logging.error(f'Evaluation of {model} on {corpus}-{subset} (run {iteration}) failed with exit code {returncode}')
-                    failures.append((task, model, iteration, returncode))
+        if returncode != 0:
+            logging.error(f'Evaluation of {model} on {corpus}-{subset} (run {iteration}) failed with exit code {returncode}')
+            failures.append((task, model, iteration, returncode))
 
     # A failed run does not stop the other ones, but it must not go unnoticed
     if failures:

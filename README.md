@@ -32,7 +32,7 @@ python run.py --tasks all --nb-run 4
 
 **Note**: `run.py`, the two download scripts, the launchers of the recipes and the tools of `tools/` find the files of the repository from their own location: they can be run from any directory, e.g. `python ~/DrBenchmark/run.py --tasks cas-pos`. A relative path given on their command line, such as the one of a local model, is relative to the current directory.
 
-**Note**: `run.py` gives each run its seed: 0 for the first run of a task for a model, 1 for the second one, and so on (`--seed` gives another seed to the first run). A run whose results already are in `recipes/<recipe>/runs/` is not computed again: the same command resumes a benchmark that was interrupted, and `--nb-run 4` after `--nb-run 2` only computes the two runs that are missing. A launcher that is not given a seed draws one, as in the scripts for SLURM: `run.py` does not take these runs for its own.
+**Note**: `run.py` gives each run its seed: 0 for the first run of a task for a model, 1 for the second one, and so on (`--seed` gives another seed to the first run). A run whose results already are in `recipes/<recipe>/runs/` is not computed again: the same command resumes a benchmark that was interrupted, and `--nb-run 4` after `--nb-run 2` only computes the two runs that are missing. A launcher that is not given a seed draws one: `run.py` does not take such a run for one of its own.
 
 **Note**: `run.py` accepts the options of the recipes and gives them to every run, e.g. `python run.py --tasks cas-pos --offline false --epochs 1 --fewshot 0.25`. They are listed by `python run.py --help`. A run with other options is another run, with its own results.
 
@@ -42,7 +42,9 @@ More information on managing environments with Anaconda can be found in [the con
 
 ### Running with SLURM
 
-The scripts for SLURM have to be submitted from the root of the repository: they look for `models.txt` and `recipes/` in the directory they are submitted from, and SLURM writes their logs in `./logs/`.
+The scripts for SLURM have to be submitted from the root of the repository: they run `run.py` in the directory they are submitted from, and SLURM writes their logs in `./logs/`.
+
+`run_all_slurm.sh` and `run_all_jean_zay.sh` submit a job array in which each job does one run of `run.py`, for every task and every model of `models.txt`: `python run.py --tasks all --nb-run 4 --job <number of the job>`. The size of the array (`--array`) has to be the number of runs: 27 tasks x the number of models x the number of runs (`NBR_RUNS`). When it is too small, the log of each job says so. As `run.py` does not compute again a run whose results exist, submitting a script again only computes the runs that are missing.
 
 1. `sbatch run_all_slurm.sh`
 

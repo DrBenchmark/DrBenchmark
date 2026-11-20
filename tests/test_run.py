@@ -11,7 +11,9 @@ import sys
 
 import pytest
 
-from helpers import MODELS_FILE, MODELS_OF_THE_FILE, RECIPES, REPO, TASKS, Task, load_module, read_json, run_command
+from helpers import (
+    MODELS_FILE, MODELS_OF_THE_FILE, RECIPES, REPO, TASKS, Task, load_module, read_json, run_command, run_without_slurm,
+)
 
 MODEL = "some org/a model"  # with a space, to check that it is given as one argument
 
@@ -139,6 +141,80 @@ def test_seed_of_the_first_run_can_be_chosen(fake_repository):
     ]
     for iteration, seed in enumerate((40, 41, 42)):
         assert f"(run {iteration}, seed {seed})" in completed.stderr
+
+
+def test_job_is_one_of_the_runs(fake_repository):
+    """With `--job`, `run.py` only does the run that has this number, among the ones it does without it."""
+    fake_repository.create_launchers({"cas-pos": 0, "e3c-ner_clinical": 0})
+    # Without `models.txt`, `run.py` warns about it before it sets its messages up, and does not show the next ones
+    (fake_repository.directory / "models.txt").write_text("not/used\n")
+    asked = ("--tasks", "cas-pos", "e3c-ner_clinical", "--models", MODEL, "other/model", "--nb-run", "2", "--epochs", "3")
+
+    assert fake_repository.run(*asked).returncode == 0
+    runs = fake_repository.recorded_calls()
+    assert len(runs) == 8
+
+    for job, run in enumerate(runs):
+        fake_repository.calls.write_text("")
+        completed = fake_repository.run(*asked, "--job", str(job))
+        assert completed.returncode == 0, completed.stderr
+        assert fake_repository.recorded_calls() == [run], job
+        assert "There is no run" not in completed.stderr
+
+    # The job of a job array that is larger than the number of runs has nothing to do
+    fake_repository.calls.write_text("")
+    completed = fake_repository.run(*asked, "--job", "8")
+    assert completed.returncode == 0
+    assert "There is no run 8: 8 runs are asked for, numbered from 0" in completed.stderr
+    assert fake_repository.recorded_calls() == []
+
+    refused = fake_repository.run(*asked, "--job", "-1")
+    assert refused.returncode == 2
+    assert "the runs are numbered from 0: --job -1" in refused.stderr
+
+
+def test_failure_of_a_job_is_the_one_of_its_run(fake_repository):
+    fake_repository.create_launchers({"cas-pos": 0, "cas-cls": 3})
+    asked = ("--tasks", "cas-pos", "cas-cls", "--models", MODEL)
+    assert fake_repository.run(*asked, "--job", "0").returncode == 0
+    assert fake_repository.run(*asked, "--job", "1").returncode == 1
+
+
+@pytest.mark.parametrize("script", ["run_all_slurm.sh", "run_all_jean_zay.sh"])
+def test_job_of_a_script_for_slurm_does_its_run(script, fake_repository, tmp_path):
+    """The scripts for SLURM run `run.py` for real: each job does one run of a task for a model of `models.txt`."""
+    fake_repository.create_launchers(dict.fromkeys(TASKS, 0))
+    (fake_repository.directory / "models.txt").write_text(MODELS_FILE)
+    nb_runs = int(re.search(r"^NBR_RUNS=(\d+)$", (REPO / script).read_text(), re.M).group(1))
+    # Task by task, then model by model: `run.py` does the tasks in the order of their names
+    runs = [(task, model, run) for task in sorted(TASKS) for model in MODELS_OF_THE_FILE for run in range(nb_runs)]
+
+    def done(job, last_job=len(runs) - 1):
+        fake_repository.calls.write_text("")
+        completed, _ = run_without_slurm(
+            REPO / script, cwd=fake_repository.directory, directory=tmp_path / "slurm",
+            task_id=job, last_task_id=last_job, run_python=True,
+        )
+        assert completed.returncode == 0, completed.stderr
+        calls = [(call.task, call.arguments[0], int(call.arguments[-1])) for call in fake_repository.recorded_calls()]
+        return calls, completed.stderr
+
+    for job in (0, 1, nb_runs, 2 * nb_runs, len(runs) - 1):
+        calls, messages = done(job)
+        # The seed of the run is its number for the task and the model
+        assert calls == [runs[job]], job
+        assert "job array" not in messages
+    calls, messages = done(len(runs))
+    assert calls == []
+    assert f"There is no run {len(runs)}: {len(runs)} runs are asked for, numbered from 0" in messages
+
+    # A job array that is too small does not do the last runs: each of its jobs says so
+    calls, messages = done(0, last_job=len(runs) - 3)
+    assert calls == [runs[0]]
+    assert (
+        f"The job array stops at the job {len(runs) - 3}: the runs {len(runs) - 2} to {len(runs) - 1} have no job. "
+        f"There is one job per run with --array=0-{len(runs) - 1}"
+    ) in messages
 
 
 def test_options_of_the_recipes_are_given_to_every_run(fake_repository, utils):

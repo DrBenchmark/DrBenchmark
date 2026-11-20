@@ -33,32 +33,7 @@ conda activate DrBenchmark
 MODEL_NAME="Dr-BERT/DrBERT-7GB"
 NBR_RUNS=1
 
-# TASK='cas-pos'
-# TASK='cas-cls'
-# TASK='cas-ner_neg'
-# TASK='cas-ner_spec'
-# TASK='clister-regr'
-# TASK='diamed-cls'
-# TASK='e3c-ner_clinical'
-# TASK='e3c-ner_temporal'
-# TASK='essai-pos'
-# TASK='essai-cls'
-# TASK='essai-ner_neg'
-# TASK='essai-ner_spec'
+# One of the names of tasks that `python run.py --help` lists
 TASK='frenchmedmcqa-mcqa'
-# TASK='frenchmedmcqa-cls'
-# TASK='mantragsc-ner_emea'
-# TASK='mantragsc-ner_medline'
-# TASK='mantragsc-ner_patents'
-# TASK='morfitt-cls'
-# TASK='deft2019-ner'
-# TASK='deft2020-regr'
-# TASK='deft2020-cls'
-# TASK='deft2021-ner'
-# TASK='deft2021-cls'
-# TASK='pxcorpus-ner'
-# TASK='pxcorpus-cls'
-# TASK='quaero-ner_emea'
-# TASK='quaero-ner_medline'
 
 python run.py --tasks "$TASK" --models "$MODEL_NAME" --nb-run "$NBR_RUNS"
