@@ -26,11 +26,15 @@ python run.py --tasks all --nb-run 4
 
 **Note**: The access to **DEFT-2019** data is restricted. Once data is acquired, add files to `./recipes/deft2019/data/` (see [its README](./recipes/deft2019/README.md) for the expected layout).
 
-**Note**: `offline` is set to `True` by default in `./config.yaml`: the datasets and the models are read from local copies, which have to be built first with `python ./download_datasets_locally.py` and `python ./download_models_locally.py`. This is the mode to use on an **offline machine / cluster**. To download the datasets and the models directly from the HuggingFace Hub instead, set `offline` to `False` in `./config.yaml`.
+**Note**: `offline` is set to `True` by default in `./config.yaml`: the datasets and the models are read from local copies, which have to be built first with `python ./download_datasets_locally.py` and `python ./download_models_locally.py`. This is the mode to use on an **offline machine / cluster**. To download the datasets and the models directly from the HuggingFace Hub instead, set `offline` to `False` in `./config.yaml`, or give `--offline false` to `run.py`.
 
 **Note**: `requirements.txt` bounds each dependency below the next major release after the one the tests were run with. To install exactly the versions of a tested environment, which are listed in `constraints.txt`, use `pip install -r requirements.txt -c constraints.txt` (Python >= 3.12 is needed).
 
 **Note**: `run.py`, the two download scripts, the launchers of the recipes and the tools of `tools/` find the files of the repository from their own location: they can be run from any directory, e.g. `python ~/DrBenchmark/run.py --tasks cas-pos`. A relative path given on their command line, such as the one of a local model, is relative to the current directory.
+
+**Note**: `run.py` gives each run its seed: 0 for the first run of a task for a model, 1 for the second one, and so on (`--seed` gives another seed to the first run). A run whose results already are in `recipes/<recipe>/runs/` is not computed again: the same command resumes a benchmark that was interrupted, and `--nb-run 4` after `--nb-run 2` only computes the two runs that are missing. A launcher that is not given a seed draws one, as in the scripts for SLURM: `run.py` does not take these runs for its own.
+
+**Note**: `run.py` accepts the options of the recipes and gives them to every run, e.g. `python run.py --tasks cas-pos --offline false --epochs 1 --fewshot 0.25`. They are listed by `python run.py --help`. A run with other options is another run, with its own results.
 
 The tasks, their names for `run.py` and the way to run each of them separately are described in [recipes/README.md](./recipes/README.md).
 

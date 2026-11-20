@@ -16,6 +16,7 @@
 # 1. Edit source ~/.profile for your environment file
 # 2. Edit --account for your JZ account
 # 3. Edit MODEL_NAME, NBR_RUNS and TASK (the task names are the ones of `python run.py --help`)
+#    run.py does not compute again a run whose results exist: to add runs to a task, increase NBR_RUNS
 
 # run.py and logs/ are looked for in the directory the job is submitted from
 if [ ! -f run.py ]; then

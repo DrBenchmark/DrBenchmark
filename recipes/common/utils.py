@@ -7,9 +7,6 @@ import hashlib
 import logging
 import argparse
 
-import torch
-from transformers import TrainingArguments
-
 
 # Root of the repository. This file is `recipes/common/utils.py`: the recipes import it through
 # the link `common` of their `scripts/` directory, which `realpath` follows.
@@ -50,18 +47,6 @@ def get_model_path(args):
         args = args.__dict__
     output_name = create_run_name(args)
     return os.path.join(args['output_dir'], f'{output_name}')
-
-
-class TrainingArgumentsWithMPSSupport(TrainingArguments):
-
-    @property
-    def device(self) -> torch.device:
-        if torch.cuda.is_available():
-            return torch.device("cuda")
-        elif torch.backends.mps.is_available():
-            return torch.device("mps")
-        else:
-            return torch.device("cpu")
 
 
 def str2bool(value):
@@ -125,45 +110,64 @@ def move_to_scripts_dir(args_cli):
     os.chdir(scripts_dir)
 
 
+def add_arguments(parser, but=()):
+    """Add the options of the recipes to `parser`, but the ones named in `but`, and return their names.
+
+    `run.py` accepts the same options, which it gives to the recipes: it loads this module
+    for that, which must not import what is slow to load (`torch`, `transformers`).
+    """
+    names = []
+
+    def add(option, **kwargs):
+        name = option[2:]
+        if name not in but:
+            parser.add_argument(option, **kwargs)
+            names.append(name)
+
+    add("--config", type=str, required=True,
+        help="Default YAML configuration file")
+    add("--model_name", type=str, required=False,
+        help="HuggingFace Hub model name")
+    add("--output_dir", type=str, required=False,
+        help="Path were the model will be saved")
+    add("--run_dir", type=str, required=False,
+        help="Path were the run output will be saved")
+    add("--data_dir", type=str, required=False,
+        help="Path where the data are stored")
+    add("--seed", type=int, required=False,
+        help="Seed to be used (between 0 and 2**32-1) in `transformers.set_seed` for reproducibility.")
+    add("--epochs", type=int, required=False,
+        help="Training epochs")
+    add("--batch_size", type=int, required=False,
+        help="Training batch size")
+    add("--gradient_accumulation_steps", type=int, required=False,
+        help="Number of batches before update model's weights: "
+             "the effective batch size is batch_size * gradient_accumulation_steps.")
+    add("--max_position_embeddings", type=int, required=False,
+        help="Max position embeddings")
+    add("--weight_decay", type=float, required=False,
+        help="Weight decay")
+    add("--learning_rate", type=float, required=False,
+        help="Learning rate")
+    add("--subset", type=str, required=False,
+        help="Corpus subset")
+    add("--fewshot", type=float, required=False,
+        help="Percentage of the train subset used during training")
+    add("--offline", type=str2bool, required=False, metavar="{true,false}",
+        help="Use the datasets and models saved locally instead of the HuggingFace Hub")
+    add("--max_train_samples", type=int, required=False,
+        help="For debugging purposes or quicker training, truncate the number of train examples to this value if set.")
+    add("--max_val_samples", type=int, required=False,
+        help="For debugging purposes or quicker training, truncate the number of validation examples to this value if set.")
+    add("--max_test_samples", type=int, required=False,
+        help="For debugging purposes or quicker evaluation, truncate the number of test examples to this value if set.")
+
+    return names
+
+
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--config", type=str, required=True,
-                        help="Default YAML configuration file")
-    parser.add_argument("--model_name", type=str, required=False,
-                        help="HuggingFace Hub model name")
-    parser.add_argument("--output_dir", type=str, required=False,
-                        help="Path were the model will be saved")
-    parser.add_argument("--run_dir", type=str, required=False,
-                        help="Path were the run output will be saved")
-    parser.add_argument("--data_dir", type=str, required=False,
-                        help="Path where the data are stored")
-    parser.add_argument("--seed", type=int, required=False,
-                        help="Seed to be used (between 0 and 2**32-1) in `transformers.set_seed` for reproducibility.")
-    parser.add_argument("--epochs", type=int, required=False,
-                        help="Training epochs")
-    parser.add_argument("--batch_size", type=int, required=False,
-                        help="Training batch size")
-    parser.add_argument("--gradient_accumulation_steps", type=int, required=False,
-                        help="Number of batches before update model's weights: "
-                             "the effective batch size is batch_size * gradient_accumulation_steps.")
-    parser.add_argument("--max_position_embeddings", type=int, required=False,
-                        help="Max position embeddings")
-    parser.add_argument("--weight_decay", type=float, required=False,
-                        help="Weight decay")
-    parser.add_argument("--learning_rate", type=float, required=False,
-                        help="Learning rate")
-    parser.add_argument("--subset", type=str, required=False,
-                        help="Corpus subset")
-    parser.add_argument("--fewshot", type=float, required=False,
-                        help="Percentage of the train subset used during training")
-    parser.add_argument("--offline", type=str2bool, required=False, metavar="{true,false}",
-                        help="Use the datasets and models saved locally instead of the HuggingFace Hub")
-    parser.add_argument("--max_train_samples", type=int, required=False,
-                        help="For debugging purposes or quicker training, truncate the number of train examples to this value if set.")
-    parser.add_argument("--max_val_samples", type=int, required=False,
-                        help="For debugging purposes or quicker training, truncate the number of validation examples to this value if set.")
-    parser.add_argument("--max_test_samples", type=int, required=False,
-                        help="For debugging purposes or quicker evaluation, truncate the number of test examples to this value if set.")
+    add_arguments(parser)
 
     # Load command line arguments
     args_cli = parser.parse_args()

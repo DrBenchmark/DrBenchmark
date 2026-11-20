@@ -51,6 +51,8 @@ From the root of the repository, with `run.py`:
 python run.py --tasks cas-pos --models "Dr-BERT/DrBERT-7GB"
 ```
 
+`run.py` gives each run its seed (0, then 1...) and the options of the recipes it is given, e.g. `--epochs 5` (see the [main README](../README.md)).
+
 Or directly with the launcher of the task, which is in the `scripts/` directory of its recipe. The launchers find their files from their own location: they can be run from any directory.
 
 ```bash
@@ -59,7 +61,7 @@ bash recipes/cas/scripts/run_task_1.sh "Dr-BERT/DrBERT-7GB"
 
 The arguments given after the model (and after the subset, for the launchers that take one) are passed to the Python script and override the values of the YAML file, e.g. `bash recipes/cas/scripts/run_task_1.sh "Dr-BERT/DrBERT-7GB" --seed 42 --epochs 5`. A relative path given on the command line (`--data_dir`, `--run_dir`, `--output_dir` or a local model) is relative to the current directory. In the results of the run, it is written from the `scripts/` directory, as the paths of the YAML file are: the name of a run does not depend on the directory it is started from.
 
-Each run writes its metrics, hyper-parameters and predictions on the test set in `runs/DrBenchmark-<task name>-<hash>.json`, and saves its best model in `save_models/DrBenchmark-<task name>-<hash>_best_model/`.
+Each run writes its metrics, hyper-parameters and predictions on the test set in `runs/DrBenchmark-<task name>-<hash>.json`, and saves its best model in `save_models/DrBenchmark-<task name>-<hash>_best_model/`. The hash is the one of the arguments of the run, among which its seed. With `--seed`, a run whose results exist is not computed again; without it, a seed that was not used yet is drawn.
 
 ## Data
 
@@ -68,4 +70,4 @@ Except for DEFT 2019, whose access is restricted (see [its README](./deft2019/))
 - `offline: False`: the datasets and the models are downloaded automatically from the HuggingFace Hub.
 - `offline: True`, which is the default value of the repository: the datasets are read from the `data/local_hf_<subset>/` directory of each recipe and the models from the `models/` directory of the repository. They have to be created beforehand with `python download_datasets_locally.py` and `python download_models_locally.py`, run from the root of the repository.
 
-The value of `config.yaml` can be overridden for one run by giving `--offline true` or `--offline false` to a launcher.
+The value of `config.yaml` can be overridden for one run by giving `--offline true` or `--offline false` to a launcher or to `run.py`.
